@@ -9,6 +9,8 @@ const PLAYGROUND := "res://assets/models/playground/"
 const FENCE_X := 11.2
 const FENCE_Z := 7.2
 
+## Лавочки, под которые можно спрятаться (их Transform: +Z — сторона, куда вылезают).
+var benches: Array[Transform3D] = []
 var slide: PlaygroundSlide
 var swing: PlaygroundSwing
 var carousel: PlaygroundCarousel
@@ -18,9 +20,9 @@ func _ready() -> void:
 	_build_surroundings()
 	_build_fence()
 	_solid(PLAYGROUND + "sandbox", Vector3(3.0, 0.3, 3.0), Vector3(-5.0, 0, -2.5))
-	_solid(PLAYGROUND + "bench", Vector3(1.8, 0.9, 0.5), Vector3(1.5, 0, -6.4))
-	_solid(PLAYGROUND + "bench", Vector3(1.8, 0.9, 0.5), Vector3(10.0, 0, -2.0), -PI / 2)
-	_solid(PLAYGROUND + "bench", Vector3(1.8, 0.9, 0.5), Vector3(-10.0, 0, -1.0), PI / 2)
+	_bench(Vector3(1.5, 0, -6.4), 0.0)
+	_bench(Vector3(10.0, 0, -2.0), -PI / 2)
+	_bench(Vector3(-10.0, 0, -1.0), PI / 2)
 	_tree("tree_poplar", Vector3(-9.2, 0, -5.4))
 	_tree("tree_birch", Vector3(9.3, 0, 5.4))
 	slide = PlaygroundSlide.new()
@@ -58,6 +60,20 @@ func _build_fence() -> void:
 		for side in [-FENCE_X, FENCE_X]:
 			_place(PLAYGROUND + "fence", Vector3(side, 0, z2), PI / 2)
 		z2 += 2.0
+
+
+func _bench(pos: Vector3, yaw: float) -> void:
+	_solid(PLAYGROUND + "bench", Vector3(1.8, 0.9, 0.5), pos, yaw)
+	benches.append(Transform3D(Basis(Vector3.UP, yaw), pos))
+
+
+## Лавочка рядом с точкой (-1 — нет): подойти можно спереди или сзади.
+func bench_near(point: Vector3, radius: float) -> int:
+	for i in benches.size():
+		var local := benches[i].affine_inverse() * point
+		if absf(local.x) < 1.0 and absf(local.z) < radius:
+			return i
+	return -1
 
 
 func _tree(model: String, pos: Vector3) -> void:

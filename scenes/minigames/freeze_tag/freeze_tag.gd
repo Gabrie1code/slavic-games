@@ -15,13 +15,14 @@ extends Node3D
 ## FOG_RADIUS = 1.2 × зона караула. Тогда экран делится: слева водящий в тумане,
 ## справа бегущие видят всё. Бегущим туман не мешает.
 ## Площадка: горка (неуязвим, пока едешь, на выходе ускорение), качели (толкать; сесть на
-## 1–5 сек — неуязвим), карусель (только раскручивать).
+## 2–10 сек — неуязвим), лавочки (залезть под лавочку на 2–10 сек — неуязвим),
+## карусель (только раскручивать).
 
 const CHARACTER_SCENE := preload("res://scenes/characters/test_character.tscn")
 
 const ROUND_TIME := 90.0
 const RUNNER_SPEED := 6.0
-const CHASER_SPEED := 6.6
+const CHASER_SPEED := 5.6 # было 6.6, −15%: водящий слишком быстро догонял
 ## Водящий «считает до трёх»: стоит на месте после старта.
 const CHASER_HEAD_START := 2.0
 const TOUCH_DISTANCE := 1.1
@@ -30,6 +31,8 @@ const UNFREEZE_TIME := 2.0
 ## После разморозки нельзя сразу заморозить снова.
 const IMMUNE_TIME := 1.5
 const ZONE_RADIUS := 3.0
+## Как близко к лавочке (спереди или сзади), чтобы под неё залезть.
+const BENCH_RADIUS := 1.0
 const ZONE_LIMIT := 3.0
 const ZONE_PUSH := 13.0
 const STUN_TIME := 1.0
@@ -94,6 +97,8 @@ var _zone_material: StandardMaterial3D
 var _yard: FreezeYard
 var _fog_material: ShaderMaterial
 var _chaser_camera: Camera3D
+## Кто прячется под лавочкой: PlayerData.id -> {"bench", "left", "racer"}.
+var _hiding: Dictionary = {}
 ## Половина экрана бегущих (когда водящий — живой игрок и экран разделён).
 var _runners_view: Control
 
@@ -622,7 +627,8 @@ func _update_playground(delta: float) -> void:
 	for r in _racers:
 		# Пробел — прыжок, но не там, где он нужен для дела (разморозить, горка, качели).
 		r.character.can_jump = not _frozen_near(r) and not _yard.slide.can_ride(r.character) \
-			and (r.is_chaser or _yard.swing.free_seat_near(r.character) < 0)
+			and (r.is_chaser or (_yard.swing.free_seat_near(r.character) < 0
+				and _free_bench_near(r) < 0))
 		if r.frozen or r.busy or r.player.input == null or not r.character.input_enabled:
 			continue
 		if not r.player.input.is_just_pressed("confirm") or _frozen_near(r):
@@ -632,9 +638,49 @@ func _update_playground(delta: float) -> void:
 			_yard.slide.ride(r.character)
 		elif not r.is_chaser:
 			var seat := _yard.swing.free_seat_near(r.character)
+			var bench := _free_bench_near(r)
 			if seat >= 0:
 				_set_busy(r, "НА КАЧЕЛЯХ!")
 				_yard.swing.sit(r.character, seat)
+			elif bench >= 0:
+				_hide_under_bench(r, bench)
+	_update_hiding(delta)
+
+
+## Свободная лавочка рядом с бегущим (-1 — нет).
+func _free_bench_near(r: Racer) -> int:
+	var bench := _yard.bench_near(r.character.global_position, BENCH_RADIUS)
+	for id: int in _hiding:
+		if int(_hiding[id]["bench"]) == bench:
+			return -1
+	return bench
+
+
+## Залезть под лавочку на 2–10 сек: персонаж лежит под сиденьем вдоль лавочки, неуязвим.
+func _hide_under_bench(r: Racer, bench: int) -> void:
+	_set_busy(r, "ПОД ЛАВОЧКОЙ!")
+	r.character.input_enabled = false
+	r.character.set_physics_process(false)
+	r.character.velocity = Vector3.ZERO
+	var spot := _yard.benches[bench]
+	r.character.global_transform = Transform3D(spot.basis * Basis(Vector3.BACK, PI / 2.0),
+		spot * Vector3(0.75, 0.22, 0.0))
+	_hiding[r.player.id] = {"bench": bench, "left": randf_range(2.0, 10.0), "racer": r}
+
+
+func _update_hiding(delta: float) -> void:
+	for id: int in _hiding.keys():
+		var entry: Dictionary = _hiding[id]
+		entry["left"] = float(entry["left"]) - delta
+		if float(entry["left"]) > 0.0:
+			continue
+		_hiding.erase(id)
+		var r: Racer = entry["racer"]
+		var spot := _yard.benches[int(entry["bench"])]
+		# Вылезает вперёд, на сторону площадки.
+		r.character.global_transform = Transform3D(spot.basis, spot * Vector3(0, 0, 0.8))
+		r.character.set_physics_process(true)
+		_on_playground_done(r.character)
 
 
 ## Рядом есть замороженный — тогда «подтвердить» значит «размораживать», а не горка/качели.

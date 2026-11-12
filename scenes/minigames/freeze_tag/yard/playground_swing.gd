@@ -1,7 +1,7 @@
 class_name PlaygroundSwing
 extends Node3D
 ## Качели на два сиденья. Сиденье раскачивается, если в него врезаться на бегу (толкнуть).
-## Подойти и нажать «подтвердить» — сесть на случайные 1–5 сек; пока сидишь — водящий
+## Подойти и нажать «подтвердить» — сесть на случайные 2–10 сек; пока сидишь — водящий
 ## не заморозит. Потом персонаж сам спрыгивает вперёд.
 ##
 ## Рама вдоль локальной X, сиденья качаются вперёд-назад (по Z).
@@ -86,10 +86,10 @@ func free_seat_near(character: PlayerCharacter) -> int:
 	return -1
 
 
-## Сесть на сиденье на случайное время 1–5 сек.
+## Сесть на сиденье на случайное время 2–10 сек.
 func sit(character: PlayerCharacter, seat: int) -> void:
 	_sitters[seat] = character
-	_sit_left[seat] = randf_range(1.0, 5.0)
+	_sit_left[seat] = randf_range(2.0, 10.0)
 	character.input_enabled = false
 	character.sit_at(_seat_point(seat), global_rotation.y + PI) # лицом вперёд (+Z качелей)
 

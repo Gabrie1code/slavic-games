@@ -410,9 +410,11 @@ func _apply_boost(f: Fighter, type: Boost) -> void:
 		_message_label.text = "%s взял СУПЕР-БИТУ!" % f.player.display_name
 	else:
 		f.drink_left = DRINK_TIME
-		f.hp = mini(MAX_HP, f.hp + DRINK_HEAL)
+		# +50 HP всегда, даже при полном здоровье (тогда сверх максимума, до MAX_HP + 50).
+		f.hp = mini(MAX_HP + DRINK_HEAL, f.hp + DRINK_HEAL)
 		_update_hp(f)
-		_message_label.text = "%s выпил «Ягуарр»! Крутится быстрее!" % f.player.display_name
+		_message_label.text = "%s выпил «Ягуарр»! +%d HP и крутится быстрее!" \
+			% [f.player.display_name, DRINK_HEAL]
 	_clear_message_later()
 
 
@@ -427,7 +429,8 @@ func _clear_message_later() -> void:
 
 func _update_hp(f: Fighter) -> void:
 	f.hp_label.text = "%d HP" % f.hp
-	f.hp_label.modulate = Color("a8f0a0").lerp(Color("ff6b5a"), 1.0 - float(f.hp) / MAX_HP)
+	f.hp_label.modulate = Color("a8f0a0").lerp(Color("ff6b5a"),
+		clampf(1.0 - float(f.hp) / MAX_HP, 0.0, 1.0))
 	if _hp_bars.has(f.player.id):
 		_set_hp_bar(_hp_bars[f.player.id], f.hp, f.alive)
 
