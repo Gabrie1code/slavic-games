@@ -34,6 +34,9 @@
 
 ## 2. Как работаем (важно для ассистента)
 
+- **После каждой выдачи давать прямую ссылку на скачивание последней версии** (ZIP ветки):
+  https://github.com/Gabrie1code/slavic-games/archive/refs/heads/claude/kind-mayer-pcztkr.zip
+
 - **Репозиторий:** `github.com/Gabrie1code/slavic-games`.
 - **Ветка разработки:** `claude/kind-mayer-pcztkr`. Всё новое коммитится и пушится туда.
 - **`main`:** туда переносится (fast-forward) только то, что владелец проверил в Godot и одобрил.
@@ -281,6 +284,17 @@
 `character.py` → `assets/models/character/saleswoman.glb`, сцена `scenes/characters/saleswoman.tscn`
 со скриптом PlayerCharacter): румяное лицо, сердитые брови, открытый рот, каре, белый колпак и халат
 с пуговицами, чулки и туфли. Части тела те же — колбаса в руке и анимация работают как раньше.
+
+**Морожка — лёд и эффекты (по картинке владельца):** глыба — высокая прозрачная шестигранная призма во
+весь рост (ICE_RADIUS 0.78, ICE_HEIGHT 2.25), светлые рёбра, матовая крышка, гроздь кристаллов у
+основания, кружащиеся снежинки (`assets/textures/fx/snowflake.png`); замороженный персонаж подкрашен
+синим (`PlayerCharacter.set_tint`). Бег: облачка пыли и белые полосы скорости (`RunEffects`,
+scenes/minigames/freeze_tag/run_effects.gd). У того, кто размораживает, у головы жёлтые лучики-вспышка
+(`fx/alert.png`, **без восклицательных знаков** — так просил владелец). Текстуры —
+`tools/textures/fx_textures.py`.
+
+**Каталог одежды одной картинкой:** `tools/blender/catalog.py` → `docs/previews/catalog.png` (строки —
+категории, в углу персонаж без одежды, подписи и цены из cosmetics.gd). Пересобирать после новых вещей.
 
 ---
 

@@ -33,6 +33,11 @@ const ZONE_RADIUS := 3.0
 const ZONE_LIMIT := 3.0
 const ZONE_PUSH := 13.0
 const STUN_TIME := 1.0
+## Ледяная глыба: радиус и высота (персонаж целиком внутри).
+const ICE_RADIUS := 0.78
+const ICE_HEIGHT := 2.25
+const SNOWFLAKE := preload("res://assets/textures/fx/snowflake.png")
+const ALERT := preload("res://assets/textures/fx/alert.png")
 ## Арена: прямоугольник внутри забора.
 const ARENA_HALF := Vector2(10.5, 6.5)
 ## Туман водящего: радиус обзора и слои (туман видит только камера водящего,
@@ -60,6 +65,8 @@ class Racer:
 	var stun_left := 0.0
 	## Едет с горки или сидит на качелях — водящий не может заморозить.
 	var busy := false
+	## Жёлтые лучики-вспышка у головы, пока размораживает друга.
+	var alert: Sprite3D
 	var zone_time := 0.0
 	var ice: Node3D
 	var zone: MeshInstance3D
@@ -81,6 +88,8 @@ var _score_labels: Dictionary = {} # PlayerData.id -> Label
 
 var _ice_material: StandardMaterial3D
 var _ice_core_material: StandardMaterial3D
+var _ice_edge_material: StandardMaterial3D
+var _run_fx: RunEffects
 var _shard_material: StandardMaterial3D
 ## Крупные полоски разморозки внизу экрана: PlayerData.id -> {"box", "bar"}.
 var _hud_bars: Dictionary = {}
@@ -109,6 +118,8 @@ func _ready() -> void:
 	_make_materials()
 	for fence in ["FenceNorth", "FenceSouth", "FenceWest", "FenceEast"]:
 		(get_node(fence + "/Mesh") as Node3D).visible = false # вместо них — модели забора
+	_run_fx = RunEffects.new()
+	add_child(_run_fx)
 	_yard = FreezeYard.new()
 	add_child(_yard)
 	_yard.slide.ride_finished.connect(_on_playground_done)
@@ -201,6 +212,8 @@ func _physics_process(delta: float) -> void:
 		_bot_chaser()
 
 	_update_playground(delta)
+	_run_fx.update(delta, _racers.filter(func(r: Racer) -> bool: return not r.frozen) \
+		.map(func(r: Racer) -> PlayerCharacter: return r.character))
 	_update_chaser(delta)
 	_update_unfreezing(delta)
 	_update_fog()
@@ -272,6 +285,7 @@ func _update_chaser(delta: float) -> void:
 
 ## Разморозка: свободный игрок рядом держит кнопку.
 func _update_unfreezing(delta: float) -> void:
+	var helpers: Array[Racer] = []
 	for f in _runners():
 		if not f.frozen:
 			continue
@@ -284,6 +298,7 @@ func _update_unfreezing(delta: float) -> void:
 				helper = r
 				break
 		if helper:
+			helpers.append(helper)
 			f.unfreeze_progress += delta
 		else:
 			f.unfreeze_progress = maxf(0.0, f.unfreeze_progress - delta * 0.5)
@@ -291,6 +306,7 @@ func _update_unfreezing(delta: float) -> void:
 			_unfreeze(f, helper)
 		else:
 			_set_unfreeze_bar(f, f.unfreeze_progress / UNFREEZE_TIME, helper)
+	_show_alerts(helpers)
 
 
 func _freeze(r: Racer) -> void:
@@ -304,6 +320,7 @@ func _freeze(r: Racer) -> void:
 
 	r.ice = _build_ice()
 	r.character.add_child(r.ice)
+	r.character.set_tint(Color(0.45, 0.75, 1.0, 0.45)) # внутри льда — синеватый
 	r.ice.scale = Vector3.ONE * 0.2
 	create_tween().tween_property(r.ice, "scale", Vector3.ONE, 0.25) \
 		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
@@ -324,65 +341,111 @@ func _freeze(r: Racer) -> void:
 	_show_message("%s заморожен!" % r.player.display_name)
 
 
-## Ледяная глыба: шестигранник, светлая сердцевина, кристаллы у основания и искры.
+## Ледяная глыба как на картинке режима: высокая прозрачная шестигранная призма во весь рост
+## (персонаж внутри хорошо виден и подкрашен синим), яркие светлые рёбра, матовая крышка,
+## гроздь кристаллов у основания и кружащиеся снежинки.
 func _build_ice() -> Node3D:
 	var root := Node3D.new()
 	var block := MeshInstance3D.new()
 	var block_mesh := CylinderMesh.new()
-	block_mesh.top_radius = 0.6
-	block_mesh.bottom_radius = 0.72
-	block_mesh.height = 2.0
+	block_mesh.top_radius = ICE_RADIUS
+	block_mesh.bottom_radius = ICE_RADIUS
+	block_mesh.height = ICE_HEIGHT
 	block_mesh.radial_segments = 6
 	block_mesh.rings = 1
 	block.mesh = block_mesh
 	block.material_override = _ice_material
-	block.position.y = 1.0
+	block.position.y = ICE_HEIGHT / 2.0
 	root.add_child(block)
-	var core := MeshInstance3D.new()
-	var core_mesh := CylinderMesh.new()
-	core_mesh.top_radius = 0.35
-	core_mesh.bottom_radius = 0.45
-	core_mesh.height = 1.7
-	core_mesh.radial_segments = 6
-	core.mesh = core_mesh
-	core.material_override = _ice_core_material
-	core.position.y = 0.9
-	core.rotation.y = PI / 6.0
-	root.add_child(core)
-	for i in 9:
+	# Матовая крышка сверху.
+	var cap := MeshInstance3D.new()
+	var cap_mesh := CylinderMesh.new()
+	cap_mesh.top_radius = ICE_RADIUS * 0.97
+	cap_mesh.bottom_radius = ICE_RADIUS * 0.97
+	cap_mesh.height = 0.04
+	cap_mesh.radial_segments = 6
+	cap.mesh = cap_mesh
+	cap.material_override = _ice_core_material
+	cap.position.y = ICE_HEIGHT - 0.02
+	root.add_child(cap)
+	# Светлые рёбра: 6 вертикальных и по 6 по верхнему и нижнему краю.
+	for i in 6:
+		var a := TAU * i / 6.0
+		var corner := Vector3(sin(a), 0.0, cos(a)) * ICE_RADIUS
+		var next := Vector3(sin(a + TAU / 6.0), 0.0, cos(a + TAU / 6.0)) * ICE_RADIUS
+		root.add_child(_ice_edge(corner, corner + Vector3.UP * ICE_HEIGHT))
+		for y: float in [0.02, ICE_HEIGHT]:
+			root.add_child(_ice_edge(corner + Vector3.UP * y, next + Vector3.UP * y))
+	# Кристаллы у основания: гроздьями, наружу и вверх.
+	for i in 14:
 		var shard := MeshInstance3D.new()
 		var shard_mesh := CylinderMesh.new()
 		shard_mesh.top_radius = 0.0
-		shard_mesh.bottom_radius = randf_range(0.08, 0.16)
-		shard_mesh.height = randf_range(0.35, 0.8)
-		shard_mesh.radial_segments = 4
+		shard_mesh.bottom_radius = randf_range(0.07, 0.15)
+		shard_mesh.height = randf_range(0.3, 0.75)
+		shard_mesh.radial_segments = 6
 		shard.mesh = shard_mesh
 		shard.material_override = _shard_material
-		var a := TAU * i / 9.0 + randf_range(-0.2, 0.2)
-		shard.position = Vector3(cos(a) * 0.72, shard_mesh.height * 0.35, sin(a) * 0.72)
-		shard.rotation = Vector3(sin(a) * 0.5, randf() * TAU, -cos(a) * 0.5)
+		var a := TAU * i / 14.0 + randf_range(-0.15, 0.15)
+		var dist := ICE_RADIUS + randf_range(-0.05, 0.12)
+		shard.position = Vector3(sin(a) * dist, shard_mesh.height * 0.3, cos(a) * dist)
+		var tilt := randf_range(0.35, 0.8)
+		shard.rotation = Vector3(cos(a) * tilt, randf() * TAU, -sin(a) * tilt)
 		root.add_child(shard)
-	var sparkles := GPUParticles3D.new()
-	sparkles.amount = 14
-	sparkles.lifetime = 1.4
-	var process := ParticleProcessMaterial.new()
-	process.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_SPHERE
-	process.emission_sphere_radius = 0.8
-	process.gravity = Vector3(0, 0.4, 0)
-	process.scale_min = 0.6
-	process.scale_max = 1.2
-	sparkles.process_material = process
-	var spark := QuadMesh.new()
-	spark.size = Vector2(0.07, 0.07)
-	var spark_mat := StandardMaterial3D.new()
-	spark_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	spark_mat.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
-	spark_mat.albedo_color = Color(0.9, 0.97, 1.0)
-	spark.material = spark_mat
-	sparkles.draw_pass_1 = spark
-	sparkles.position.y = 1.0
-	root.add_child(sparkles)
+	root.add_child(_snowflakes())
 	return root
+
+
+## Светлое ребро льда между точками a и b.
+func _ice_edge(a: Vector3, b: Vector3) -> MeshInstance3D:
+	var edge := MeshInstance3D.new()
+	var mesh := BoxMesh.new()
+	mesh.size = Vector3(0.045, 0.045, a.distance_to(b))
+	edge.mesh = mesh
+	edge.material_override = _ice_edge_material
+	edge.position = (a + b) / 2.0
+	var dir := (b - a).normalized()
+	var up := Vector3.RIGHT if absf(dir.y) > 0.9 else Vector3.UP
+	edge.basis = Basis.looking_at(dir, up)
+	return edge
+
+
+## Снежинки, медленно кружащие вокруг глыбы.
+func _snowflakes() -> GPUParticles3D:
+	var flakes := GPUParticles3D.new()
+	flakes.amount = 10
+	flakes.lifetime = 2.2
+	var process := ParticleProcessMaterial.new()
+	process.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_BOX
+	process.emission_box_extents = Vector3(ICE_RADIUS + 0.15, ICE_HEIGHT / 2.0, ICE_RADIUS + 0.15)
+	process.gravity = Vector3(0, 0.12, 0)
+	process.initial_velocity_min = 0.05
+	process.initial_velocity_max = 0.2
+	process.angle_min = -180.0
+	process.angle_max = 180.0
+	process.scale_min = 0.6
+	process.scale_max = 1.3
+	var fade := Gradient.new()
+	fade.set_color(0, Color(1, 1, 1, 0))
+	fade.set_color(1, Color(1, 1, 1, 0))
+	fade.add_point(0.25, Color(1, 1, 1, 1))
+	fade.add_point(0.75, Color(1, 1, 1, 1))
+	var ramp := GradientTexture1D.new()
+	ramp.gradient = fade
+	process.color_ramp = ramp
+	flakes.process_material = process
+	var quad := QuadMesh.new()
+	quad.size = Vector2(0.2, 0.2)
+	var flake_mat := StandardMaterial3D.new()
+	flake_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	flake_mat.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+	flake_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	flake_mat.albedo_texture = SNOWFLAKE
+	flake_mat.vertex_color_use_as_albedo = true
+	quad.material = flake_mat
+	flakes.draw_pass_1 = quad
+	flakes.position.y = ICE_HEIGHT / 2.0
+	return flakes
 
 
 ## Полоска разморозки над головой (поворачивается к камере в _face_bars).
@@ -472,6 +535,7 @@ func _unfreeze(r: Racer, helper: Racer) -> void:
 	r.unfreeze_progress = 0.0
 	r.immune_left = IMMUNE_TIME
 	r.character.input_enabled = true
+	r.character.set_tint(Color(0, 0, 0, 0))
 	if r.ice:
 		var melt := create_tween()
 		melt.tween_property(r.ice, "scale", Vector3(1.3, 0.05, 1.3), 0.2)
@@ -597,6 +661,26 @@ func _bot_chaser() -> void:
 				var to := r.character.global_position - pos
 				move = Vector2(to.x, to.z).normalized()
 	bot.move = move.limit_length(1.0)
+
+
+## Показать лучики у тех, кто сейчас размораживает (и спрятать у остальных).
+func _show_alerts(helpers: Array[Racer]) -> void:
+	for r in _racers:
+		var on := helpers.has(r)
+		if on and r.alert == null:
+			r.alert = Sprite3D.new()
+			r.alert.texture = ALERT
+			r.alert.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+			r.alert.pixel_size = 0.0035
+			r.alert.no_depth_test = true
+			r.alert.shaded = false
+			r.alert.layers = HUD_LAYER
+			r.alert.position = Vector3(0.55, 2.0, 0) # лучики веером справа над головой
+			r.character.add_child(r.alert)
+		if r.alert:
+			r.alert.visible = on
+			if on: # «подпрыгивает», как на картинке
+				r.alert.scale = Vector3.ONE * (1.0 + absf(sin(Time.get_ticks_msec() / 120.0)) * 0.2)
 
 
 # ---------------- Площадка ----------------
@@ -769,6 +853,13 @@ func _make_materials() -> void:
 	_ice_core_material.emission_enabled = true
 	_ice_core_material.emission = Color(0.7, 0.85, 1.0)
 	_ice_core_material.emission_energy_multiplier = 0.4
+	_ice_material.cull_mode = BaseMaterial3D.CULL_DISABLED # видны и дальние грани — «объём»
+	_ice_material.albedo_color = Color(0.62, 0.86, 1.0, 0.24)
+	_ice_core_material.albedo_color = Color(0.92, 0.97, 1.0, 0.55)
+	_ice_edge_material = StandardMaterial3D.new()
+	_ice_edge_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_ice_edge_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	_ice_edge_material.albedo_color = Color(0.9, 0.97, 1.0, 0.85)
 	_shard_material = StandardMaterial3D.new()
 	_shard_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	_shard_material.albedo_color = Color(0.75, 0.93, 1.0, 0.75)

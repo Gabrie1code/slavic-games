@@ -346,6 +346,21 @@ func play_death(fade_delay: float = 0.9, fade_time: float = 1.0) -> void:
 		set_physics_process(false))
 
 
+## Подкрасить всего персонажа поверх его цветов (например, синим во льду).
+## Прозрачный цвет (alpha = 0) — убрать подкраску.
+func set_tint(color: Color) -> void:
+	var meshes: Array[GeometryInstance3D] = []
+	_collect_geometry(visual, meshes)
+	var overlay: StandardMaterial3D = null
+	if color.a > 0.0:
+		overlay = StandardMaterial3D.new()
+		overlay.albedo_color = color
+		overlay.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		overlay.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	for mesh in meshes:
+		mesh.material_overlay = overlay
+
+
 func _collect_geometry(node: Node, out: Array[GeometryInstance3D]) -> void:
 	if node is GeometryInstance3D:
 		out.append(node as GeometryInstance3D)
