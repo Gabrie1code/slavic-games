@@ -265,16 +265,13 @@ def front_patch(m, x, z, w, h, extra=0.02, thick=0.012, rot_y=0.0):
 
 
 def shoulder_straps(m, xs=(-0.13, 0.13), z_front=0.8, z_back=0.8, w=0.055, extra=0.02, buckle=None):
-    """Лямки через плечи: спереди вниз, через верх плеча, сзади вниз."""
+    """Лямки через плечи, облегающие тело (грудь — плечо — спина)."""
     pieces = []
     for x in xs:
-        top = 1.1
-        yf = torso_front_y(x, (top + z_front) / 2, extra) + 0.008
-        pieces.append(box((w, 0.016, top - z_front), (x, yf, (top + z_front) / 2), m))
-        pieces.append(box((w, 0.016, top - z_back), (x, -yf, (top + z_back) / 2), m))
-        pieces.append(box((w, 2 * yf + 0.016, 0.03), (x, 0, top), m))
+        pts = strap_over_shoulder(x, z_front, z_back, extra)
+        pieces.append(strap_mesh(pts, m, width=w))
         if buckle:
-            pieces.append(box((w + 0.015, 0.02, 0.035), (x, yf + 0.006, z_front + 0.05), buckle))
+            pieces.append(buckle_at(body_point(x, z_front + 0.07, True, extra + 0.014), buckle))
     return pieces
 
 
@@ -359,6 +356,109 @@ def rotate_pieces(pieces, angle_y, center):
         bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
         # apply переносит поворот в вершины, но сдвиг остаётся в location — это нормально для part()
     return pieces
+
+
+# ======================= Лямки, облегающие тело =======================
+# Лента строится по точкам на поверхности тела (туловище + купол плеч) и отступает
+# наружу по нормали — как лямки бронежилета, без «ступенек».
+
+DOME_Z, DOME_RX, DOME_RY, DOME_RZ = 1.03, 0.27, 0.2, 0.0972
+
+
+def body_point(x, z, front=True, extra=0.0):
+    """Точка на поверхности тела и нормаль в ней (y>0 — грудь, y<0 — спина)."""
+    s = 1.0 if front else -1.0
+    if z > DOME_Z:
+        k = max(1e-4, 1 - ((z - DOME_Z) / DOME_RZ) ** 2)
+        rx, ry = DOME_RX * math.sqrt(k), DOME_RY * math.sqrt(k)
+        y = ry * math.sqrt(max(0.0, 1 - (x / rx) ** 2)) if abs(x) < rx else 0.0
+        n = Vector((x / DOME_RX ** 2, s * y / DOME_RY ** 2, (z - DOME_Z) / DOME_RZ ** 2))
+    else:
+        rx = torso_r(z)
+        ry = 0.74 * rx
+        y = ry * math.sqrt(max(0.0, 1 - (x / rx) ** 2)) if abs(x) < rx else 0.0
+        n = Vector((x / rx ** 2, s * y / ry ** 2, 0.0))
+    n.normalize()
+    p = Vector((x, s * y, z)) + n * extra
+    return p, n
+
+
+def strap_over_shoulder(x, z_front, z_back, extra=0.02, steps=10):
+    """Лента через плечо: по груди вверх, через купол плеча, по спине вниз."""
+    pts = []
+    for i in range(steps + 1):
+        z = z_front + (DOME_Z - z_front) * i / steps
+        pts.append(body_point(x, z, True, extra))
+    k = max(1e-4, 1 - (x / DOME_RX) ** 2)
+    for i in range(1, steps):
+        phi = math.pi * i / steps
+        y = DOME_RY * math.sqrt(k) * math.cos(phi)
+        z = DOME_Z + DOME_RZ * math.sqrt(k) * math.sin(phi)
+        n = Vector((x / DOME_RX ** 2, y / DOME_RY ** 2, (z - DOME_Z) / DOME_RZ ** 2)).normalized()
+        pts.append((Vector((x, y, z)) + n * extra, n))
+    for i in range(steps + 1):
+        z = DOME_Z + (z_back - DOME_Z) * i / steps
+        pts.append(body_point(x, z, False, extra))
+    return pts
+
+
+def strap_around(z, a0, a1, extra=0.02, steps=10):
+    """Лента вокруг тела на высоте z: угол 0 — центр груди, π/2 — правый бок, π — спина."""
+    rx = torso_r(z)
+    ry = 0.74 * rx
+    pts = []
+    for i in range(steps + 1):
+        a = a0 + (a1 - a0) * i / steps
+        x, y = rx * math.sin(a), ry * math.cos(a)
+        n = Vector((x / rx ** 2, y / ry ** 2, 0)).normalized()
+        pts.append((Vector((x, y, z)) + n * extra, n))
+    return pts
+
+
+def strap_across(x0, z0, x1, z1, extra=0.02, steps=12):
+    """Лента наискосок по груди из (x0, z0) в (x1, z1)."""
+    return [body_point(x0 + (x1 - x0) * i / steps, z0 + (z1 - z0) * i / steps, True, extra)
+            for i in range(steps + 1)]
+
+
+def strap_mesh(pts, m, width=0.055, thick=0.014):
+    """Сплошная лента по точкам (точка, нормаль): ширина поперёк пути, толщина по нормали."""
+    verts, faces = [], []
+    count = len(pts)
+    for i, (p, n) in enumerate(pts):
+        a = pts[max(i - 1, 0)][0]
+        b = pts[min(i + 1, count - 1)][0]
+        t = (b - a).normalized()
+        side = n.cross(t).normalized() * (width / 2)
+        inner = n * thick
+        verts += [p + side, p - side, p - side - inner, p + side - inner]
+    for i in range(count - 1):
+        o, q = i * 4, (i + 1) * 4
+        for k in range(4):
+            k2 = (k + 1) % 4
+            faces.append((o + k, o + k2, q + k2, q + k))
+    faces.append((0, 3, 2, 1))
+    last = (count - 1) * 4
+    faces.append((last, last + 1, last + 2, last + 3))
+    mesh = bpy.data.meshes.new("Strap")
+    mesh.from_pydata([tuple(v) for v in verts], [], faces)
+    mesh.update()
+    o = bpy.data.objects.new("Strap", mesh)
+    bpy.context.scene.collection.objects.link(o)
+    return flat(o, m)
+
+
+def buckle_at(pt, m, size=(0.07, 0.05)):
+    """Пряжка на ленте в точке (точка, нормаль)."""
+    p, n = pt
+    o = box((size[0], 0.02, size[1]), (0, 0, 0), m)
+    o.rotation_euler = n.to_track_quat("Y", "Z").to_euler()
+    o.location = p + n * 0.006
+    bpy.ops.object.select_all(action="DESELECT")
+    o.select_set(True)
+    bpy.context.view_layer.objects.active = o
+    bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
+    return o
 
 
 # ======================= Шапки =======================
@@ -481,44 +581,54 @@ def item_abibas_jacket():
 
 
 def item_jacket_alkogolichka():
-    """Майка-алкоголичка: круглый вырез, глубокие проймы, лямки — часть майки."""
+    """Майка-алкоголичка. Ткань строится колонками вокруг тела: у каждой колонки свой верхний
+    край (плавная кривая) — так вырез и проймы гладкие. Лямки — облегающие ленты через плечи."""
     WHITE = mat("Undershirt", (0.95, 0.95, 0.93), 0.9)
-    TRIM = mat("UndershirtTrim", (0.82, 0.82, 0.8), 0.9)
-    e = 0.014
-    shell = [cyl(torso_r(0.58) + e, 0.475, (0, 0, 0.8175), WHITE, verts=48, r2=torso_r(1.055) + e,
-                 scale=(1, 0.74, 1)),
-             sphere(0.27 + e, (0, 0, 1.03), WHITE, scale=(1, 0.74, 0.36), segs=48, rings=14)]
+    TRIM = mat("UndershirtTrim", (0.86, 0.86, 0.83), 0.9)
+    e = 0.016
+    z_bot = 0.58
+    cols, rows = 72, 12
+    strap_x = 0.155
 
-    def neck_z(x):
-        return 0.88 + 2.8 * x * x                                                    # U-образный вырез
+    def top_z(u):
+        x = abs(math.sin(u)) * (torso_r(1.0) + e)
+        front = math.cos(u) > 0
+        neck_w, neck_z = (0.13, 0.9) if front else (0.12, 0.97)
+        if x < neck_w:                                   # круглый вырез
+            return neck_z + (1.0 - neck_z) * (x / neck_w) ** 2
+        if x < strap_x + 0.035:                          # под лямкой
+            return 1.0
+        side = min(1.0, (x - strap_x - 0.035) / 0.07)    # пройма опускается к боку
+        return 1.0 - 0.15 * (1 - math.cos(side * math.pi)) / 2
 
-    def keep(c, normal_z):
-        ax = abs(c.x)
-        if abs(normal_z) > 0.95 and (c.z < 0.6 or c.z > 1.1):
-            return False                                                             # торцы
-        if c.z > 1.035 and not (0.115 < ax < 0.2):
-            return False                                                             # над плечом — только лямка
-        if c.y > 0 and ax < 0.125 and c.z > neck_z(ax):
-            return False                                                             # вырез спереди
-        if c.y < 0 and ax < 0.12 and c.z > 0.98:
-            return False                                                             # вырез сзади
-        side = ax / (torso_r(min(c.z, 1.05)) + e)
-        if side > 0.7 and c.z > 0.84 - (side - 0.7) * 0.25:
-            return False                                                             # проймы
-        return True
-
-    for o in shell:
-        bm = bmesh.new()
-        bm.from_mesh(o.data)
-        vertical = [ed for ed in bm.edges if abs(ed.verts[0].co.z - ed.verts[1].co.z) > 0.05]
-        if vertical:
-            bmesh.ops.subdivide_edges(bm, edges=vertical, cuts=26, use_grid_fill=True)
-        kill = [f for f in bm.faces if not keep(f.calc_center_median(), f.normal.z)]
-        bmesh.ops.delete(bm, geom=kill, context="FACES")
-        bm.to_mesh(o.data)
-        bm.free()
-    shell.append(cyl(torso_r(0.6) + e + 0.003, 0.025, (0, 0, 0.595), TRIM, verts=32, scale=(1, 0.74, 1)))
-    return jacket(shell)
+    verts, faces = [], []
+    for i in range(cols):
+        u = 2 * math.pi * i / cols
+        h = top_z(u)
+        for j in range(rows + 1):
+            z = z_bot + (h - z_bot) * j / rows
+            r = torso_r(z) + e
+            verts.append((r * math.sin(u), 0.74 * r * math.cos(u), z))
+    for i in range(cols):
+        i2 = (i + 1) % cols
+        for j in range(rows):
+            a, b = i * (rows + 1) + j, i2 * (rows + 1) + j
+            faces.append((a, b, b + 1, a + 1))
+    mesh = bpy.data.meshes.new("Undershirt")
+    mesh.from_pydata(verts, [], faces)
+    mesh.update()
+    shirt = bpy.data.objects.new("Undershirt", mesh)
+    bpy.context.scene.collection.objects.link(shirt)
+    flat(shirt, WHITE)
+    solid = shirt.modifiers.new("Solid", "SOLIDIFY")
+    solid.thickness = 0.008
+    pieces = [shirt]
+    for x in (-strap_x, strap_x):
+        pieces.append(strap_mesh(strap_over_shoulder(x, 0.98, 0.98, extra=e - 0.004), WHITE, width=0.07,
+                                 thick=0.01))
+    pieces.append(cyl(torso_r(z_bot) + e + 0.004, 0.025, (0, 0, z_bot + 0.01), TRIM, verts=32,
+                      scale=(1, 0.74, 1)))
+    return [part("Torso", pieces)]
 
 
 def item_jacket_dutik():
@@ -924,6 +1034,25 @@ def item_face_welder_mask():
 
 # ======================= Аксессуары: шея и спина =======================
 
+
+
+def item_face_gas_mask():
+    """Противогаз (как ГП-5): резиновый шлем-маска, круглые стёкла, коробка фильтра на хоботке."""
+    RUBBER = mat("MaskRubber", (0.28, 0.32, 0.26), 0.7)
+    GLASS = mat("MaskGlass", (0.15, 0.2, 0.22), 0.05, 0.5)
+    RIM = mat("MaskRim", (0.6, 0.6, 0.58), 0.4, 0.8)
+    CAN = mat("FilterCan", (0.3, 0.35, 0.25), 0.5, 0.3)
+    pieces = [sphere(0.315, (0, 0, 1.33), RUBBER, scale=(1, 0.97, 0.97), segs=16, rings=10)]
+    for x in (-0.11, 0.11):
+        pieces.append(cyl(0.085, 0.05, (x, 0.29, 1.37), RIM, verts=12, rot=(math.radians(90), 0, 0)))
+        pieces.append(cyl(0.07, 0.06, (x, 0.3, 1.37), GLASS, verts=12, rot=(math.radians(90), 0, 0)))
+    pieces.append(cyl(0.07, 0.12, (0, 0.31, 1.2), RUBBER, verts=10, r2=0.05,
+                      rot=(math.radians(70), 0, 0)))                                   # хоботок
+    pieces.append(cyl(0.085, 0.16, (0, 0.38, 1.08), CAN, verts=12, rot=(math.radians(20), 0, 0)))
+    pieces.append(cyl(0.088, 0.02, (0, 0.395, 1.01), RIM, verts=12, rot=(math.radians(20), 0, 0)))
+    return [part("Head", pieces)]
+
+
 def item_neck_gold_chain():
     """Толстая золотая цепь: петля вокруг шеи с провисом на грудь и медальоном."""
     GOLD = mat("GoldBright", (1.0, 0.82, 0.38), 0.2, 1.0)
@@ -953,7 +1082,7 @@ def item_neck_gold_chain():
 
 
 def item_back_bag():
-    """Челночная сумка в клетку за спиной, лямка наискосок через грудь до сумки."""
+    """Челночная сумка в клетку за спиной; лямка облегает тело: плечо — грудь наискосок — бок — сумка."""
     RED = mat("BagRed", (0.75, 0.12, 0.1), 0.8)
     BLUE = mat("BagBlue", (0.12, 0.2, 0.6), 0.8)
     WHITE = mat("BagWhite", (0.9, 0.9, 0.88), 0.8)
@@ -967,32 +1096,28 @@ def item_back_bag():
     for face_x in (-W / 2, W / 2):
         for i, z in enumerate((-0.15, -0.05, 0.05, 0.15)):
             pieces.append(box((0.012, D, 0.04), (face_x, Y, Z + z), BLUE if i % 2 else RED))
-    # Лямка: верх сумки → через правое плечо → наискосок по груди → под левой рукой → низ сумки.
-    path = [(0.15, Y + D / 2, Z + H / 2), (0.16, 0.0, 1.13)]
-    for i in range(7):
-        t = i / 6
-        x, z = 0.16 - 0.38 * t, 1.08 - 0.46 * t
-        path.append((x, chest_y(x, z, 0.02) + 0.01, z))
-    path += [(-0.27, 0.0, 0.6), (-0.2, Y + D / 2, Z - H / 2 + 0.03)]
-    pieces += strap_path(path, BLUE, w=0.06)
+    # Через правое плечо — наискосок по груди — вокруг левого бока к низу сумки.
+    over = strap_over_shoulder(0.15, 1.0, 1.0, steps=8)
+    path = [pt for pt in over[::-1] if pt[0].y < 0.02]           # спина → верх плеча
+    path += strap_across(0.15, 1.0, -0.2, 0.62)[0:]              # грудь наискосок
+    path += strap_around(0.62, -math.asin(min(1.0, 0.2 / torso_r(0.62))), -math.pi * 0.78)[1:]
+    pieces.append(strap_mesh(path, BLUE, width=0.06))
     return [part("Torso", pieces)]
 
 
 def item_back_ranets():
-    """Школьный ранец: лямки через плечи, по груди и под руками к низу ранца."""
+    """Школьный ранец: лямки облегают тело — от верха ранца через плечи, по груди, под руками к низу."""
     BROWN = mat("RanetsBrown", (0.35, 0.18, 0.08), 0.6)
     REFLECT = mat("Reflector", (0.95, 0.75, 0.1), 0.3)
     STRAP = mat("Strap", (0.15, 0.1, 0.06), 0.7)
     pieces = [box((0.36, 0.16, 0.38), (0, -0.28, 0.82), BROWN, bevel=0.04)]
     pieces.append(box((0.32, 0.03, 0.18), (0, -0.37, 0.86), BROWN, bevel=0.02))
     pieces.append(box((0.1, 0.02, 0.06), (0, -0.39, 0.8), REFLECT))
-    for s in (-1, 1):
-        x = s * 0.13
-        path = [(x, -0.2, 1.0), (x, 0.0, 1.13)]
-        for z in (1.06, 0.95, 0.84, 0.74):
-            path.append((x, chest_y(x, z, 0.02) + 0.01, z))
-        path += [(s * 0.27, 0.0, 0.68), (s * 0.15, -0.2, 0.66)]
-        pieces += strap_path(path, STRAP, w=0.05)
+    for s_ in (-1, 1):
+        x = s_ * 0.13
+        a_front = math.asin(min(1.0, abs(x) / torso_r(0.74))) * s_
+        pieces.append(strap_mesh(strap_over_shoulder(x, 0.74, 0.98), STRAP, width=0.05))
+        pieces.append(strap_mesh(strap_around(0.74, a_front, s_ * math.pi * 0.66), STRAP, width=0.05))
     return [part("Torso", pieces)]
 
 
@@ -1009,14 +1134,11 @@ def item_back_guitar():
          box((0.07, 0.04, 0.48), (0, Y, 1.24), DARK),
          box((0.1, 0.05, 0.14), (0, Y, 1.53), DARK, bevel=0.015)]
     g = rotate_pieces(g, math.radians(-28), (0, Y, 0.85))
-    # Ремень: гриф за левым плечом → наискосок по груди → под правой рукой → к корпусу.
-    path = [(-0.16, -0.25, 1.08), (-0.16, 0.0, 1.13)]
-    for i in range(7):
-        t = i / 6
-        x, z = -0.16 + 0.38 * t, 1.08 - 0.46 * t
-        path.append((x, chest_y(x, z, 0.02) + 0.01, z))
-    path += [(0.27, 0.0, 0.6), (0.18, Y + 0.02, 0.6)]
-    g += strap_path(path, STRAP, w=0.05)
+    # Ремень облегает тело: через левое плечо — наискосок по груди — вокруг правого бока к корпусу.
+    path = [pt for pt in strap_over_shoulder(-0.16, 1.0, 1.0, steps=8)[::-1] if pt[0].y < 0.02]
+    path += strap_across(-0.16, 1.0, 0.2, 0.62)
+    path += strap_around(0.62, math.asin(min(1.0, 0.2 / torso_r(0.62))), math.pi * 0.78)[1:]
+    g.append(strap_mesh(path, STRAP, width=0.05))
     return [part("Torso", g)]
 
 
@@ -1065,6 +1187,7 @@ ITEMS = {
     "face_bruise": item_face_bruise,
     "face_beard": item_face_beard,
     "face_welder_mask": item_face_welder_mask,
+    "face_gas_mask": item_face_gas_mask,
     # Шея и спина
     "neck_gold_chain": item_neck_gold_chain,
     "back_bag": item_back_bag,

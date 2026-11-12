@@ -44,6 +44,7 @@ const ITEMS := {
 	"face_bruise": {"slot": Slot.FACE, "name": "Фингал", "price": 0},
 	"face_beard": {"slot": Slot.FACE, "name": "Борода-лопата", "price": 150},
 	"face_welder_mask": {"slot": Slot.FACE, "name": "Маска сварщика", "price": 250},
+	"face_gas_mask": {"slot": Slot.FACE, "name": "Противогаз", "price": 200},
 	# Верх
 	"jacket_abibas": {"slot": Slot.JACKET, "name": "Олимпийка «Абибас»", "price": 0},
 	"jacket_alkogolichka": {"slot": Slot.JACKET, "name": "Майка-алкоголичка", "price": 0},
