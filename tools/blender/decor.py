@@ -93,14 +93,23 @@ def blob(r, loc, m, scale=(1, 1, 1)):
 
 
 def leaf(base, length, width, yaw, pitch, m):
-    """Плоский вытянутый лист из точки base: направление — yaw (вокруг Z), наклон pitch от вертикали."""
+    """Вытянутый лист из точки base: направление — yaw (вокруг Z), наклон pitch от вертикали.
+    Лист с толщиной и «жилкой» посередине (плоский лист без толщины давал в игре
+    полосатую «битую» тень)."""
     me = bpy.data.meshes.new("Leaf")
     d = Vector((math.sin(pitch) * math.cos(yaw), math.sin(pitch) * math.sin(yaw), math.cos(pitch)))
     side = Vector((-math.sin(yaw), math.cos(yaw), 0)) * width / 2
+    n = d.cross(side).normalized() * 0.004
     b = Vector(base)
     tip = b + d * length
     mid = b + d * length * 0.45
-    me.from_pydata([b, mid + side, tip, mid - side], [], [(0, 1, 2, 3)])
+    ridge = n * 3                                                          # жилка чуть выгнута
+    v = [b + n, mid + side + n, tip + n, mid - side + n, mid + ridge,
+         b - n, mid + side - n, tip - n, mid - side - n, mid + ridge - n * 2]
+    faces = [(0, 1, 4), (1, 2, 4), (2, 3, 4), (3, 0, 4),                     # верх
+             (5, 9, 6), (6, 9, 7), (7, 9, 8), (8, 9, 5),                     # низ
+             (0, 5, 6, 1), (1, 6, 7, 2), (2, 7, 8, 3), (3, 8, 5, 0)]          # кромка
+    me.from_pydata(v, [], faces)
     o = bpy.data.objects.new("Leaf", me)
     bpy.context.collection.objects.link(o)
     return flat(o, m)
@@ -160,10 +169,15 @@ for px in (-0.28, 0.2):
     for o in pot(0.055, 0.1):
         o.location += Vector((px, -0.11, 0.03))
         P.append(o)
-for k in range(9):                                                        # традесканция свисает
-    a = k / 9 * math.tau
-    P.append(leaf((-0.28, -0.11, 0.13), random.uniform(0.15, 0.3), 0.06, a, random.uniform(1.6, 2.4),
-                  LEAF2 if k % 2 else LEAF3))
+for k in range(12):                                                       # традесканция
+    # Растёт из горшка вверх и в стороны; несколько плетей свешиваются через край вперёд
+    # (не назад — там стена).
+    hang = k >= 8
+    a = random.uniform(-2.6, -0.5) if hang else k / 8 * math.tau
+    rim = Vector((math.cos(a) * 0.05, math.sin(a) * 0.05, 0))
+    base = Vector((-0.28, -0.11, 0.14)) + (rim if hang else rim * 0.3)
+    pitch = random.uniform(1.75, 2.05) if hang else random.uniform(0.35, 1.05)
+    P.append(leaf(tuple(base), random.uniform(0.12, 0.2), 0.05, a, pitch, LEAF2 if k % 2 else LEAF3))
 for k in range(6):                                                        # кактус-«мышка» справа
     P.append(blob(0.035, (0.2 + random.uniform(-0.03, 0.03), -0.11, 0.15 + k * 0.025), LEAF,
                   scale=(1, 1, 1.3)))
@@ -172,9 +186,10 @@ P.append(cyl(0.037, 0.015, (-0.02, -0.1, 0.125), MATR_RED, verts=10))
 export("wall_shelf_plants", P)
 
 # ---- Фикус ----
+random.seed(21) # у каждой модели свой «посев»: правка одной не меняет другие
 P = pot(0.18, 0.32, TUB)
 P.append(cyl(0.025, 0.9, (0, 0, 0.75), TRUNK, verts=6, r2=0.015))
-for k in range(14):
+for k in range(18):
     z = random.uniform(0.75, 1.45)
     a = random.uniform(0, math.tau)
     r = random.uniform(0.12, 0.32)
@@ -244,6 +259,7 @@ for i in range(8):
 export("floor_runner", P)
 
 # ---- Стопки книг (разные, чтобы не повторялись) ----
+random.seed(33)
 MORE = BOOKS + [mat("Book%d" % i, c, 0.8) for i, c in enumerate(
     [(0.9, 0.85, 0.75), (0.15, 0.15, 0.18), (0.75, 0.35, 0.1), (0.3, 0.55, 0.6)], start=5)]
 GOLD_STRIPE = mat("BookGold", (0.85, 0.65, 0.2), 0.4)
