@@ -17,6 +17,8 @@ const ARCADE_RADIUS := 1.1
 const TOILET_RADIUS := 1.2
 const NIGHTSTAND_RADIUS := 1.1
 const CAN_RADIUS := 1.0
+## Как далеко долетает краска из баллончика.
+const SPRAY_REACH := 3.5
 ## Через сколько граммофон можно завести снова (секунды).
 const TUNE_TIME := 3.0
 const NOTE := preload("res://assets/textures/fx/note_pixel.png")
@@ -72,6 +74,16 @@ static func drop_key(p: PlayerData) -> String:
 			return "Y"
 
 
+static func secondary_key(p: PlayerData) -> String:
+	match p.device_kind:
+		PlayerData.DeviceKind.KEYBOARD_WASD:
+			return "ПКМ"
+		PlayerData.DeviceKind.KEYBOARD_ARROWS:
+			return ","
+		_:
+			return "RB"
+
+
 static func attack_key(p: PlayerData) -> String:
 	match p.device_kind:
 		PlayerData.DeviceKind.KEYBOARD_WASD:
@@ -88,14 +100,37 @@ func holds_can(p: PlayerData) -> bool:
 	return _held_cans.has(p.id)
 
 
-## Каждый кадр для держащего баллончик: «выбросить» (G) — бросить, удар — пшикнуть.
-func process_can_holder(p: PlayerData) -> void:
+## Каждый кадр для держащего баллончик: «бросить» (G) — бросить; второе действие (ПКМ) — цвет;
+## зажат удар — красить туда, куда смотрит прицел (camera — камера от первого лица, null — вид
+## сверху: тогда «прицел» — прямо перед персонажем). view_can — баллончик «в кадре».
+func process_can_holder(p: PlayerData, camera: Camera3D, view_can: Node3D) -> void:
 	var can: SprayCan = _held_cans[p.id]
 	var character: PlayerCharacter = characters[p.id]
 	if p.input.is_just_pressed("drop"):
 		release_can(p)
-	elif p.input.is_just_pressed("attack"):
-		can.spray(p.color, -character.global_basis.z)
+		return
+	if p.input.is_just_pressed("secondary"):
+		can.next_color()
+	# Баллончик «в кадре» — того же цвета, что и в руке (перекрашиваем, только если сменился).
+	if view_can and int(view_can.get_meta("tint", -1)) != can.color_index:
+		SprayCan.tint_stripe(view_can, can.color())
+		view_can.set_meta("tint", can.color_index)
+	if not p.input.is_pressed("attack"):
+		can.stop_spray()
+		return
+	var from := character.global_position + Vector3.UP * 1.3
+	var direction := -character.global_basis.z
+	if camera:
+		from = camera.global_position
+		direction = -camera.global_basis.z
+	var query := PhysicsRayQueryParameters3D.create(from, from + direction * SPRAY_REACH, 1,
+		[character.get_rid()])
+	var hit := apartment.get_world_3d().direct_space_state.intersect_ray(query)
+	if hit.is_empty():
+		can.spray_at(from + direction * SPRAY_REACH, Vector3.UP, false,
+			apartment.get_process_delta_time())
+	else:
+		can.spray_at(hit["position"], hit["normal"], true, apartment.get_process_delta_time())
 
 
 ## Бросить баллончик (G или игрок ушёл из лобби).
@@ -112,7 +147,8 @@ func release_can(p: PlayerData) -> void:
 func can_holder_hint(p: PlayerData) -> Array[Dictionary]:
 	if not holds_can(p):
 		return []
-	return [entry(drop_key(p), "Бросить баллончик"), entry(attack_key(p), "Пшикнуть")]
+	return [entry(attack_key(p), "Красить (зажать)"), entry(secondary_key(p), "Сменить цвет"),
+		entry(drop_key(p), "Бросить баллончик")]
 
 
 ## Тумбочка и брошенные баллончики: открыть ящик, взять баллончик.

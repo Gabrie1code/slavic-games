@@ -240,7 +240,8 @@ func _process(delta: float) -> void:
 		if character:
 			character.can_jump = _prompt_for(p, character).is_empty()
 		if _gadgets.holds_can(p):
-			_gadgets.process_can_holder(p) # G — бросить, удар — пшикнуть (рука занята)
+			var view: Dictionary = _views.get(p.id, {})
+			_gadgets.process_can_holder(p, view.get("camera"), view.get("can")) # G, ПКМ, удар
 		elif p.input.is_just_pressed("attack"):
 			_punch(p)
 		if p.input.is_just_pressed("confirm") and _gadgets.can_use_toilet(p):

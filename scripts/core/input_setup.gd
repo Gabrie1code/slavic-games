@@ -11,7 +11,7 @@ extends RefCounted
 
 const ACTIONS: Array[String] = [
 	"move_left", "move_right", "move_up", "move_down", "confirm", "cancel", "attack",
-	"crouch", "sprint", "drop",
+	"crouch", "sprint", "drop", "secondary",
 ]
 const DEADZONE := 0.3
 
@@ -79,6 +79,7 @@ static func _keyboard_layout(kind: PlayerData.DeviceKind) -> Dictionary:
 			"crouch": [KEY_C], # + левый Ctrl (см. _events_for)
 			"sprint": [], # левый Shift (см. _events_for)
 			"drop": [KEY_G], # выбросить то, что в руке (баллончик)
+			"secondary": [KEY_R], # второе действие (цвет баллончика) + правая кнопка мыши
 		}
 	return {
 		"move_left": [KEY_LEFT],
@@ -91,6 +92,7 @@ static func _keyboard_layout(kind: PlayerData.DeviceKind) -> Dictionary:
 		"crouch": [], # правый Ctrl (см. _events_for)
 		"sprint": [], # правый Shift (см. _events_for)
 		"drop": [KEY_PERIOD, KEY_KP_PERIOD],
+		"secondary": [KEY_COMMA, KEY_KP_1],
 	}
 
 
@@ -107,10 +109,12 @@ static func _events_for(player: PlayerData, action: String) -> Array[InputEvent]
 			var sided := _sided_key(player.device_kind, action)
 			if sided:
 				events.append(sided)
-			# Удар у игрока на WASD — ещё и левой кнопкой мыши.
-			if action == "attack" and player.device_kind == PlayerData.DeviceKind.KEYBOARD_WASD:
+			# У игрока на WASD мышь: удар — левая кнопка, второе действие — правая.
+			var mouse_button: Dictionary = {"attack": MOUSE_BUTTON_LEFT, "secondary": MOUSE_BUTTON_RIGHT}
+			if mouse_button.has(action) \
+					and player.device_kind == PlayerData.DeviceKind.KEYBOARD_WASD:
 				var click := InputEventMouseButton.new()
-				click.button_index = MOUSE_BUTTON_LEFT
+				click.button_index = mouse_button[action]
 				click.device = -1
 				events.append(click)
 		PlayerData.DeviceKind.JOYPAD:
@@ -146,6 +150,8 @@ static func _joypad_events(action: String, device: int) -> Array[InputEvent]:
 			events.append(_button(JOY_BUTTON_LEFT_STICK, device))
 		"drop":
 			events.append(_button(JOY_BUTTON_Y, device))
+		"secondary":
+			events.append(_button(JOY_BUTTON_RIGHT_SHOULDER, device))
 	return events
 
 
