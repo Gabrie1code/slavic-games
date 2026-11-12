@@ -148,7 +148,8 @@ func _build_living_room() -> void:
 	_solid(_model("sofa"), Vector3(2.4, 0.6, 0.9), 0.3, SOFA_POS, SOFA_YAW)
 	for local_x in [-0.55, 0.55]:
 		var front := Vector3(0, 0, 1).rotated(Vector3.UP, SOFA_YAW)
-		var seat_pos := SOFA_POS + Vector3(local_x, 0.04, 0.1).rotated(Vector3.UP, SOFA_YAW)
+		# Высота: верх подушки (~0.59) минус высота таза персонажа (0.55) + запас.
+		var seat_pos := SOFA_POS + Vector3(local_x, 0.1, 0.12).rotated(Vector3.UP, SOFA_YAW)
 		seats.append({"pos": seat_pos, "yaw": SOFA_YAW + PI, "approach": seat_pos + front * 0.9})
 	var table_pos := Vector3(-2.6, 0, -0.25)
 	_solid(_model("coffee_table"), Vector3(1.0, 0.5, 0.55), 0.25, table_pos)

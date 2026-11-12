@@ -14,6 +14,9 @@ extends Node3D
 
 enum View { FIRST_PERSON, THIRD_PERSON }
 
+## Слои «кулаков в кадре» всех игроков (биты 11–14).
+const VIEWMODEL_LAYERS := 0b1111 << 10
+
 const CHARACTER_SCENE := preload("res://scenes/characters/test_character.tscn")
 const ROUNDS := 5
 ## Зоны в квартире (координаты — в Apartment).
@@ -26,6 +29,10 @@ const MOUSE_SENSITIVITY := 0.0025
 const STICK_LOOK_SPEED := 2.8
 const EYE_HEIGHT := 1.42
 const PITCH_LIMIT := 1.2
+## Удар рукой: дальность, перезарядка, сила толчка.
+const PUNCH_REACH := 1.4
+const PUNCH_COOLDOWN := 0.35
+const PUNCH_PUSH := 3.0
 
 var _characters: Dictionary = {} # PlayerData.id -> персонаж
 var _slot_panels: Array[PanelContainer] = []
@@ -46,6 +53,8 @@ var _seated: Dictionary = {}
 
 ## Когда игрок сел (чтобы зажатая клавиша движения не подняла его сразу же).
 var _sit_time: Dictionary = {}
+## Когда игрок бил в последний раз (перезарядка удара).
+var _punch_time: Dictionary = {}
 
 ## Вид от первого лица: PlayerData.id -> {"container", "camera", "prompt"}.
 var _view := View.FIRST_PERSON
@@ -67,7 +76,7 @@ var _rooms_root: Control
 func _ready() -> void:
 	_camera.look_at_from_position(Vector3(1.5, 12.0, 11.5), Vector3(1.5, 0, -0.6))
 	# Сверху не показываем потолок и передние стены.
-	_camera.cull_mask &= ~Apartment.FP_ONLY_LAYER
+	_camera.cull_mask &= ~Apartment.FP_ONLY_LAYER & ~VIEWMODEL_LAYERS
 	var views_layer := CanvasLayer.new()
 	views_layer.layer = 0
 	add_child(views_layer)
@@ -188,6 +197,8 @@ func _process(delta: float) -> void:
 			if since > 0.35 and pressed:
 				_stand(p)
 			continue
+		if p.input.is_just_pressed("attack"):
+			_punch(p)
 		var at_tv := _is_near(p, Apartment.TV_ZONE, TV_ZONE_RADIUS)
 		var seat := _free_seat_near(p)
 		if p.input.is_just_pressed("confirm") and _is_near(p, Apartment.WARDROBE_ZONE, WARDROBE_RADIUS):
@@ -271,6 +282,52 @@ func _build_zone(pos: Vector3, radius: float, color: Color, text: String) -> voi
 	hint.rotation_degrees.x = -90
 	hint.position = pos + Vector3(0, 0.06, radius * 0.5)
 	add_child(hint)
+
+
+## Удар рукой: от третьего лица — взмах вперёд, от первого — тычок кулаком в кадре.
+## Разбивает вещи впереди, толкает стулья и гантели, отталкивает других игроков.
+func _punch(p: PlayerData) -> void:
+	var now := Time.get_ticks_msec() / 1000.0
+	if now - float(_punch_time.get(p.id, -10.0)) < PUNCH_COOLDOWN:
+		return
+	var character: PlayerCharacter = _characters[p.id]
+	if not character.punch():
+		return
+	_punch_time[p.id] = now
+	if _views.has(p.id):
+		var fist: Node3D = _views[p.id]["fist"]
+		var jab := create_tween()
+		jab.tween_property(fist, "position:z", -0.85, 0.07).set_ease(Tween.EASE_OUT)
+		jab.tween_property(fist, "position:z", -0.45, 0.16).set_ease(Tween.EASE_IN)
+
+	var origin := character.global_position
+	var forward := -character.global_basis.z
+	for node in get_tree().get_nodes_in_group("breakable"):
+		var item := node as Breakable
+		if item and not item.is_broken() and _in_front(origin, forward, item.global_position, 2.2):
+			item.shatter(origin)
+	for node in get_tree().get_nodes_in_group("tippable"):
+		var body := node as Tippable
+		if body and _in_front(origin, forward, body.global_position, 1.5):
+			body.apply_impulse((forward + Vector3.UP * 0.3) * PUNCH_PUSH * body.mass * 0.4,
+				Vector3.UP * 0.4)
+	for other_id: int in _characters:
+		var other: PlayerCharacter = _characters[other_id]
+		if other != character and not other.sitting \
+				and _in_front(origin, forward, other.global_position, 1.0):
+			other.apply_knockback(forward * 7.0 + Vector3.UP * 3.0)
+
+
+## Цель перед персонажем: ближе PUNCH_REACH по полу, в конусе ~60° и не выше max_height.
+func _in_front(origin: Vector3, forward: Vector3, target: Vector3, max_height: float) -> bool:
+	var offset := target - origin
+	if offset.y > max_height or offset.y < -0.5:
+		return false
+	offset.y = 0.0
+	var flat_forward := Vector3(forward.x, 0.0, forward.z).normalized()
+	if offset.length() > PUNCH_REACH:
+		return false
+	return offset.length() < 0.3 or offset.normalized().dot(flat_forward) > 0.5
 
 
 ## Свободное место на диване рядом с игроком (-1 — нет).
@@ -360,6 +417,11 @@ func _player_layer(p: PlayerData) -> int:
 	return 1 << (p.slot + 1)
 
 
+## Слой «кулака в кадре»: его видит только камера этого игрока.
+func _viewmodel_layer(p: PlayerData) -> int:
+	return 1 << (p.slot + 10)
+
+
 func _apply_view() -> void:
 	var first := _view == View.FIRST_PERSON
 	for p in PlayerManager.players:
@@ -387,9 +449,24 @@ func _create_view(p: PlayerData) -> void:
 	container.add_child(viewport) # мир общий с лобби — своя только камера
 	var camera := Camera3D.new()
 	camera.fov = 75.0
-	camera.cull_mask = 0xFFFFF & ~_player_layer(p)
+	# Своё тело не рисуем, чужие «кулаки в кадре» — тоже; свой кулак — рисуем.
+	camera.cull_mask = (0xFFFFF & ~_player_layer(p) & ~VIEWMODEL_LAYERS) | _viewmodel_layer(p)
 	viewport.add_child(camera)
 	camera.current = true
+	var fist := MeshInstance3D.new()
+	var fist_mesh := SphereMesh.new()
+	fist_mesh.radius = 0.09
+	fist_mesh.height = 0.16
+	fist_mesh.radial_segments = 8
+	fist_mesh.rings = 4
+	fist.mesh = fist_mesh
+	var fist_mat := StandardMaterial3D.new()
+	fist_mat.albedo_color = p.color
+	fist.material_override = fist_mat
+	fist.layers = _viewmodel_layer(p)
+	fist.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	fist.position = Vector3(0.26, -0.24, -0.45)
+	camera.add_child(fist)
 
 	var frame := ReferenceRect.new()
 	frame.border_color = p.color
@@ -408,7 +485,7 @@ func _create_view(p: PlayerData) -> void:
 	prompt.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	container.add_child(prompt)
 	_views_root.add_child(container)
-	_views[p.id] = {"container": container, "camera": camera, "prompt": prompt}
+	_views[p.id] = {"container": container, "camera": camera, "prompt": prompt, "fist": fist}
 	_layout_views()
 
 
@@ -638,7 +715,7 @@ func _build_ui() -> void:
 	var hint := Label.new()
 	hint.text = ("Вход: Пробел (WASD) · Enter (стрелки) · A (геймпад)\n"
 		+ "Прыжок: та же кнопка · Выйти: Q / Backspace / B · Закрыть игру: Esc\n"
-		+ "Переодеться: ШКАФ в спальне · Сесть: диван · НАЧАТЬ: все к ТЕЛЕВИЗОРУ · F2 — вид")
+		+ "ШКАФ в спальне · диван · ТЕЛЕВИЗОР — старт · Удар: F/ЛКМ, /, X · F2 — вид")
 	hint.add_theme_font_size_override("font_size", 22)
 	hint.add_theme_color_override("font_outline_color", Color.BLACK)
 	hint.add_theme_constant_override("outline_size", 8)

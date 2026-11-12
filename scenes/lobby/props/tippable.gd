@@ -14,6 +14,7 @@ var _away_time := 0.0
 func setup(scene: PackedScene, size: Vector3, center_y: float, body_mass: float = 4.0) -> void:
 	_model = scene.instantiate()
 	add_child(_model)
+	add_to_group("tippable")
 	var shape := CollisionShape3D.new()
 	var box := BoxShape3D.new()
 	box.size = size

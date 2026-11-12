@@ -21,6 +21,7 @@ func setup(scene: PackedScene, colors: Array[Color], reach: float = 0.45,
 		shard_size: float = 0.07) -> void:
 	_model = scene.instantiate()
 	add_child(_model)
+	add_to_group("breakable")
 	_colors = colors
 	_shard_size = shard_size
 
@@ -35,6 +36,10 @@ func setup(scene: PackedScene, colors: Array[Color], reach: float = 0.45,
 	area.add_child(shape)
 	area.body_entered.connect(_on_body_entered)
 	add_child(area)
+
+
+func is_broken() -> bool:
+	return _broken
 
 
 func _on_body_entered(body: Node3D) -> void:

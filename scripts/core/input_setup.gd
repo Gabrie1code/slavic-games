@@ -10,7 +10,7 @@ extends RefCounted
 ## поэтому WASD работает и при русской раскладке.
 
 const ACTIONS: Array[String] = [
-	"move_left", "move_right", "move_up", "move_down", "confirm", "cancel",
+	"move_left", "move_right", "move_up", "move_down", "confirm", "cancel", "attack",
 ]
 const DEADZONE := 0.3
 
@@ -74,6 +74,7 @@ static func _keyboard_layout(kind: PlayerData.DeviceKind) -> Dictionary:
 			"move_down": [KEY_S],
 			"confirm": [KEY_SPACE, KEY_E],
 			"cancel": [KEY_Q],
+			"attack": [KEY_F], # + левая кнопка мыши (см. _events_for)
 		}
 	return {
 		"move_left": [KEY_LEFT],
@@ -82,6 +83,7 @@ static func _keyboard_layout(kind: PlayerData.DeviceKind) -> Dictionary:
 		"move_down": [KEY_DOWN],
 		"confirm": [KEY_ENTER, KEY_KP_ENTER],
 		"cancel": [KEY_BACKSPACE, KEY_SHIFT],
+		"attack": [KEY_SLASH, KEY_KP_0],
 	}
 
 
@@ -94,6 +96,12 @@ static func _events_for(player: PlayerData, action: String) -> Array[InputEvent]
 				e.physical_keycode = key
 				e.device = -1
 				events.append(e)
+			# Удар у игрока на WASD — ещё и левой кнопкой мыши.
+			if action == "attack" and player.device_kind == PlayerData.DeviceKind.KEYBOARD_WASD:
+				var click := InputEventMouseButton.new()
+				click.button_index = MOUSE_BUTTON_LEFT
+				click.device = -1
+				events.append(click)
 		PlayerData.DeviceKind.JOYPAD:
 			events.append_array(_joypad_events(action, player.joypad_id))
 	return events
@@ -118,6 +126,8 @@ static func _joypad_events(action: String, device: int) -> Array[InputEvent]:
 			events.append(_button(JOY_BUTTON_A, device))
 		"cancel":
 			events.append(_button(JOY_BUTTON_B, device))
+		"attack":
+			events.append(_button(JOY_BUTTON_X, device))
 	return events
 
 

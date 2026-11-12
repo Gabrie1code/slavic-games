@@ -13,7 +13,7 @@ const GRAVITY_SCALE := 2.2
 ## Сила, с которой персонаж толкает незакреплённые вещи (стулья, торшер).
 const PUSH_FORCE := 0.5
 ## Поза сидя: насколько опустить модель и поднять ноги вперёд.
-const SIT_DROP := -0.1
+const SIT_DROP := 0.0
 const SIT_LEGS := 1.45
 ## Вид от первого лица: скорость поворота стрелками/клавишами (рад/сек).
 const FP_TURN_SPEED := 2.6
@@ -188,6 +188,22 @@ func _push_bodies() -> void:
 			var push := -hit.get_normal()
 			push.y = 0.0
 			body.apply_impulse(push * PUSH_FORCE, hit.get_position() - body.global_position)
+
+
+## Удар рукой: правая рука резко выбрасывается вперёд и возвращается.
+## Возвращает false, если рука занята (держит предмет).
+func punch() -> bool:
+	if _right_arm_busy:
+		return false
+	set_arm_pose(0.15, 1.65, 0.07)
+	_finish_punch()
+	return true
+
+
+func _finish_punch() -> void:
+	await get_tree().create_timer(0.16).timeout
+	if is_inside_tree():
+		set_arm_angle(ARM_DOWN, 0.18)
 
 
 ## Отбросить персонажа (например, от удара битой).
