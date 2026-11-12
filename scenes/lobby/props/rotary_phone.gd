@@ -15,6 +15,10 @@ const HANDSET_POS := Vector3(0, 0.16, -0.07)
 const EAR_POS := Vector3(0.31, 0.27, 0.0)
 ## Откуда выходит провод (сбоку корпуса) и на какой длине трубка вырывается.
 const CORD_ANCHOR := Vector3(-0.11, 0.05, 0.0)
+## Провод сначала уходит от телефона вбок на столько метров (за край тумбочки).
+const CORD_EXIT := 0.3
+## Конец трубки, куда входит провод (нижний, «микрофон»): в координатах модели трубки.
+const HANDSET_END := Vector3(-0.1, -0.02, 0.0)
 const CORD_LENGTH := 2.6
 const CORD_SEGMENTS := 28
 const CORD_COILS := 14.0
@@ -45,7 +49,11 @@ var _dial: Node3D
 var _handset: Node3D
 var _dialing := false
 var _bubble: Label3D
+## Провод, который видят все (к трубке у уха), и провод «в кадре» (к трубке у камеры)
+## — его видит только сам говорящий от первого лица.
 var _cord: Array[MeshInstance3D] = []
+var _view_cord: Array[MeshInstance3D] = []
+var _view_handset: Node3D
 
 
 func _ready() -> void:
@@ -60,7 +68,8 @@ func _ready() -> void:
 	_dial.add_child(_model("phone_dial"))
 	_handset = _model("phone_handset")
 	_hang_handset()
-	_build_cord()
+	_cord = _build_cord()
+	_view_cord = _build_cord()
 
 
 func _process(_delta: float) -> void:
@@ -74,7 +83,21 @@ func _process(_delta: float) -> void:
 	if flat.length() > CORD_LENGTH:
 		_drop() # отошёл слишком далеко — трубка вырвалась
 		return
-	_update_cord()
+	_update_cord(_cord, _handset.to_global(HANDSET_END))
+	if _view_handset and is_instance_valid(_view_handset) and _view_handset.is_visible_in_tree():
+		_update_cord(_view_cord, _view_handset.to_global(HANDSET_END))
+	else:
+		_show_cord(_view_cord, false)
+
+
+## От первого лица своя трубка «в кадре»: провод к ней видит только этот игрок (view_layer),
+## а общий провод к уху — все, кроме него (слой модели игрока, model_layer).
+func set_view_handset(view_handset: Node3D, view_layer: int, model_layer: int) -> void:
+	_view_handset = view_handset
+	for piece in _view_cord:
+		piece.layers = view_layer
+	for piece in _cord:
+		piece.layers = model_layer
 
 
 ## Можно ли этому игроку взять трубку.
@@ -93,9 +116,8 @@ func pick_up(p: PlayerData, character: PlayerCharacter) -> void:
 	_handset.position = EAR_POS
 	_handset.rotation = Vector3(0, 0, PI / 2) # трубка вертикально у щеки
 	character.set_arm_pose(2.45, 0.35, 0.25)
-	for piece in _cord:
-		piece.visible = true
-	_update_cord()
+	_show_cord(_cord, true)
+	_update_cord(_cord, _handset.to_global(HANDSET_END))
 
 
 ## Положить трубку на рычаг.
@@ -195,8 +217,11 @@ func _release_user() -> void:
 		_bubble.queue_free()
 	user = null
 	_user_character = null
+	_view_handset = null
+	_show_cord(_cord, false)
+	_show_cord(_view_cord, false)
 	for piece in _cord:
-		piece.visible = false
+		piece.layers = 1
 
 
 func _hang_handset() -> void:
@@ -209,7 +234,7 @@ func _hang_handset() -> void:
 
 # ---------------- Витой провод ----------------
 
-func _build_cord() -> void:
+func _build_cord() -> Array[MeshInstance3D]:
 	var mesh := CylinderMesh.new()
 	mesh.top_radius = 0.008
 	mesh.bottom_radius = 0.008
@@ -219,6 +244,7 @@ func _build_cord() -> void:
 	var cord_mat := StandardMaterial3D.new()
 	cord_mat.albedo_color = Color(0.03, 0.03, 0.035)
 	cord_mat.roughness = 0.4
+	var pieces: Array[MeshInstance3D] = []
 	for i in CORD_SEGMENTS:
 		var piece := MeshInstance3D.new()
 		piece.mesh = mesh
@@ -227,32 +253,44 @@ func _build_cord() -> void:
 		piece.top_level = true # ставим в мировых координатах
 		piece.visible = false
 		add_child(piece)
-		_cord.append(piece)
+		pieces.append(piece)
+	return pieces
 
 
-## Провод от корпуса к трубке: провисает дугой и закручен пружинкой (волнистый).
-func _update_cord() -> void:
-	var from := to_global(CORD_ANCHOR)
-	var to := _handset.global_position
+func _show_cord(pieces: Array[MeshInstance3D], on: bool) -> void:
+	for piece in pieces:
+		piece.visible = on
+
+
+## Провод от корпуса к концу трубки: сначала выходит из телефона вбок (за край тумбочки),
+## потом провисает дугой к трубке и закручен пружинкой. Ниже пола не опускается.
+func _update_cord(pieces: Array[MeshInstance3D], to: Vector3) -> void:
+	_show_cord(pieces, true)
+	var anchor := to_global(CORD_ANCHOR)
+	var out := to - anchor
+	out.y = 0.0
+	out = out.normalized() if out.length() > 0.01 else global_basis.x
+	var from := anchor + out * CORD_EXIT # за краем тумбочки
 	var span := from.distance_to(to)
-	var sag := clampf(CORD_LENGTH - span, 0.0, CORD_LENGTH) * 0.35 + 0.05
+	var sag := clampf(CORD_LENGTH - span, 0.0, CORD_LENGTH) * 0.3
+	var floor_y := (get_parent() as Node3D).global_position.y + 0.03
 	var side := (to - from).cross(Vector3.UP).normalized()
 	if side.length() < 0.1:
 		side = Vector3.RIGHT
 	var up := side.cross(to - from).normalized()
-	var points: Array[Vector3] = []
-	for i in CORD_SEGMENTS + 1:
-		var t := float(i) / CORD_SEGMENTS
+	var points: Array[Vector3] = [anchor]
+	for i in CORD_SEGMENTS:
+		var t := float(i) / (CORD_SEGMENTS - 1)
 		var p := from.lerp(to, t) + Vector3.DOWN * sin(t * PI) * sag
 		# Пружинка: маленький виток вокруг линии провода (не у самых концов).
-		var coil := 0.025 * sin(t * PI)
 		var a := t * CORD_COILS * TAU
-		p += (side * cos(a) + up * sin(a)) * coil
+		p += (side * cos(a) + up * sin(a)) * 0.022 * sin(t * PI)
+		p.y = maxf(p.y, floor_y)
 		points.append(p)
 	for i in CORD_SEGMENTS:
 		var a := points[i]
 		var b := points[i + 1]
-		var piece := _cord[i]
+		var piece := pieces[i]
 		var length := maxf(a.distance_to(b), 0.001)
 		var dir := (b - a) / length
 		var helper := Vector3.UP if absf(dir.y) < 0.95 else Vector3.RIGHT

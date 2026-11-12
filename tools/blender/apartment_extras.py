@@ -245,6 +245,24 @@ for name, x, y in (("LegFL", -0.065, 0.14), ("LegFR", 0.065, 0.14), ("LegBL", -0
     cat.append(join(name, P, (x, y, 0.2)))
 export("cat", cat)
 
+# ---------------- Миска кота и корм (корм отдельно: съел — исчез, потом снова насыпан) -------
+BOWL = mat("BowlRed", (0.8, 0.18, 0.15), 0.35)
+BOWL_IN = mat("BowlInner", (0.95, 0.93, 0.88), 0.4)
+bpy.ops.mesh.primitive_cone_add(vertices=20, radius1=0.09, radius2=0.12, depth=0.06, location=(0, 0, 0.03))
+P = [flat(bpy.context.object, BOWL)]
+P.append(cyl(0.1, 0.004, (0, 0, 0.063), BOWL_IN, verts=20))               # дно (над крышкой)
+P.append(box((0.07, 0.004, 0.025), (0, -0.108, 0.035), BOWL_IN))               # табличка «КОТ»
+export("cat_bowl", [join("CatBowl", P)])
+KIBBLE = [mat("Kibble%d" % i, c, 0.8) for i, c in enumerate([(0.45, 0.25, 0.1), (0.6, 0.35, 0.15),
+                                                              (0.35, 0.18, 0.08)])]
+P = []
+for i in range(26):
+    a = i * 2.39996
+    r = 0.085 * math.sqrt((i + 0.5) / 26)
+    P.append(sphere(0.014, (math.cos(a) * r, math.sin(a) * r, 0.074 + (0.085 - r) * 0.25), KIBBLE[i % 3],
+                    scale=(1.2, 1, 0.7), segs=6, rings=4))
+export("cat_food", [join("CatFood", P)])
+
 # ---------------- Лежанка кота ----------------
 P = [cyl(0.32, 0.06, (0, 0, 0.03), mat("BedBase", (0.45, 0.2, 0.3), 0.9), verts=20)]
 bpy.ops.mesh.primitive_torus_add(major_radius=0.3, minor_radius=0.07, major_segments=20, minor_segments=8,
@@ -268,7 +286,8 @@ if RENDER:
     sun.rotation_euler = (0.6, 0.2, -0.5)
     scene.collection.objects.link(sun)
     xs = {"phone_table": -1.5, "phone_base": -1.5, "phone_dial": -1.5, "phone_handset": -1.5,
-          "gramophone": -0.75, "cuckoo_clock": 0.0, "cuckoo_pendulum": 0.0, "cat": 0.8, "cat_bed": 1.6}
+          "gramophone": -0.75, "cuckoo_clock": 0.0, "cuckoo_pendulum": 0.0, "cat": 0.8, "cat_bed": 1.6,
+          "cat_bowl": 1.2, "cat_food": 1.2}
     for name, objs in KEEP:
         for o in objs:
             o.location.x += xs[name]

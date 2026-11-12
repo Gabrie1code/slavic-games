@@ -3,12 +3,13 @@ extends Node3D
 ## Кот квартиры — рыжий Баггет (отсылка к настоящему коту одного из участников проекта).
 ## Бродит по всем комнатам (по точкам-«тропинкам» WAYPOINTS, чтобы не ходить
 ## сквозь мебель), иногда садится. Время от времени сам идёт на лежанку и спит (zZZ) —
-## в это время (и пока идёт спать) его гладить нельзя.
+## в это время (и пока идёт спать) его гладить нельзя. Иногда идёт к миске поесть: корм исчезает
+## и через FOOD_RESPAWN сек снова насыпан (как разбитая посуда).
 ##
 ## Погладить: игрок рядом жмёт кнопку действия → сердечки, кот замирает и машет хвостом.
 ## Перезарядка общая на всех — PET_COOLDOWN секунд.
 
-enum State { WALK, IDLE, PETTED, TO_BED, SLEEP }
+enum State { WALK, IDLE, PETTED, TO_BED, SLEEP, TO_FOOD, EAT }
 
 const CAT_NAME := "Баггет"
 const HEART := preload("res://assets/textures/fx/heart_pixel.png")
@@ -37,15 +38,20 @@ const WAYPOINTS: Array[Vector3] = [
 	Vector3(-10.7, 0, 1.2),   # 15 у автомата
 	Vector3(-11.05, 0, -0.4), # 16 у левой стены
 	Vector3(-9.0, 0, -1.3),   # 17 за столом
+	Vector3(5.3, 0, 0.62),    # 18 у миски
 ]
 const LINKS: Array[Vector2i] = [
 	Vector2i(0, 1), Vector2i(1, 2), Vector2i(2, 3), Vector2i(3, 4), Vector2i(4, 5),
 	Vector2i(5, 6), Vector2i(6, 0), Vector2i(0, 7), Vector2i(7, 8), Vector2i(8, 9),
 	Vector2i(9, 10), Vector2i(10, 11), Vector2i(4, 12), Vector2i(12, 13), Vector2i(13, 14),
-	Vector2i(14, 15), Vector2i(15, 16), Vector2i(16, 17),
+	Vector2i(14, 15), Vector2i(15, 16), Vector2i(16, 17), Vector2i(10, 18), Vector2i(11, 18),
 ]
 const BED_POINT := 11
 const BED_POS := Vector3(6.0, 0, 0.95)
+const FOOD_POINT := 18
+const BOWL_POS := Vector3(5.3, 0, 1.0)
+const EAT_TIME := 3.0
+const FOOD_RESPAWN := 25.0
 
 ## Когда кота гладили в последний раз (общая перезарядка для всех игроков).
 var last_pet_time := -100.0
@@ -58,6 +64,8 @@ var _time := 0.0
 var _parts: Dictionary = {}
 var _model: Node3D
 var _zzz: Label3D
+var _food: Node3D
+var _food_ready := true
 
 
 func _ready() -> void:
@@ -70,6 +78,14 @@ func _ready() -> void:
 	bed.top_level = true
 	add_child(bed)
 	bed.position = BED_POS
+	var bowl_scene := load("res://assets/models/apartment/cat_bowl.glb") as PackedScene
+	var bowl := bowl_scene.instantiate() as Node3D
+	bowl.top_level = true
+	add_child(bowl)
+	bowl.position = BOWL_POS
+	var food_scene := load("res://assets/models/apartment/cat_food.glb") as PackedScene
+	_food = food_scene.instantiate() as Node3D
+	bowl.add_child(_food)
 	_zzz = Label3D.new()
 	_zzz.text = "z Z Z"
 	_zzz.font_size = 48
@@ -94,8 +110,12 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	_time += delta
 	match state:
-		State.WALK, State.TO_BED:
+		State.WALK, State.TO_BED, State.TO_FOOD:
 			_walk(delta)
+		State.EAT:
+			_wait -= delta
+			if _wait <= 0.0:
+				_finish_eating()
 		State.IDLE, State.PETTED:
 			_wait -= delta
 			if _wait <= 0.0:
@@ -136,6 +156,13 @@ func pet() -> bool:
 # ---------------- Поведение ----------------
 
 func _decide() -> void:
+	# Проголодался — идёт к миске (если корм насыпан).
+	if _food_ready and randf() < 0.18:
+		_path = _route(_point, FOOD_POINT)
+		if _path.is_empty():
+			_path.append(FOOD_POINT)
+		state = State.TO_FOOD
+		return
 	# Иногда кот сам уходит спать.
 	if randf() < 0.15:
 		_path = _route(_point, BED_POINT)
@@ -175,6 +202,12 @@ func _walk(delta: float) -> void:
 
 
 func _arrive() -> void:
+	if state == State.TO_FOOD:
+		state = State.EAT
+		_wait = EAT_TIME
+		var to_bowl := BOWL_POS - position
+		rotation.y = atan2(-to_bowl.x, -to_bowl.z) # мордой к миске
+		return
 	if state == State.TO_BED:
 		state = State.SLEEP
 		_wait = randf_range(20.0, 40.0)
@@ -182,6 +215,24 @@ func _arrive() -> void:
 		return
 	state = State.IDLE
 	_wait = randf_range(1.0, 4.0)
+
+
+## Поел: корм пропал, через FOOD_RESPAWN сек снова насыпан (вырастает из миски).
+func _finish_eating() -> void:
+	state = State.IDLE
+	_wait = 1.0
+	if not _food_ready:
+		return
+	_food_ready = false
+	_food.visible = false
+	await get_tree().create_timer(FOOD_RESPAWN).timeout
+	if not is_inside_tree():
+		return
+	_food.visible = true
+	_food.scale = Vector3.ONE * 0.01
+	create_tween().tween_property(_food, "scale", Vector3.ONE, 0.35) \
+		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	_food_ready = true
 
 
 func _wake_up() -> void:
@@ -224,7 +275,7 @@ func _neighbours(point: int) -> Array[int]:
 # ---------------- Анимация ----------------
 
 func _animate(delta: float) -> void:
-	var walking := state == State.WALK or state == State.TO_BED
+	var walking := state == State.WALK or state == State.TO_BED or state == State.TO_FOOD
 	var sleeping := state == State.SLEEP
 	var phase := _time * 9.0
 	var legs := {"LegFL": 0.0, "LegFR": PI, "LegBL": PI, "LegBR": 0.0}
@@ -239,6 +290,8 @@ func _animate(delta: float) -> void:
 	_model.position.y = lerpf(_model.position.y, drop, minf(1.0, delta * 6.0))
 	var head := _parts["CatHead"] as Node3D
 	var nod := -0.35 if sleeping else (sin(_time * 1.3) * 0.08)
+	if state == State.EAT:
+		nod = -0.55 + absf(sin(_time * 7.0)) * 0.2 # ест: голова в миске, кивает
 	head.rotation.x = lerpf(head.rotation.x, nod, minf(1.0, delta * 5.0))
 	var tail := _parts["CatTail"] as Node3D
 	var wag := 0.15

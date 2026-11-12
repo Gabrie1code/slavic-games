@@ -632,6 +632,9 @@ func _update_first_person(delta: float) -> void:
 		var on_phone := _gadgets.holds_phone(p)
 		(_views[id]["fist"] as Node3D).visible = not on_phone
 		(_views[id]["handset"] as Node3D).visible = on_phone
+		if on_phone: # провод «в кадре» — к своей трубке у камеры
+			_apartment.phone.set_view_handset(_views[id]["handset"], _viewmodel_layer(p),
+				_player_layer(p))
 	# Мышь ловим, только если есть игрок на WASD и не открыто окно/примерочная.
 	var want_capture := _view == View.FIRST_PERSON and _rooms.is_empty() and not _bot_dialog.visible \
 		and PlayerManager.is_device_taken(PlayerData.DeviceKind.KEYBOARD_WASD)
