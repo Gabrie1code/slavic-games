@@ -7,7 +7,7 @@ extends StaticBody3D
 ## летит туда, куда показывает курсор мыши; вода в чаше от попадания желтеет,
 ## промах — лужица на полу (высыхает).
 ## После этого действие недоступно COOLDOWN сек, зато работает кнопка смыва на бачке:
-## вода крутится воронкой, уходит и возвращается снова голубой.
+## кнопка нажимается, вода плавно становится снова голубой.
 ## Модель — tools/blender/toilet.py (части ToiletBody, Lid, Water, FlushButton).
 
 const MODEL := preload("res://assets/models/apartment/toilet.glb")
@@ -188,14 +188,10 @@ func _process_flush(delta: float) -> void:
 		return
 	_flush_left -= delta
 	var k := 1.0 - _flush_left / FLUSH_TIME
-	# Кнопка нажата первые полсекунды; вода крутится воронкой, уходит и набирается снова.
-	_button.position.y = _button_y - (0.01 if k < 0.2 else 0.0)
-	_water.rotation.y += delta * 9.0
-	var level := 1.0 - sin(clampf(k, 0.0, 1.0) * PI) * 0.65
-	_water.scale = Vector3(level, 1.0, level)
-	_yellow = move_toward(_yellow, 0.0, delta / (FLUSH_TIME * 0.5))
-	if _flush_left <= 0.0:
-		_water.scale = Vector3.ONE
+	# Кнопка утоплена первые полсекунды; вода плавно меняет цвет с жёлтого на голубой.
+	# (Раньше овал воды крутился и вылезал за чашу — смотрелось криво.)
+	_button.position.y = _button_y - (0.008 if k < 0.2 else 0.0)
+	_yellow = move_toward(_yellow, 0.0, delta / (FLUSH_TIME * 0.8))
 
 
 func _build_stream() -> void:

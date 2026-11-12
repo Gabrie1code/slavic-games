@@ -32,6 +32,9 @@ const LAYER_SCALE := {
 	Cosmetics.Slot.JACKET: Vector3(1.035, 1.0, 1.035),
 	Cosmetics.Slot.SHOES: Vector3(1.06, 1.0, 1.06),
 }
+## Слои надписей с именами (у каждого слота свой): своё имя не видно своей камере, а зеркало
+## не показывает ни одно имя. Биты 7, 8, 9, 16 свободны в лобби.
+const NAME_LAYERS: Array[int] = [1 << 7, 1 << 8, 1 << 9, 1 << 16]
 const ARM_DOWN := 0.12
 const ARM_UP := 2.75
 const ARM_SIDE := 1.45
@@ -382,6 +385,20 @@ func _shirt_number() -> Label3D:
 func set_render_layer(layer: int) -> void:
 	_render_layer = layer
 	_apply_layer(self)
+	_name_label.layers = name_layer(player.slot) # имя — на своём слое (см. NAME_LAYERS)
+
+
+## Слой надписи с именем игрока в слоте slot.
+static func name_layer(slot: int) -> int:
+	return NAME_LAYERS[slot % NAME_LAYERS.size()]
+
+
+## Все слои имён (зеркало их не рисует).
+static func all_name_layers() -> int:
+	var mask := 0
+	for layer in NAME_LAYERS:
+		mask |= layer
+	return mask
 
 
 ## Смерть: персонаж краснеет, падает навзничь, на глазах крестики, потом плавно исчезает

@@ -37,7 +37,8 @@ func _ready() -> void:
 	# Стена, на которой висит зеркало (и рамка), — на слоях стены туалета: камера зеркала стоит
 	# «за стеной» и её не рисует (иначе вместо отражения — тёмная стена).
 	_camera.cull_mask = 0xFFFFF & ~(0b1111 << 10) & ~ZoneBadge.OVERHEAD_LAYER \
-		& ~Apartment.OVERVIEW_ONLY_LAYER & ~ToiletRoom.WALL_LAYER & ~ToiletRoom.WALL_HIGH_LAYER
+		& ~Apartment.OVERVIEW_ONLY_LAYER & ~ToiletRoom.WALL_LAYER & ~ToiletRoom.WALL_HIGH_LAYER \
+		& ~PlayerCharacter.all_name_layers() # имена над головами в зеркале не показываем
 	_viewport.add_child(_camera)
 	_camera.current = true
 	var quad := MeshInstance3D.new()

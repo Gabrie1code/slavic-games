@@ -65,6 +65,8 @@ const SPAWNS: Array[Vector3] = [
 ]
 
 const CRYSTAL := Color(0.75, 0.9, 1.0, 0.6)
+const PORCELAIN := Color(0.95, 0.95, 0.93)
+const COBALT := Color(0.1, 0.2, 0.6)
 const CLAY := Color(0.65, 0.3, 0.15)
 const PLANT := Color(0.15, 0.45, 0.15)
 const GLASS := Color(0.8, 0.95, 0.9, 0.6)
@@ -192,13 +194,24 @@ func _build_living_room() -> void:
 	# «Стенка» у задней стены: сервант с хрусталём — телевизор — книжная секция с радио.
 	var sideboard_pos := Vector3(-4.85, 0, -3.72)
 	_solid(_model("sideboard"), Vector3(2.0, 2.2, 0.5), 1.1, sideboard_pos)
+	# В серванте — фарфоровый сервиз (белый с кобальтом и золотом), бьётся по одной вещи.
 	var shelf_heights := [0.97, 1.365, 1.765]
+	var china_rows := [
+		["china_teapot", "china_cup", "china_plate", "china_cup"],
+		["china_plate", "china_sugar", "china_cup", "china_plate"],
+		["china_cup", "china_plate", "china_cup", "china_teapot"],
+	]
 	for row in shelf_heights.size():
 		for i in 4:
 			var x := sideboard_pos.x - 0.72 + i * 0.48
-			var item := "crystal_vase" if (i + row) % 2 == 0 else "wine_glass"
-			# Зона пошире: сервант не даёт подойти вплотную к полке.
-			_breakable(item, Vector3(x, shelf_heights[row], sideboard_pos.z - 0.05), [CRYSTAL], 0.6, 0.05)
+			_breakable(china_rows[row][i], Vector3(x, shelf_heights[row], sideboard_pos.z - 0.05),
+				[PORCELAIN, COBALT], 0.6, 0.04)
+	# На серванте: плюшевый мишка в левом углу и часы с настоящим временем по центру.
+	var bear := _place(_model("teddy_bear"), Vector3(sideboard_pos.x - 0.75, 2.2, sideboard_pos.z))
+	bear.rotation.y = 0.35
+	var clock := TableClock.new()
+	clock.position = Vector3(sideboard_pos.x, 2.2, sideboard_pos.z - 0.03)
+	add_child(clock)
 	var tv := TV_SCENE.instantiate() as Node3D
 	tv.scale = Vector3.ONE * 1.3
 	tv.add_child(TvScreen.new()) # картинка «▶ ИГРАТЬ» прямо на выпуклом стекле
