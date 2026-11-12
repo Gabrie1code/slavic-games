@@ -167,6 +167,10 @@ func _play_turn(p: PlayerData) -> void:
 	await _throw_dice(roll)
 	_set_message("%s: выпало %d!" % [p.display_name, roll])
 	await get_tree().create_timer(0.6).timeout
+	# Кубик над головой исчезает до того, как фишка пойдёт: дальше шаги
+	# показывает только крупный кубик слева. Так над фишкой не бывает двух
+	# предметов сразу (кубика и бутылочки на развилке).
+	await _hide_dice()
 
 	var steps := roll
 	_hud_steps.text = "Осталось шагов: %d" % steps
@@ -178,16 +182,11 @@ func _play_turn(p: PlayerData) -> void:
 		await _hop(pawn, target.stand_position(p.slot))
 		stats.space_index = target.index
 		steps -= 1
-		# Кубик летит над фишкой и показывает, сколько шагов осталось.
-		_dice_pivot.global_position = pawn.global_position + Vector3.UP * DICE_HEIGHT
 		_hud_steps.text = "Осталось шагов: %d" % steps if steps > 0 else "Пришли!"
-		if steps > 0:
-			_show_dice_face(steps, 0.15)
 		# Проходя мимо ларька, можно купить дефицит.
 		if target.index == MatchState.deficit_space:
 			await _offer_deficit(p)
 
-	_dice_pivot.visible = false
 	await _apply_space(p, _spaces[stats.space_index])
 	_update_ui()
 
@@ -213,6 +212,16 @@ func _choose_path(_p: PlayerData, from: BoardSpace) -> BoardSpace:
 	options[chosen].set_highlight(false)
 	_bottle.visible = false
 	return options[chosen]
+
+
+## Кубик над фишкой «схлопывается» и прячется.
+func _hide_dice() -> void:
+	var tween := create_tween()
+	tween.tween_property(_dice_pivot, "scale", Vector3.ONE * 0.01, 0.2) \
+		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
+	await tween.finished
+	_dice_pivot.visible = false
+	_dice_pivot.scale = Vector3.ONE
 
 
 ## Бросок: кубик подпрыгивает, кувыркается и встаёт выпавшей гранью к камере.
