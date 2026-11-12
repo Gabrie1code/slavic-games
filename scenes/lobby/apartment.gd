@@ -23,6 +23,11 @@ const FP_ONLY_LAYER := 1 << 19
 ## Лампа над столом игры на рубли: отдельный слой, чтобы камера стола могла её не рисовать,
 ## когда смотрит сверху (иначе абажур закрывает сукно). Остальным видна как FP-only вещь.
 const RUBGAME_LAMP_LAYER := 1 << 15
+## Слой только для общей камеры сверху (камеры от первого лица его не рисуют): плоская
+## картинка за окном, чтобы сверху в проёме не было дыры.
+const OVERVIEW_ONLY_LAYER := 1 << 6
+## Проём окна в задней стене гостиной: x от, x до, y от, y до (рама модели перекрывает края).
+const WINDOW_HOLE := Rect2(0.95, 0.92, 1.4, 1.46)
 
 const WALL_HEIGHT := 3.0
 const BACK_Z := -4.0
@@ -95,6 +100,8 @@ var _night_lamp: Breakable
 var _night_light: OmniLight3D
 var _night_bulb_mat: StandardMaterial3D
 var _time := 0.0
+## Модель окна гостиной (у неё прячем «небо», чтобы видеть вид за проёмом).
+var _last_window: Node3D
 
 
 func _ready() -> void:
@@ -123,8 +130,8 @@ func _build_rooms() -> void:
 	_solid_box(Vector3(bed_w, 0.2, BEDROOM_FRONT_Z - BACK_Z),
 		Vector3((PARTITION_X + RIGHT_X) / 2, -0.1, (BACK_Z + BEDROOM_FRONT_Z) / 2), bedroom_floor)
 	# Задняя стена (гостиная и спальня разного цвета) и плинтус.
-	_solid_box(Vector3(living_w, WALL_HEIGHT, 0.2),
-		Vector3((LEFT_X + PARTITION_X) / 2, WALL_HEIGHT / 2, BACK_Z - 0.1), wallpaper)
+	# В задней стене гостиной — проём под окном (за ним объёмный вид, см. _build_window_view).
+	_wall_with_hole(LEFT_X, PARTITION_X, WINDOW_HOLE, wallpaper)
 	_solid_box(Vector3(bed_w, WALL_HEIGHT, 0.2),
 		Vector3((PARTITION_X + RIGHT_X) / 2, WALL_HEIGHT / 2, BACK_Z - 0.1), wallpaper_bed)
 	_box(Vector3(RIGHT_X - LEFT_X, 0.12, 0.04),
@@ -209,19 +216,8 @@ func _build_living_room() -> void:
 
 	# Окно со шторами, на подоконнике горшки, под окном гантели.
 	var window_pos := Vector3(1.65, 0, BACK_Z + 0.08)
-	_place(_model("window"), window_pos)
-	# Вид из окна (хрущёвки, небо, тополя) — картинка поверх пересвеченного «неба» модели.
-	var view := MeshInstance3D.new()
-	var view_mesh := QuadMesh.new()
-	view_mesh.size = Vector2(1.4, 1.5)
-	view.mesh = view_mesh
-	var view_mat := StandardMaterial3D.new()
-	view_mat.albedo_texture = load("res://assets/textures/window_view.png")
-	view_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	view.material_override = view_mat
-	view.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	view.position = window_pos + Vector3(0, 1.65, -0.058)
-	add_child(view)
+	_last_window = _place(_model("window"), window_pos)
+	_build_window_view(window_pos)
 	_place(_model("curtains"), window_pos + Vector3(0, 0, 0.12))
 	for i in 3:
 		var pot := "cactus_pot" if i != 1 else "aloe_pot"
@@ -378,6 +374,85 @@ func _build_lamp_light() -> void:
 	_lamp_glow.material_override = _lamp_glow_mat
 	_lamp_glow.position = Vector3(0, 1.45, 0)
 	floor_lamp.add_child(_lamp_glow)
+
+
+# ---------------- Вид из окна ----------------
+
+## Задняя стена с прямоугольным проёмом hole (x, y — от, size — ширина и высота).
+func _wall_with_hole(x0: float, x1: float, hole: Rect2, material: Material) -> void:
+	var z := BACK_Z - 0.1
+	var hx0 := hole.position.x
+	var hx1 := hole.end.x
+	_solid_box(Vector3(hx0 - x0, WALL_HEIGHT, 0.2), Vector3((x0 + hx0) / 2, WALL_HEIGHT / 2, z),
+		material)
+	_solid_box(Vector3(x1 - hx1, WALL_HEIGHT, 0.2), Vector3((hx1 + x1) / 2, WALL_HEIGHT / 2, z),
+		material)
+	_solid_box(Vector3(hole.size.x, hole.position.y, 0.2),
+		Vector3((hx0 + hx1) / 2, hole.position.y / 2, z), material)
+	var top := WALL_HEIGHT - hole.end.y
+	_solid_box(Vector3(hole.size.x, top, 0.2),
+		Vector3((hx0 + hx1) / 2, hole.end.y + top / 2, z), material)
+
+
+## «Объёмный» вид из окна: плоские картинки на разной глубине за проёмом (деревья у дома,
+## дома напротив с двором, небо). Ближние при движении сдвигаются сильнее — получается объём.
+## Всё это видят только камеры от первого лица; сверху в проёме — плоская картинка.
+func _build_window_view(window_pos: Vector3) -> void:
+	_hide_window_sky(_last_window)
+	var center_x := window_pos.x
+	var layers := [
+		# [картинка, ширина, высота, низ по Y, глубина за стеной]
+		["window_trees", 18.0, 10.0, -6.0, 4.0],
+		["window_houses", 56.0, 18.0, -6.0, 28.0],
+		["window_sky", 170.0, 85.0, -25.0, 60.0],
+	]
+	for layer: Array in layers:
+		var quad := MeshInstance3D.new()
+		var mesh := QuadMesh.new()
+		mesh.size = Vector2(layer[1], layer[2])
+		quad.mesh = mesh
+		var mat := StandardMaterial3D.new()
+		mat.albedo_texture = load("res://assets/textures/window/%s.png" % layer[0])
+		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		if layer[0] != "window_sky":
+			mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR
+		quad.material_override = mat
+		quad.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		quad.layers = FP_ONLY_LAYER
+		quad.position = Vector3(center_x, float(layer[3]) + float(layer[2]) / 2.0,
+			BACK_Z - 0.2 - float(layer[4]))
+		add_child(quad)
+	# Земля двора под окнами (между стеной и деревьями видно, если смотреть вниз).
+	var ground := _box(Vector3(80, 0.1, 40), Vector3(center_x, -6.05, BACK_Z - 20.2),
+		_mat(Color(0.37, 0.5, 0.28), 1.0))
+	ground.layers = FP_ONLY_LAYER
+	# Сверху (общая камера) — прежняя плоская картинка прямо за проёмом.
+	var flat := MeshInstance3D.new()
+	var flat_mesh := QuadMesh.new()
+	flat_mesh.size = WINDOW_HOLE.size
+	flat.mesh = flat_mesh
+	var flat_mat := StandardMaterial3D.new()
+	flat_mat.albedo_texture = load("res://assets/textures/window_view.png")
+	flat_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	flat.material_override = flat_mat
+	flat.layers = OVERVIEW_ONLY_LAYER
+	flat.position = Vector3(center_x, WINDOW_HOLE.get_center().y, BACK_Z - 0.21)
+	add_child(flat)
+
+
+## «Небо» в модели окна (непрозрачная голубая плита) закрывало бы проём — делаем его невидимым.
+func _hide_window_sky(node: Node) -> void:
+	if node is MeshInstance3D:
+		var mesh_instance := node as MeshInstance3D
+		for i in mesh_instance.mesh.get_surface_count():
+			var surface := mesh_instance.mesh.surface_get_material(i)
+			if surface and surface.resource_name.begins_with("WindowSky"):
+				var clear := StandardMaterial3D.new()
+				clear.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+				clear.albedo_color = Color(0, 0, 0, 0)
+				mesh_instance.set_surface_override_material(i, clear)
+	for child in node.get_children():
+		_hide_window_sky(child)
 
 
 # ---------------- Уют: полки, растения, плакаты, дорожка ----------------

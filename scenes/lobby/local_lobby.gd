@@ -581,7 +581,8 @@ func _create_view(p: PlayerData) -> void:
 	var camera := Camera3D.new()
 	camera.fov = 75.0
 	# Своё тело не рисуем, чужие «кулаки в кадре» — тоже; свой кулак — рисуем.
-	camera.cull_mask = (0xFFFFF & ~_player_layer(p) & ~VIEWMODEL_LAYERS) | _viewmodel_layer(p)
+	camera.cull_mask = (0xFFFFF & ~_player_layer(p) & ~VIEWMODEL_LAYERS
+		& ~Apartment.OVERVIEW_ONLY_LAYER) | _viewmodel_layer(p)
 	viewport.add_child(camera)
 	camera.current = true
 	var fist := MeshInstance3D.new()
