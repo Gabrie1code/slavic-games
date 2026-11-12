@@ -25,8 +25,9 @@ const SLOTS: Array[int] = [
 const CLOSEUP_SLOTS: Array[int] = [Cosmetics.Slot.HAT, Cosmetics.Slot.FACE]
 const CAM_BODY := [Vector3(0, 1.0, 3.3), Vector3(0, 0.85, 0)]
 const CAM_HEAD := [Vector3(0, 1.36, 2.4), Vector3(0, 1.22, 0)]
-## Первая строка списка — цвет персонажа, дальше — слоты одежды.
-const COLOR_ROW := 0
+## Строки: слоты одежды, затем «Цвет», затем строка кнопок («Купить и надеть», «Готово»).
+const COLOR_ROW := 6
+const BUTTONS_ROW := 7
 const GOLD := Color("f6c343")
 const GREEN := Color("8fd694")
 const RED := Color("ff7a6b")
@@ -38,6 +39,10 @@ var lobby_character: PlayerCharacter
 var _row := 0
 ## Какой цвет сейчас показан в строке «Цвет» (может быть занятый — тогда не применён).
 var _color_candidate := 0
+## В строке кнопок: 0 — «Купить и надеть», 1 — «Готово».
+var _button_focus := 1
+## Вещь, на которую смотрит кнопка «Купить и надеть»: последняя выбранная строка одежды.
+var _item_row := 0
 var _saved: Dictionary = {}
 var _message := ""
 var _message_color := GREEN
@@ -115,40 +120,51 @@ func _handle_input() -> void:
 		return
 	if input.is_just_pressed("cancel"):
 		close()
-	elif input.is_just_pressed("confirm"):
-		if _row == COLOR_ROW:
+	elif input.menu_just_pressed("confirm"):
+		if _row == BUTTONS_ROW:
+			if _button_focus == 0:
+				_buy_current()
+			else:
+				close()
+		elif _row == COLOR_ROW:
 			if _color_candidate == player.color_index:
 				close()
 		elif PlayerManager.owns(player, _current_id()):
 			close()
 		else:
 			_buy_current()
-	elif input.is_just_pressed("move_up"):
+	elif input.menu_just_pressed("move_up"):
 		_select_row(_row - 1)
-	elif input.is_just_pressed("move_down"):
+	elif input.menu_just_pressed("move_down"):
 		_select_row(_row + 1)
-	elif input.is_just_pressed("move_left"):
+	elif input.menu_just_pressed("move_left"):
 		_cycle_item(-1)
-	elif input.is_just_pressed("move_right"):
+	elif input.menu_just_pressed("move_right"):
 		_cycle_item(1)
 
 
+## Строк в списке (одежда + цвет), без строки кнопок.
 func _row_count() -> int:
 	return SLOTS.size() + 1
 
 
-## Слот одежды строки (для строки «Цвет» — -1).
+## Слот одежды строки (для «Цвета» и кнопок — -1).
 func _slot_at(row: int) -> int:
-	return -1 if row == COLOR_ROW else SLOTS[row - 1]
+	return SLOTS[row] if row < SLOTS.size() else -1
 
 
 func _current_id() -> String:
-	return "" if _row == COLOR_ROW else player.outfit.get(_slot_at(_row), "")
+	var row := _row if _row < SLOTS.size() else _item_row
+	return player.outfit.get(SLOTS[row], "")
 
 
 func _select_row(row: int) -> void:
-	_row = posmod(row, _row_count())
-	_color_candidate = player.color_index # ушли со строки — показываем свой цвет
+	# Листаем по кругу: одежда → цвет → кнопки → снова шапка.
+	_row = posmod(row, _row_count() + 1)
+	if _row < SLOTS.size():
+		_item_row = _row
+	if _row != COLOR_ROW:
+		_color_candidate = player.color_index # ушли со строки — показываем свой цвет
 	_message = ""
 	_cam_target = CAM_HEAD if CLOSEUP_SLOTS.has(_slot_at(_row)) else CAM_BODY
 	_refresh()
@@ -171,6 +187,10 @@ func _cycle_item(step: int) -> void:
 	if _row == COLOR_ROW:
 		_cycle_color(step)
 		return
+	if _row == BUTTONS_ROW:
+		_button_focus = posmod(_button_focus + step, 2)
+		_refresh()
+		return
 	var slot := _slot_at(_row)
 	var options: Array[String] = [""]
 	options.append_array(Cosmetics.items_for_slot(slot as Cosmetics.Slot))
@@ -188,7 +208,7 @@ func _cycle_item(step: int) -> void:
 
 func _buy_current() -> void:
 	var id := _current_id()
-	if _row == COLOR_ROW or PlayerManager.owns(player, id):
+	if PlayerManager.owns(player, id):
 		return
 	if PlayerManager.buy(player, id):
 		_message = "Куплено: %s!" % Cosmetics.item_name(id)
@@ -245,6 +265,9 @@ func _refresh() -> void:
 	# Большая кнопка под списком: что будет с выбранной вещью.
 	var id := _current_id()
 	var item_title := Cosmetics.item_name(id)
+	_style_focus(_buy_button, _row == BUTTONS_ROW and _button_focus == 0)
+	_style_focus(_done_button, _row == BUTTONS_ROW and _button_focus == 1)
+	_set_button_colors(_done_button, Color("3a2a22"), Color.WHITE)
 	if _row == COLOR_ROW:
 		if color_owner == null:
 			_buy_button.text = "Цвет выбран ✓"
@@ -272,8 +295,13 @@ func _refresh() -> void:
 		_shortage_label.text = "" if enough else "Не хватает: %d ₽" % (cost - wallet)
 	_message_label.text = _message
 	_message_label.add_theme_color_override("font_color", _message_color)
-	_hint_label.text = ("↑↓ — что меняем   ←→ — листать   "
+	_hint_label.text = ("↑↓ — что меняем (внизу — цвет и кнопки)   ←→ — листать\n"
 		+ "Подтвердить — купить / готово   Отмена — выйти")
+
+
+## Рамка «выбрано с клавиатуры» у кнопки (на строке кнопок).
+func _style_focus(button: Button, focused: bool) -> void:
+	button.set_meta("focused", focused)
 
 
 func _set_button_colors(button: Button, bg: Color, font: Color) -> void:
@@ -282,8 +310,9 @@ func _set_button_colors(button: Button, bg: Color, font: Color) -> void:
 		style.bg_color = bg.lightened(0.12) if state == "hover" else bg
 		style.set_corner_radius_all(12)
 		style.set_content_margin_all(12)
-		style.border_color = GOLD if state == "hover" else bg.lightened(0.25)
-		style.set_border_width_all(2)
+		var focused: bool = button.get_meta("focused", false)
+		style.border_color = GOLD if state == "hover" or focused else bg.lightened(0.25)
+		style.set_border_width_all(5 if focused else 2)
 		button.add_theme_stylebox_override(state, style)
 	for state in ["font_color", "font_hover_color", "font_pressed_color", "font_disabled_color"]:
 		button.add_theme_color_override(state, font)

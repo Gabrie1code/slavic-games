@@ -30,6 +30,7 @@ var _next_id := 1
 
 
 func _ready() -> void:
+	InputSetup.ensure_menu_arrows()
 	Input.joy_connection_changed.connect(_on_joy_connection_changed)
 
 
@@ -55,6 +56,7 @@ func add_local_player(kind: PlayerData.DeviceKind, joypad_id: int = -1) -> Playe
 
 	InputSetup.register_player(p)
 	p.input = PlayerInput.new(p.slot)
+	p.input.wasd_keyboard = kind == PlayerData.DeviceKind.KEYBOARD_WASD
 	p.outfit = load_outfit(p.device_key())
 
 	players.append(p)

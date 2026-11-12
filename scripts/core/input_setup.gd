@@ -15,6 +15,24 @@ const ACTIONS: Array[String] = [
 const DEADZONE := 0.3
 
 
+## Общие «стрелки меню» (стрелки + Enter) — для игрока на WASD в меню. Создаются один раз.
+static func ensure_menu_arrows() -> void:
+	var keys := {
+		"menu_arrow_up": [KEY_UP], "menu_arrow_down": [KEY_DOWN],
+		"menu_arrow_left": [KEY_LEFT], "menu_arrow_right": [KEY_RIGHT],
+		"menu_arrow_confirm": [KEY_ENTER, KEY_KP_ENTER],
+	}
+	for action: String in keys:
+		if InputMap.has_action(action):
+			continue
+		InputMap.add_action(action)
+		for key: Key in keys[action]:
+			var e := InputEventKey.new()
+			e.physical_keycode = key
+			e.device = -1
+			InputMap.action_add_event(action, e)
+
+
 static func action_name(slot: int, action: String) -> StringName:
 	return StringName("p%d_%s" % [slot, action])
 

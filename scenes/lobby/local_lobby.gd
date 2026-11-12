@@ -75,6 +75,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		if _bot_dialog.visible:
 			return
 		var scheme := InputSetup.keyboard_join_scheme(key.physical_keycode)
+		# Пока открыта примерочная, Enter — это «подтвердить» в меню, а не вход игрока.
+		if scheme == PlayerData.DeviceKind.KEYBOARD_ARROWS and not _rooms.is_empty():
+			return
 		if scheme != -1:
 			PlayerManager.add_local_player(scheme as PlayerData.DeviceKind)
 	elif event is InputEventJoypadButton:
@@ -376,11 +379,11 @@ func _process_bot_dialog() -> void:
 	for p in PlayerManager.players:
 		if p.input == null or p.is_bot():
 			continue
-		if p.input.is_just_pressed("move_left") or p.input.is_just_pressed("move_down"):
+		if p.input.menu_just_pressed("move_left") or p.input.menu_just_pressed("move_down"):
 			_change_bot_count(-1)
-		elif p.input.is_just_pressed("move_right") or p.input.is_just_pressed("move_up"):
+		elif p.input.menu_just_pressed("move_right") or p.input.menu_just_pressed("move_up"):
 			_change_bot_count(1)
-		elif p.input.is_just_pressed("confirm"):
+		elif p.input.menu_just_pressed("confirm"):
 			_confirm_bots()
 			return
 		elif p.input.is_just_pressed("cancel"):
