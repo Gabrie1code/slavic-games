@@ -190,7 +190,10 @@ func _can_hint(p: PlayerData) -> Array[Dictionary]:
 		disabled = true
 	elif stand.can_open():
 		text = "Открыть ящик"
-	return [] if text == "" else [entry(confirm_key(p), text, disabled)]
+	var result: Array[Dictionary] = []
+	if text != "":
+		result.append(entry(confirm_key(p), text, disabled))
+	return result
 
 
 ## Брошенный баллончик рядом, на который игрок смотрит (null — нет).
