@@ -51,7 +51,8 @@ var _hud_steps: Label
 
 var _round_label: Label
 var _message_label: Label
-var _score_labels: Dictionary = {} # PlayerData.id -> Label
+var _score_labels: Dictionary = {} # PlayerData.id -> Label с балансом
+var _score_panels: Dictionary = {} # PlayerData.id -> PanelContainer карточки
 
 @onready var _camera: Camera3D = $Camera3D
 @onready var _sun: DirectionalLight3D = $Sun
@@ -469,19 +470,38 @@ func _build_ui() -> void:
 	_round_label.custom_minimum_size.x = 260
 	top.add_child(_round_label)
 
+	# Карточка игрока: слева живой «портрет на паспорт», правее ник и ниже баланс.
 	for p in MatchState.turn_order():
 		var panel := PanelContainer.new()
 		panel.custom_minimum_size = Vector2(230, 0)
 		var style := StyleBoxFlat.new()
 		style.bg_color = p.color.darkened(0.35)
 		style.set_corner_radius_all(10)
-		style.set_content_margin_all(10)
+		style.set_content_margin_all(8)
 		style.border_color = Color("f6c343")
 		panel.add_theme_stylebox_override("panel", style)
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 10)
+		panel.add_child(row)
+		var photo_frame := PanelContainer.new()
+		var photo_style := StyleBoxFlat.new()
+		photo_style.bg_color = Color("e9e2cf") # светлый фон, как у фото на паспорт
+		photo_style.set_corner_radius_all(6)
+		photo_frame.add_theme_stylebox_override("panel", photo_style)
+		photo_frame.add_child(PlayerPortrait.new().setup(p, 64))
+		row.add_child(photo_frame)
+		var texts := VBoxContainer.new()
+		texts.alignment = BoxContainer.ALIGNMENT_CENTER
+		row.add_child(texts)
+		var name_label := _make_label(22)
+		name_label.text = p.display_name
+		texts.add_child(name_label)
 		var label := _make_label(22)
-		panel.add_child(label)
+		label.add_theme_color_override("font_color", Color("f6c343"))
+		texts.add_child(label)
 		top.add_child(panel)
 		_score_labels[p.id] = label
+		_score_panels[p.id] = panel
 
 	var spacer := Control.new()
 	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -531,11 +551,11 @@ func _update_ui() -> void:
 	for p in MatchState.turn_order():
 		var s := MatchState.get_stats(p)
 		var label := _score_labels[p.id] as Label
-		label.text = "%s\n%d ₽   ·   Дефицит: %d" % [p.display_name, s.coins, s.deficit]
+		label.text = "%d ₽" % s.coins # дефицит здесь не пишем — только баланс
 
 
 func _highlight_score(current: PlayerData) -> void:
 	for p in MatchState.turn_order():
-		var panel := (_score_labels[p.id] as Label).get_parent() as PanelContainer
+		var panel := _score_panels[p.id] as PanelContainer
 		var style := panel.get_theme_stylebox("panel") as StyleBoxFlat
 		style.set_border_width_all(4 if p == current else 0)
