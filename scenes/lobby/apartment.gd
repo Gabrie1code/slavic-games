@@ -104,6 +104,7 @@ func _ready() -> void:
 	_build_living_extras()
 	toilet_room = ToiletRoom.new()
 	add_child(toilet_room)
+	_build_decor()
 
 
 # ---------------- Стены и пол ----------------
@@ -268,7 +269,8 @@ func _build_bedroom() -> void:
 	var bed_pos := Vector3(7.8, 0, -2.9)
 	_solid(_model("bed"), Vector3(1.1, 0.7, 2.05), 0.35, bed_pos)
 	# Ковёр левее кровати на 0.35 м: при ширине 2.6 м иначе заезжает в правую стену.
-	_place(_model("wall_carpet"), Vector3(bed_pos.x - 0.35, 0.75, BACK_Z + 0.08))
+	# Свой ковёр в спальне (зелёный, с «гёлями») — не такой, как в гостиной.
+	_place(_model("wall_carpet_green"), Vector3(bed_pos.x - 0.35, 0.75, BACK_Z + 0.08))
 	var stand_pos := Vector3(6.75, 0, -3.65)
 	# Тумбочка с ящиком: в ящике баллончик с краской (Nightstand, SprayCan).
 	nightstand = Nightstand.new()
@@ -277,7 +279,7 @@ func _build_bedroom() -> void:
 	_night_lamp = _breakable("table_lamp", stand_pos + Vector3(0, 0.6, 0),
 		[Color("2a7040"), Color("c0a050")], 0.4)
 	_build_night_light()
-	_place(_model("floor_rug"), Vector3(6.4, 0.005, -0.7)).rotation_degrees.y = 90.0
+	_place(_model("floor_rug_oval"), Vector3(6.3, 0.005, -0.8)).rotation_degrees.y = 90.0
 	_tippable("dumbbell", Vector3(0.34, 0.12, 0.12), 0.06, Vector3(8.5, 0, 0.6), 3.0, 30.0)
 	_tippable("stool", Vector3(0.36, 0.47, 0.36), 0.24, Vector3(8.4, 0, -0.4), 2.0)
 	_breakable("book_stack", Vector3(8.4, 0.47, -0.4), [Color("992018"), Color("cc9918")], 0.4)
@@ -361,6 +363,31 @@ func _build_lamp_light() -> void:
 	_lamp_glow.material_override = _lamp_glow_mat
 	_lamp_glow.position = Vector3(0, 1.45, 0)
 	floor_lamp.add_child(_lamp_glow)
+
+
+# ---------------- Уют: полки, растения, плакаты, дорожка ----------------
+
+func _build_decor() -> void:
+	# Растения (в кадках — твёрдые, обходить).
+	var plant_size := Vector3(0.45, 1.0, 0.45)
+	_solid(_model("plant_ficus"), plant_size, 0.5, Vector3(-1.65, 0, -3.62))
+	_solid(_model("plant_palm"), plant_size, 0.5, Vector3(2.62, 0, -3.6))
+	_solid(_model("plant_snake"), plant_size, 0.5, Vector3(-5.6, 0, 3.15))
+	_solid(_model("plant_snake"), plant_size, 0.5, Vector3(3.5, 0, -3.7), 0.8)
+	_solid(_model("plant_ficus"), plant_size, 0.5, Vector3(8.65, 0, 1.15), 1.3)
+	# Настенные полки (задняя сторона модели — к стене; модель смотрит на +Z).
+	_place(_model("wall_shelf_books"), Vector3(PARTITION_X - 0.08, 1.55, -3.0)).rotation.y = -PI / 2
+	_place(_model("wall_shelf_books"), Vector3(RIGHT_X, 1.5, -0.9)).rotation.y = -PI / 2
+	_place(_model("wall_shelf_plants"), Vector3(RIGHT_X, 1.55, 0.5)).rotation.y = -PI / 2
+	_place(_model("wall_shelf_plants"), Vector3(PARTITION_X + 0.08, 1.6, -3.0)).rotation.y = PI / 2
+	# Плакаты.
+	var size := Vector2(0.5, 0.7)
+	_poster("home_space", size, Vector3(PARTITION_X - 0.085, 1.65, 0.65), -PI / 2)
+	_poster("home_kefir", size, Vector3(LEFT_X + 0.012, 1.65, -2.5), PI / 2)
+	_poster("home_calendar", size, Vector3(5.75, 1.6, BACK_Z + 0.012), 0.0)
+	_poster("home_hockey", size, Vector3(PARTITION_X + 0.085, 1.6, 0.65), PI / 2)
+	# Ковровая дорожка к двери в спальню.
+	_place(_model("floor_runner"), Vector3(1.55, 0.004, -1.0))
 
 
 # ---------------- Телефон, часы, кот ----------------
