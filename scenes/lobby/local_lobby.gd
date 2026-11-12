@@ -85,7 +85,7 @@ func _build_ui() -> void:
 	root.add_child(column)
 
 	var title := Label.new()
-	title.text = "SLAVIG GAMES"
+	title.text = "SLAVIC GAMES"
 	title.add_theme_font_size_override("font_size", 64)
 	title.add_theme_color_override("font_color", Color("f6c343"))
 	title.add_theme_color_override("font_outline_color", Color("7a1410"))

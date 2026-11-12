@@ -13,7 +13,7 @@ tonemap_mode = 2
 ssao_enabled = true
 
 [sub_resource type="StandardMaterial3D" id="Mat_carpet"]
-albedo_color = Color(0.62, 0.14, 0.11, 1)
+albedo_color = Color(0.3, 0.06, 0.08, 1)
 roughness = 0.95
 
 [sub_resource type="StandardMaterial3D" id="Mat_carpet_border"]
