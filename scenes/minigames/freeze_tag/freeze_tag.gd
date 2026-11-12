@@ -65,6 +65,8 @@ class Racer:
 	var stun_left := 0.0
 	## Едет с горки или сидит на качелях — водящий не может заморозить.
 	var busy := false
+	## Спринт на Shift: +50% на 3 сек, перезарядка 15 сек (только у убегающих).
+	var sprint := SprintAbility.new()
 	## Жёлтые лучики-вспышка у головы, пока размораживает друга.
 	var alert: Sprite3D
 	var zone_time := 0.0
@@ -209,7 +211,10 @@ func _physics_process(delta: float) -> void:
 			r.free_time += delta
 		r.immune_left = maxf(0.0, r.immune_left - delta)
 		if r.player.is_bot():
-			_bot_runner(r)
+			_bot_runner(r) # бот мог нажать спринт — проверяем ниже в этом же кадре
+		if r.sprint.update(delta, r.character, r.player.input, RUNNER_SPEED,
+				not r.frozen and not r.busy and r.character.input_enabled):
+			_show_message("%s включил спринт!" % r.player.display_name)
 	if _chaser.player.is_bot():
 		_bot_chaser()
 
@@ -599,6 +604,8 @@ func _bot_runner(r: Racer) -> void:
 	var pos := r.character.global_position
 	var chaser_pos := _chaser.character.global_position
 	var chaser_dist := _flat_distance(pos, chaser_pos)
+	if chaser_dist < 3.0 and r.sprint.ready():
+		bot.press("sprint") # водящий рядом — рывок
 
 	var target: Racer = null
 	var target_dist := INF
@@ -917,7 +924,7 @@ func _clear_message_later() -> void:
 func _update_scores() -> void:
 	var scores := _scores()
 	for r in _racers:
-		var role := "водящий" if r.is_chaser else ("лёд" if r.frozen else "бегает")
+		var role := "водящий" if r.is_chaser else ("лёд" if r.frozen else r.sprint.status())
 		(_score_labels[r.player.id] as Label).text = "%s (%s)\n%d очк." % [
 			r.player.display_name, role, scores[r.player.id]]
 

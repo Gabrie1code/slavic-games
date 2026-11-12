@@ -51,6 +51,9 @@ var first_person := false
 ## Насколько персонаж присел: 0 — стоит, 1 — сидит на корточках (плавно).
 var crouch_amount := 0.0
 var crouching := false
+## Бег на Shift, пока кнопка зажата: +доля к скорости (в лобби 0.15). 0 — бега нет
+## (в мини-играх свои правила, например спринт-способность в «Морожке»).
+var run_bonus := 0.0
 ## От первого лица: true — A/D шагают вбок (поворот мышью/стиком), false — A/D поворачивают.
 var fp_strafe := false
 ## Наклон взгляда вверх/вниз (для камеры от первого лица).
@@ -127,6 +130,8 @@ func _physics_process(delta: float) -> void:
 		move = player.input.get_move()
 		if crouching:
 			move *= CROUCH_SPEED # крадётся
+		elif run_bonus > 0.0 and player.input.is_pressed("sprint"):
+			move *= 1.0 + run_bonus # бежит
 		elif can_jump and player.input.is_just_pressed("confirm") and is_on_floor():
 			velocity.y = JUMP_VELOCITY
 

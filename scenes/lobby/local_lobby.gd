@@ -32,6 +32,8 @@ const MOUSE_SENSITIVITY := 0.0025
 const STICK_LOOK_SPEED := 2.8
 const EYE_HEIGHT := 1.42
 const PITCH_LIMIT := 1.2
+## Бег на Shift в лобби: +15% к скорости.
+const RUN_BONUS := 0.15
 ## На сколько опускается камера, когда персонаж присел.
 const CROUCH_EYE_DROP := 0.45
 ## Удар рукой: дальность, перезарядка, сила толчка.
@@ -737,6 +739,7 @@ func _on_player_joined(p: PlayerData) -> void:
 	character.setup(p, spawn)
 	_players_root.add_child(character)
 	character.add_to_group("lobby_character") # часы с кукушкой чувствуют, кто рядом
+	character.run_bonus = RUN_BONUS # Shift — бег
 	_characters[p.id] = character
 	character.set_render_layer(_player_layer(p))
 	if _view == View.FIRST_PERSON and not p.is_bot():

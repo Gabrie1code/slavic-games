@@ -10,7 +10,8 @@ extends RefCounted
 ## поэтому WASD работает и при русской раскладке.
 
 const ACTIONS: Array[String] = [
-	"move_left", "move_right", "move_up", "move_down", "confirm", "cancel", "attack", "crouch",
+	"move_left", "move_right", "move_up", "move_down", "confirm", "cancel", "attack",
+	"crouch", "sprint",
 ]
 const DEADZONE := 0.3
 
@@ -75,7 +76,8 @@ static func _keyboard_layout(kind: PlayerData.DeviceKind) -> Dictionary:
 			"confirm": [KEY_SPACE, KEY_E],
 			"cancel": [KEY_Q],
 			"attack": [KEY_F], # + левая кнопка мыши (см. _events_for)
-			"crouch": [KEY_C], # + левый Shift (см. _events_for)
+			"crouch": [KEY_C], # + левый Ctrl (см. _events_for)
+			"sprint": [], # левый Shift (см. _events_for)
 		}
 	return {
 		"move_left": [KEY_LEFT],
@@ -83,9 +85,10 @@ static func _keyboard_layout(kind: PlayerData.DeviceKind) -> Dictionary:
 		"move_up": [KEY_UP],
 		"move_down": [KEY_DOWN],
 		"confirm": [KEY_ENTER, KEY_KP_ENTER],
-		"cancel": [KEY_BACKSPACE], # + правый Shift (см. _events_for)
+		"cancel": [KEY_BACKSPACE],
 		"attack": [KEY_SLASH, KEY_KP_0],
 		"crouch": [], # правый Ctrl (см. _events_for)
+		"sprint": [], # правый Shift (см. _events_for)
 	}
 
 
@@ -136,23 +139,22 @@ static func _joypad_events(action: String, device: int) -> Array[InputEvent]:
 			events.append(_button(JOY_BUTTON_X, device))
 		"crouch":
 			events.append(_button(JOY_BUTTON_RIGHT_STICK, device))
+		"sprint":
 			events.append(_button(JOY_BUTTON_LEFT_SHOULDER, device))
+			events.append(_button(JOY_BUTTON_LEFT_STICK, device))
 	return events
 
 
-## Клавиша с нужной стороной: присесть — левый Shift (WASD) / правый Ctrl (стрелки),
-## отмена у игрока на стрелках — правый Shift. null — такой клавиши нет.
+## Клавиша с нужной стороной: левые Shift/Ctrl — игроку на WASD, правые — на стрелках.
+## Shift — бег (спринт), Ctrl — присесть. null — такой клавиши нет.
 static func _sided_key(kind: PlayerData.DeviceKind, action: String) -> InputEventKey:
 	var key := KEY_NONE
-	var side := KEY_LOCATION_LEFT
-	if kind == PlayerData.DeviceKind.KEYBOARD_WASD and action == "crouch":
+	if action == "sprint":
 		key = KEY_SHIFT
-	elif kind == PlayerData.DeviceKind.KEYBOARD_ARROWS and action == "crouch":
+	elif action == "crouch":
 		key = KEY_CTRL
-		side = KEY_LOCATION_RIGHT
-	elif kind == PlayerData.DeviceKind.KEYBOARD_ARROWS and action == "cancel":
-		key = KEY_SHIFT
-		side = KEY_LOCATION_RIGHT
+	var side := KEY_LOCATION_LEFT if kind == PlayerData.DeviceKind.KEYBOARD_WASD \
+		else KEY_LOCATION_RIGHT
 	if key == KEY_NONE:
 		return null
 	var e := InputEventKey.new()
