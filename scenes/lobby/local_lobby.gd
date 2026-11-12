@@ -56,6 +56,8 @@ var _countdown := -1.0
 var _countdown_label: Label
 ## Кадр, в котором нажали «Начать» в окне ботов (это нажатие больше никуда не идёт).
 var _dialog_closed_frame := -1
+## Отсчёт закончился, игра запускается — лобби больше ничего не открывает и не слушает.
+var _launching := false
 
 ## Кто где сидит на диване: PlayerData.id -> номер места.
 var _seated: Dictionary = {}
@@ -123,8 +125,8 @@ func _input(event: InputEvent) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if event.is_echo() or not event.is_pressed():
-		return
+	if event.is_echo() or not event.is_pressed() or _launching:
+		return # запускаемся — новых игроков и окон уже не нужно
 
 	if event is InputEventKey:
 		var key := event as InputEventKey
@@ -165,6 +167,8 @@ func _handle_dev_key(keycode: Key) -> bool:
 
 ## Все живые игроки готовы: спросить про ботов (если есть места), иначе — сразу отсчёт.
 func _all_ready() -> void:
+	if _launching:
+		return
 	_close_all_wardrobes()
 	if PlayerManager.free_slots() > 0:
 		_open_bot_dialog()
@@ -186,6 +190,10 @@ func _cancel_countdown() -> void:
 
 
 func _launch() -> void:
+	# Пока экран затемняется перед сменой сцены, лобби ещё живёт: без этого флага оно снова
+	# видело «все готовы» и открывало окно ботов прямо перед стартом.
+	_launching = true
+	_bot_dialog.visible = false
 	MatchState.start_new_match(ROUNDS)
 	SceneManager.change_scene(MatchState.SCENE_BOARD)
 
@@ -193,6 +201,8 @@ func _launch() -> void:
 func _process(delta: float) -> void:
 	if _view == View.FIRST_PERSON:
 		_update_first_person(delta)
+	if _launching:
+		return
 	if _bot_dialog.visible and _countdown >= 0.0:
 		_bot_dialog.visible = false # на всякий случай: во время отсчёта окна нет
 	if _bot_dialog.visible:
