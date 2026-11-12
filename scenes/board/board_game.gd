@@ -78,6 +78,7 @@ func _ready() -> void:
 		# На доске фишки двигаем сами, без физики. Выключаем после add_child,
 		# иначе Godot включит обработку обратно при входе в сцену.
 		pawn.set_physics_process(false)
+		pawn.rotation.y = _camera_yaw() # с самого начала лицом к нам, а не спиной
 		_pawns[p.id] = pawn
 
 	_dice_pivot = Node3D.new()
@@ -401,19 +402,23 @@ func _hop(pawn: Node3D, to: Vector3) -> void:
 	await tween.finished
 
 
-## Пришёл спиной к нам — подпрыгивает и в прыжке разворачивается лицом к камере.
-func _face_camera(pawn: Node3D) -> void:
-	var forward := -pawn.global_basis.z
+## Поворот «лицом к камере» (как в _hop: yaw = atan2(−x, −z) направления взгляда).
+func _camera_yaw() -> float:
 	var to_camera := Vector3(CAMERA_OFFSET.x, 0.0, CAMERA_OFFSET.z).normalized()
-	if Vector3(forward.x, 0.0, forward.z).normalized().dot(to_camera) >= 0.0:
-		return # и так видно лицо (или бок)
+	return atan2(-to_camera.x, -to_camera.z)
+
+
+## Дошёл — поворачивается лицом к камере. Если стоял спиной — разворот в прыжке.
+func _face_camera(pawn: Node3D) -> void:
 	var start_y := pawn.position.y
 	var start_yaw := pawn.rotation.y
-	var target_yaw := atan2(-to_camera.x, -to_camera.z) # как в _hop: лицом по направлению to_camera
-	var turn := wrapf(target_yaw - start_yaw, -PI, PI)
+	var turn := wrapf(_camera_yaw() - start_yaw, -PI, PI)
+	if absf(turn) < 0.05:
+		return
+	var hop := 0.45 if absf(turn) > PI / 2.0 else 0.0
 	var tween := create_tween()
 	tween.tween_method(func(t: float) -> void:
-		pawn.position.y = start_y + sin(t * PI) * 0.45
+		pawn.position.y = start_y + sin(t * PI) * hop
 		pawn.rotation.y = start_yaw + turn * t,
 		0.0, 1.0, 0.35)
 	await tween.finished

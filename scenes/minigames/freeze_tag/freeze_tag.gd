@@ -28,7 +28,8 @@ const CHASER_SPRINT := 0.15
 ## Водящий «считает до трёх»: стоит на месте после старта.
 const CHASER_HEAD_START := 2.0
 const TOUCH_DISTANCE := 1.1
-const UNFREEZE_RADIUS := 1.7
+## Разморозка идёт сама, пока свободный игрок стоит ближе половины зоны караула (кнопку не жать).
+const UNFREEZE_RADIUS := 1.5 # = ZONE_RADIUS / 2
 const UNFREEZE_TIME := 2.0
 ## После разморозки нельзя сразу заморозить снова.
 const IMMUNE_TIME := 1.5
@@ -303,7 +304,7 @@ func _update_chaser(delta: float) -> void:
 		c.status.text = "ВОДЯЩИЙ"
 
 
-## Разморозка: свободный игрок рядом держит кнопку.
+## Разморозка: свободный игрок просто стоит рядом (ближе UNFREEZE_RADIUS) — полоска идёт сама.
 func _update_unfreezing(delta: float) -> void:
 	var helpers: Array[Racer] = []
 	for f in _runners():
@@ -314,7 +315,7 @@ func _update_unfreezing(delta: float) -> void:
 			if r.frozen or r.busy or r == f or r.player.input == null:
 				continue
 			var d := _flat_distance(r.character.global_position, f.character.global_position)
-			if d < UNFREEZE_RADIUS and r.player.input.is_pressed("confirm"):
+			if d < UNFREEZE_RADIUS:
 				helper = r
 				break
 		if helper:
@@ -538,14 +539,9 @@ func _bot_runner(r: Racer) -> void:
 
 	var move := Vector2.ZERO
 	if target and chaser_dist > 4.5:
-		if target_dist < UNFREEZE_RADIUS * 0.8:
-			bot.hold("confirm", true)
-		else:
-			bot.hold("confirm", false)
+		if target_dist > UNFREEZE_RADIUS * 0.7: # подошёл — стоит рядом, разморозка идёт сама
 			var to := target.character.global_position - pos
 			move = Vector2(to.x, to.z).normalized()
-	else:
-		bot.hold("confirm", false)
 		var away := pos - chaser_pos
 		move = Vector2(away.x, away.z).normalized()
 		# Немного петляем, чтобы не убегать по прямой в угол.
@@ -643,12 +639,12 @@ func _update_playground(delta: float) -> void:
 	_yard.carousel.update_spin(delta, characters)
 	for r in _racers:
 		# Пробел — прыжок, но не там, где он нужен для дела (разморозить, горка, качели).
-		r.character.can_jump = not _frozen_near(r) and not _yard.slide.can_ride(r.character) \
+		r.character.can_jump = not _yard.slide.can_ride(r.character) \
 			and (r.is_chaser or (_yard.swing.free_seat_near(r.character) < 0
 				and _free_bench_near(r) < 0))
 		if r.frozen or r.busy or r.player.input == null or not r.character.input_enabled:
 			continue
-		if not r.player.input.is_just_pressed("confirm") or _frozen_near(r):
+		if not r.player.input.is_just_pressed("confirm"):
 			continue
 		if _yard.slide.can_ride(r.character):
 			_set_busy(r, "НА ГОРКЕ!")
@@ -698,15 +694,6 @@ func _update_hiding(delta: float) -> void:
 		r.character.global_transform = Transform3D(spot.basis, spot * Vector3(0, 0, 0.8))
 		r.character.set_physics_process(true)
 		_on_playground_done(r.character)
-
-
-## Рядом есть замороженный — тогда «подтвердить» значит «размораживать», а не горка/качели.
-func _frozen_near(r: Racer) -> bool:
-	for f in _runners():
-		if f.frozen and _flat_distance(f.character.global_position, r.character.global_position) \
-				< UNFREEZE_RADIUS:
-			return true
-	return false
 
 
 func _set_busy(r: Racer, text: String) -> void:
@@ -897,8 +884,8 @@ func _build_ui() -> void:
 	_timer_label = _label("%d" % int(ROUND_TIME), 52, Color.WHITE)
 	top.add_child(_timer_label)
 
-	var rules := ("Водящий морозит касанием. Разморозить друга: стой рядом и держи "
-		+ "Пробел / Enter / A (полоска внизу).\n"
+	var rules := ("Водящий морозит касанием. Разморозить друга: просто стой рядом с ним "
+		+ "(полоска внизу).\n"
 		+ "Не карауль замороженных: в красной зоне можно быть только 3 сек.")
 	column.add_child(_label(rules, 20, Color.WHITE))
 
