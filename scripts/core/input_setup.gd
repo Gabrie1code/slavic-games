@@ -11,7 +11,7 @@ extends RefCounted
 
 const ACTIONS: Array[String] = [
 	"move_left", "move_right", "move_up", "move_down", "confirm", "cancel", "attack",
-	"crouch", "sprint",
+	"crouch", "sprint", "drop",
 ]
 const DEADZONE := 0.3
 
@@ -78,6 +78,7 @@ static func _keyboard_layout(kind: PlayerData.DeviceKind) -> Dictionary:
 			"attack": [KEY_F], # + левая кнопка мыши (см. _events_for)
 			"crouch": [KEY_C], # + левый Ctrl (см. _events_for)
 			"sprint": [], # левый Shift (см. _events_for)
+			"drop": [KEY_G], # выбросить то, что в руке (баллончик)
 		}
 	return {
 		"move_left": [KEY_LEFT],
@@ -89,6 +90,7 @@ static func _keyboard_layout(kind: PlayerData.DeviceKind) -> Dictionary:
 		"attack": [KEY_SLASH, KEY_KP_0],
 		"crouch": [], # правый Ctrl (см. _events_for)
 		"sprint": [], # правый Shift (см. _events_for)
+		"drop": [KEY_PERIOD, KEY_KP_PERIOD],
 	}
 
 
@@ -142,6 +144,8 @@ static func _joypad_events(action: String, device: int) -> Array[InputEvent]:
 		"sprint":
 			events.append(_button(JOY_BUTTON_LEFT_SHOULDER, device))
 			events.append(_button(JOY_BUTTON_LEFT_STICK, device))
+		"drop":
+			events.append(_button(JOY_BUTTON_Y, device))
 	return events
 
 

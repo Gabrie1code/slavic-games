@@ -239,7 +239,9 @@ func _process(delta: float) -> void:
 		# Пробел должен погладить кота, а не подбросить персонажа.
 		if character:
 			character.can_jump = _prompt_for(p, character).is_empty()
-		if p.input.is_just_pressed("attack"):
+		if _gadgets.holds_can(p):
+			_gadgets.process_can_holder(p) # G — бросить, удар — пшикнуть (рука занята)
+		elif p.input.is_just_pressed("attack"):
 			_punch(p)
 		if p.input.is_just_pressed("confirm") and _gadgets.can_use_toilet(p):
 			_open_room(p, ToiletScreen.new().setup_for(p, character, _apartment.toilet_room.toilet))
@@ -604,6 +606,15 @@ func _create_view(p: PlayerData) -> void:
 	handset.visible = false
 	_set_layers(handset, _viewmodel_layer(p))
 	camera.add_child(handset)
+	# Баллончик «в кадре», пока игрок его держит (вместо кулака).
+	var view_can := (load("res://assets/models/apartment/spray_can.glb") as PackedScene) \
+		.instantiate() as Node3D
+	view_can.position = Vector3(0.24, -0.3, -0.42)
+	view_can.rotation = Vector3(0.15, 0.4, -0.1)
+	view_can.scale = Vector3.ONE * 1.3
+	view_can.visible = false
+	_set_layers(view_can, _viewmodel_layer(p))
+	camera.add_child(view_can)
 
 	var frame := ReferenceRect.new()
 	frame.border_color = p.color
@@ -623,7 +634,7 @@ func _create_view(p: PlayerData) -> void:
 	container.add_child(prompt)
 	_views_root.add_child(container)
 	_views[p.id] = {"container": container, "camera": camera, "prompt": prompt, "fist": fist,
-		"handset": handset}
+		"handset": handset, "can": view_can}
 	_layout_views()
 
 
@@ -707,9 +718,13 @@ func _update_first_person(delta: float) -> void:
 		eye.y = minf(eye.y, Apartment.WALL_HEIGHT - 0.15) # камера не заглядывает за потолок
 		camera.global_transform = Transform3D(
 			Basis.from_euler(Vector3(character.fp_pitch, character.rotation.y, 0.0)), eye)
-		(_views[id]["prompt"] as KeyPrompt).set_entries(_prompt_for(p, character))
+		var entries := _prompt_for(p, character)
+		entries.append_array(_gadgets.can_holder_hint(p))
+		(_views[id]["prompt"] as KeyPrompt).set_entries(entries)
 		var on_phone := _gadgets.holds_phone(p)
-		(_views[id]["fist"] as Node3D).visible = not on_phone
+		var holds_can := _gadgets.holds_can(p)
+		(_views[id]["fist"] as Node3D).visible = not on_phone and not holds_can
+		(_views[id]["can"] as Node3D).visible = holds_can
 		(_views[id]["handset"] as Node3D).visible = on_phone
 		if on_phone: # провод «в кадре» — к своей трубке у камеры
 			_apartment.phone.set_view_handset(_views[id]["handset"], _viewmodel_layer(p),
@@ -857,6 +872,7 @@ func _place_bot(p: PlayerData, character: PlayerCharacter) -> void:
 
 func _on_player_left(p: PlayerData) -> void:
 	_seated.erase(p.id)
+	_gadgets.release_can(p)
 	if _apartment.phone.user == p:
 		_apartment.phone.hang_up()
 	_remove_view(p)

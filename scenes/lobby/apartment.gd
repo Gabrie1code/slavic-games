@@ -74,8 +74,8 @@ var floor_lamp: Tippable
 ## Торшер включён (горит, только пока стоит на месте). Выключили кнопкой — через LAMP_BACK сек
 ## сам включается и плавно разгорается (как восстанавливается разбитая посуда).
 var lamp_on := true
-## Ночник в спальне включён.
-var night_lamp_on := true
+## Тумбочка в спальне: ящик с баллончиком.
+var nightstand: Nightstand
 ## Дисковый телефон (гостиная, у двери в игровую) и кот.
 var phone: RotaryPhone
 ## Туалет (унитаз — toilet_room.toilet).
@@ -89,7 +89,7 @@ var _lamp_glow: MeshInstance3D
 var _lamp_glow_mat: StandardMaterial3D
 var _lamp_level := 1.0 # 0 — не горит, 1 — горит в полную силу
 var _lamp_back_at := 0.0
-## Ночник на тумбочке в спальне: включается и выключается кнопкой; разбили — не светит.
+## Ночник на тумбочке в спальне: горит всегда; разбили — не светит, пока не восстановится.
 var _night_lamp: Breakable
 var _night_light: OmniLight3D
 var _night_bulb_mat: StandardMaterial3D
@@ -270,7 +270,10 @@ func _build_bedroom() -> void:
 	# Ковёр левее кровати на 0.35 м: при ширине 2.6 м иначе заезжает в правую стену.
 	_place(_model("wall_carpet"), Vector3(bed_pos.x - 0.35, 0.75, BACK_Z + 0.08))
 	var stand_pos := Vector3(6.75, 0, -3.65)
-	_solid(_model("nightstand"), Vector3(0.45, 0.6, 0.4), 0.3, stand_pos)
+	# Тумбочка с ящиком: в ящике баллончик с краской (Nightstand, SprayCan).
+	nightstand = Nightstand.new()
+	nightstand.position = stand_pos
+	add_child(nightstand)
 	_night_lamp = _breakable("table_lamp", stand_pos + Vector3(0, 0.6, 0),
 		[Color("2a7040"), Color("c0a050")], 0.4)
 	_build_night_light()
@@ -299,7 +302,7 @@ func _process(delta: float) -> void:
 	_lamp_light.light_energy = LAMP_ENERGY * _lamp_level
 	_lamp_light.visible = _lamp_level > 0.01
 	_lamp_glow_mat.albedo_color = Color(0.3, 0.27, 0.22).lerp(Color(1.0, 0.92, 0.7), _lamp_level)
-	var night_lit := night_lamp_on and not _night_lamp.is_broken()
+	var night_lit := not _night_lamp.is_broken()
 	_night_light.visible = night_lit
 	_night_bulb_mat.albedo_color = Color(1.0, 0.92, 0.7) if night_lit else Color(0.3, 0.27, 0.22)
 
@@ -313,21 +316,6 @@ func lamp_lit() -> bool:
 func turn_off_lamp() -> void:
 	lamp_on = false
 	_lamp_back_at = _time + LAMP_BACK
-
-
-## Ночник цел (разбитый не включить, пока не восстановится).
-func night_lamp_ready() -> bool:
-	return not _night_lamp.is_broken()
-
-
-## Где стоит ночник (для зоны кнопки).
-func night_lamp_position() -> Vector3:
-	return _night_lamp.global_position
-
-
-## Щёлкнуть выключателем ночника.
-func toggle_night_lamp() -> void:
-	night_lamp_on = not night_lamp_on
 
 
 ## Лампочка под зелёным абажуром ночника.

@@ -15,6 +15,8 @@ const GRAMOPHONE_RADIUS := 1.4
 const LAMP_RADIUS := 1.2
 const ARCADE_RADIUS := 1.1
 const TOILET_RADIUS := 1.2
+const NIGHTSTAND_RADIUS := 1.1
+const CAN_RADIUS := 1.0
 ## Через сколько граммофон можно завести снова (секунды).
 const TUNE_TIME := 3.0
 const NOTE := preload("res://assets/textures/fx/note_pixel.png")
@@ -23,6 +25,8 @@ var apartment: Apartment
 ## PlayerData.id -> PlayerCharacter (тот же словарь, что в лобби).
 var characters: Dictionary
 var _tune_until := 0.0
+## Кто держит баллончик: PlayerData.id -> SprayCan.
+var _held_cans: Dictionary = {}
 var _player: AudioStreamPlayer3D
 
 
@@ -58,6 +62,16 @@ static func confirm_key(p: PlayerData) -> String:
 			return "A"
 
 
+static func drop_key(p: PlayerData) -> String:
+	match p.device_kind:
+		PlayerData.DeviceKind.KEYBOARD_WASD:
+			return "G"
+		PlayerData.DeviceKind.KEYBOARD_ARROWS:
+			return "."
+		_:
+			return "Y"
+
+
 static func attack_key(p: PlayerData) -> String:
 	match p.device_kind:
 		PlayerData.DeviceKind.KEYBOARD_WASD:
@@ -66,6 +80,86 @@ static func attack_key(p: PlayerData) -> String:
 			return "/"
 		_:
 			return "X"
+
+
+# ---------------- Баллончики ----------------
+
+func holds_can(p: PlayerData) -> bool:
+	return _held_cans.has(p.id)
+
+
+## Каждый кадр для держащего баллончик: «выбросить» (G) — бросить, удар — пшикнуть.
+func process_can_holder(p: PlayerData) -> void:
+	var can: SprayCan = _held_cans[p.id]
+	var character: PlayerCharacter = characters[p.id]
+	if p.input.is_just_pressed("drop"):
+		release_can(p)
+	elif p.input.is_just_pressed("attack"):
+		can.spray(p.color, -character.global_basis.z)
+
+
+## Бросить баллончик (G или игрок ушёл из лобби).
+func release_can(p: PlayerData) -> void:
+	if not _held_cans.has(p.id):
+		return
+	var can: SprayCan = _held_cans[p.id]
+	_held_cans.erase(p.id)
+	if is_instance_valid(can) and characters.has(p.id):
+		can.drop(characters[p.id], apartment)
+
+
+## Подсказка держащему баллончик (добавляется к остальным).
+func can_holder_hint(p: PlayerData) -> Array[Dictionary]:
+	if not holds_can(p):
+		return []
+	return [entry(drop_key(p), "Бросить баллончик"), entry(attack_key(p), "Пшикнуть")]
+
+
+## Тумбочка и брошенные баллончики: открыть ящик, взять баллончик.
+func _use_cans(p: PlayerData, character: PlayerCharacter) -> bool:
+	if holds_can(p):
+		return false # одна рука — один баллончик
+	var loose := _near_loose_can(p)
+	var stand := apartment.nightstand
+	var near_stand := _near(p, stand.front_point(), NIGHTSTAND_RADIUS)
+	var can: SprayCan = null
+	if loose:
+		can = loose
+	elif near_stand and stand.can_take():
+		can = stand.take_can()
+	elif near_stand and stand.can_open():
+		stand.open()
+		return true
+	if can == null:
+		return false
+	_held_cans[p.id] = can
+	can.hold(p, character)
+	return true
+
+
+func _can_hint(p: PlayerData) -> Array[Dictionary]:
+	if holds_can(p):
+		return []
+	if _near_loose_can(p):
+		return [entry(confirm_key(p), "Подобрать баллончик")]
+	var stand := apartment.nightstand
+	if not _near(p, stand.front_point(), NIGHTSTAND_RADIUS):
+		return []
+	if stand.can_take():
+		return [entry(confirm_key(p), "Взять баллончик")]
+	if stand.can_open():
+		return [entry(confirm_key(p), "Открыть ящик")]
+	return [] # ящик «сломан» (открыт) — кнопки нет
+
+
+## Брошенный баллончик рядом, на который игрок смотрит (null — нет).
+func _near_loose_can(p: PlayerData) -> SprayCan:
+	for node in apartment.get_tree().get_nodes_in_group("spray_can"):
+		var can := node as SprayCan
+		if can and can.state == SprayCan.State.LOOSE \
+				and _near(p, can.global_position, CAN_RADIUS):
+			return can
+	return null
 
 
 func holds_phone(p: PlayerData) -> bool:
@@ -92,7 +186,7 @@ func try_interact(p: PlayerData) -> bool:
 	if _near_tippable(p, apartment.gramophone, GRAMOPHONE_RADIUS) and _gramophone_ready():
 		_play_gramophone()
 		return true
-	if _use_switch(p):
+	if _use_switch(p) or _use_cans(p, character):
 		return true
 	if _near_cat(p) and apartment.cat.pet():
 		# Персонаж тянет руку к коту.
@@ -114,8 +208,6 @@ func _use_switch(p: PlayerData) -> bool:
 		toilet.flush()
 	elif toilet and toilet.can_open():
 		toilet.open_lid()
-	elif _near_night_lamp(p):
-		apartment.toggle_night_lamp()
 	elif arcade and arcade.is_working():
 		arcade.break_down()
 	else:
@@ -141,16 +233,17 @@ func hint(p: PlayerData) -> Array[Dictionary]:
 	return _furniture_hint(p)
 
 
-## Граммофон, торшер, ночник, туалет и автоматы: кнопка есть, только пока вещь стоит на месте.
+## Граммофон, торшер, тумбочка, баллончики, туалет и автоматы.
+## Кнопка есть, только пока вещь стоит на месте (поваленную трогать нельзя).
 func _furniture_hint(p: PlayerData) -> Array[Dictionary]:
 	if _near_tippable(p, apartment.gramophone, GRAMOPHONE_RADIUS):
 		return [entry(confirm_key(p), "Завести граммофон", not _gramophone_ready())]
 	# Выключенный торшер «чинится» сам — кнопки нет, пока снова не загорится.
 	if _near_tippable(p, apartment.floor_lamp, LAMP_RADIUS) and apartment.lamp_lit():
 		return [entry(confirm_key(p), "Выключить торшер")]
-	if _near_night_lamp(p):
-		var action := "Выключить ночник" if apartment.night_lamp_on else "Включить ночник"
-		return [entry(confirm_key(p), action)]
+	var can_entries := _can_hint(p)
+	if not can_entries.is_empty():
+		return can_entries
 	if _near_toilet(p):
 		return _toilet_hint(p)
 	return _arcade_hint(p)
@@ -202,11 +295,6 @@ func _near_arcade(p: PlayerData) -> ArcadeScreen:
 		if _near(p, screen.global_position, ARCADE_RADIUS):
 			return screen
 	return null
-
-
-## Рядом с целым ночником (разбитый ждёт восстановления — кнопки нет).
-func _near_night_lamp(p: PlayerData) -> bool:
-	return apartment.night_lamp_ready() and _near(p, apartment.night_lamp_position(), LAMP_RADIUS)
 
 
 ## Рядом с вещью, которая стоит на месте (поваленную трогать нельзя — кнопки нет).
