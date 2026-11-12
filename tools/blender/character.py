@@ -543,9 +543,11 @@ def item_hat_tubeteika():
 def item_hat_pompom():
     P = mat("KnitNavy", (0.03, 0.06, 0.2), 0.95)
     W = mat("KnitWhite", (0.92, 0.92, 0.9), 0.95)
-    pieces = [sphere_cap(0.315, (0, -0.01, 1.36), P, 1.44)]
-    pieces.append(cyl(0.32, 0.1, (0, -0.01, 1.47), W, verts=12))
-    pieces.append(sphere(0.11, (0, -0.01, 1.71), W, segs=8, rings=6))
+    # Шапка с запасом от головы (r 0.3) и гладкая: раньше грани почти касались головы
+    # и при беге голова просвечивала сквозь шапку.
+    pieces = [sphere_cap(0.338, (0, -0.01, 1.355), P, 1.44, segs=20, rings=12)]
+    pieces.append(cyl(0.342, 0.1, (0, -0.01, 1.47), W, verts=20))
+    pieces.append(sphere(0.11, (0, -0.01, 1.72), W, segs=10, rings=7))
     return [part("Head", pieces)]
 
 

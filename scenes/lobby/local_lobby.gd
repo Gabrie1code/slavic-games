@@ -443,10 +443,10 @@ func _phone_cat_hint(p: PlayerData) -> String:
 func _cat_hint(p: PlayerData) -> String:
 	var cat := _apartment.cat
 	if cat.is_sleepy():
-		return "~Кот спит — не будить"
+		return "~%s спит — не будить" % LobbyCat.CAT_NAME
 	if not cat.can_pet():
-		return "~Кота только что погладили (%d с)" % ceili(cat.cooldown_left())
-	return "%s — погладить кота" % _confirm_key(p)
+		return "~Баггета только что погладили (%d с)" % ceili(cat.cooldown_left())
+	return "%s — погладить Баггета" % _confirm_key(p)
 
 
 func _attack_key(p: PlayerData) -> String:
@@ -952,12 +952,13 @@ func _build_bot_dialog() -> void:
 	buttons.alignment = BoxContainer.ALIGNMENT_CENTER
 	buttons.add_theme_constant_override("separation", 20)
 	column.add_child(buttons)
-	var start := _dialog_button("Начать", 30)
-	start.pressed.connect(_confirm_bots)
-	buttons.add_child(start)
+	# Слева «Назад», справа «Начать» (как привычно: «вперёд» — справа).
 	var back := _dialog_button("Назад", 30)
 	back.pressed.connect(_close_bot_dialog)
 	buttons.add_child(back)
+	var start := _dialog_button("Начать", 30)
+	start.pressed.connect(_confirm_bots)
+	buttons.add_child(start)
 
 	var hint := Label.new()
 	hint.text = ("Влево/вправо — меньше/больше (по кругу)\n"

@@ -1,6 +1,6 @@
 class_name LobbyCat
 extends Node3D
-## Кот квартиры. Бродит по всем комнатам (по точкам-«тропинкам» WAYPOINTS, чтобы не ходить
+## Кот квартиры — рыжий Баггет (отсылка к настоящему коту одного из участников проекта). Бродит по всем комнатам (по точкам-«тропинкам» WAYPOINTS, чтобы не ходить
 ## сквозь мебель), иногда садится. Время от времени сам идёт на лежанку и спит (zZZ) —
 ## в это время (и пока идёт спать) его гладить нельзя.
 ##
@@ -8,6 +8,8 @@ extends Node3D
 ## Перезарядка общая на всех — PET_COOLDOWN секунд.
 
 enum State { WALK, IDLE, PETTED, TO_BED, SLEEP }
+
+const CAT_NAME := "Баггет"
 
 const PET_COOLDOWN := 5.0
 const PET_REACH := 1.3
@@ -74,6 +76,14 @@ func _ready() -> void:
 	_zzz.position = Vector3(0, 0.75, 0)
 	_zzz.visible = false
 	add_child(_zzz)
+	var name_label := Label3D.new()
+	name_label.text = CAT_NAME
+	name_label.font_size = 32
+	name_label.outline_size = 8
+	name_label.modulate = Color(1.0, 0.72, 0.35)
+	name_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	name_label.position = Vector3(0, 0.62, 0)
+	add_child(name_label)
 	_point = randi() % WAYPOINTS.size()
 	position = WAYPOINTS[_point]
 
@@ -89,7 +99,7 @@ func _process(delta: float) -> void:
 				_decide()
 		State.SLEEP:
 			_wait -= delta
-			_zzz.position.y = 0.6 + sin(_time * 1.5) * 0.05
+			_zzz.position.y = 0.92 + sin(_time * 1.5) * 0.05
 			if _wait <= 0.0:
 				_wake_up()
 	_animate(delta)
