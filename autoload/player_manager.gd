@@ -24,6 +24,8 @@ const COLOR_NAMES: Array[String] = [
 
 ## Имена ботов.
 const BOT_NAMES: Array[String] = ["Колян", "Серёга", "Вовчик", "Лёха"]
+## Номиналы фишек казино (цена фишки в рублях = номинал).
+const CHIP_VALUES: Array[int] = [10, 50, 100, 500]
 
 var players: Array[PlayerData] = []
 var _next_id := 1
@@ -137,6 +139,26 @@ func buy(p: PlayerData, id: String) -> bool:
 	_profile_set(p, "owned", owned)
 	_profile_set(p, "wallet", wallet(p) - cost)
 	return true
+
+
+# ---------------- Фишки казино ----------------
+
+## Сколько фишек каждого номинала у игрока: {10: 3, 50: 0, ...}.
+func chips(p: PlayerData) -> Dictionary:
+	var saved: Dictionary = _profile_get(p.device_key(), "chips", {})
+	var result := {}
+	for value in CHIP_VALUES:
+		result[value] = int(saved.get(value, 0))
+	return result
+
+
+## Добавить (или забрать — отрицательное число) фишки номинала value.
+func add_chips(p: PlayerData, value: int, count: int) -> void:
+	if p.is_bot() or p.device_key() == "":
+		return
+	var all := chips(p)
+	all[value] = maxi(0, int(all.get(value, 0)) + count)
+	_profile_set(p, "chips", all)
 
 
 func _profile_get(key: String, section: String, default: Variant) -> Variant:

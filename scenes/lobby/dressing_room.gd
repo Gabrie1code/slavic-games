@@ -1,5 +1,5 @@
 class_name DressingRoom
-extends Control
+extends LobbyRoom
 ## Примерочная одного игрока: слева крупно его персонаж, справа список вещей.
 ##
 ## Открывается на рынке в лобби. Если примеряют несколько игроков — экран делится,
@@ -12,7 +12,6 @@ extends Control
 ##   на своей вещи подтвердить / отмена (или кнопка «Готово») — выйти.
 ## При выходе примеренные, но не купленные вещи снимаются.
 
-signal closed(player: PlayerData)
 ## Игрок сменил цвет (лобби обновит слоты игроков).
 signal color_changed(player: PlayerData)
 
@@ -32,7 +31,6 @@ const GOLD := Color("f6c343")
 const GREEN := Color("8fd694")
 const RED := Color("ff7a6b")
 
-var player: PlayerData
 ## Персонаж игрока в лобби: одежда меняется и на нём.
 var lobby_character: PlayerCharacter
 

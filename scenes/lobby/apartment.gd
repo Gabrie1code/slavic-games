@@ -8,10 +8,11 @@ extends Node3D
 ##   напротив телевизора диван (можно сесть), журнальный столик на ковре, кресло у стены с ковром;
 ##   окно со шторами и тюлем, гантели, обеденный стол со стульями, торшер, люстра.
 ## Спальня: шкаф с зеркалом (примерочная и покупки), кровать с ковром над ней, тумбочка с лампой.
+## Казино — слева от гостиной (дверь в левой стене): стол рулетки, игровые автоматы, неон.
 ##
 ## Сверху (вид от третьего лица) нет потолка и передних стен — «срез». Потолок и передние стены
 ## есть только для вида от первого лица: они на отдельном слое FP_ONLY_LAYER.
-## Координаты: X вправо, Z к камере. Гостиная X −6..3.1, спальня X 3.1..9.
+## Координаты: X вправо, Z к камере. Казино X −11.5..−6, гостиная X −6..3.1, спальня X 3.1..9.
 
 const DIR := "res://assets/models/apartment/"
 const TV_SCENE := preload("res://assets/models/props/soviet_tv.glb")
@@ -29,6 +30,11 @@ const RIGHT_X := 9.0
 ## Дверной проём между комнатами (по Z).
 const DOOR_FROM_Z := -1.8
 const DOOR_TO_Z := -0.2
+## Казино: левее гостиной, задняя стена ближе. Дверь — в левой стене гостиной.
+const CASINO_LEFT_X := -11.5
+const CASINO_BACK_Z := -2.5
+const CASINO_DOOR_FROM_Z := 1.6
+const CASINO_DOOR_TO_Z := 3.0
 
 ## Важные точки (лобби вешает на них зоны).
 const TV_POS := Vector3(-2.6, 0, -3.5)
@@ -37,6 +43,9 @@ const WARDROBE_POS := Vector3(4.6, 0, -3.62)
 const WARDROBE_ZONE := Vector3(4.6, 0, -2.5)
 const SOFA_POS := Vector3(-2.6, 0, 0.95)
 const SOFA_YAW := PI # диван смотрит на телевизор (на −Z)
+const CASINO_TABLE_POS := Vector3(-8.6, 0, 0.2)
+## Где нажимать «сыграть» — перед столом (и вообще рядом со столом, см. лобби).
+const CASINO_ZONE := Vector3(-7.9, 0, 1.45)
 const SPAWNS: Array[Vector3] = [
 	Vector3(-0.3, 0.3, -1.2), Vector3(0.9, 0.3, -1.2),
 	Vector3(-0.3, 0.3, -2.4), Vector3(0.9, 0.3, -2.4),
@@ -49,12 +58,15 @@ const GLASS := Color(0.8, 0.95, 0.9, 0.6)
 
 ## Места на диване: [{"pos": точка посадки, "yaw": куда смотрит сидящий, "approach": где подойти}].
 var seats: Array[Dictionary] = []
+## Стол рулетки (крутится сам каждые 20 секунд).
+var casino_table: CasinoTable
 
 
 func _ready() -> void:
 	_build_rooms()
 	_build_living_room()
 	_build_bedroom()
+	_build_casino()
 
 
 # ---------------- Стены и пол ----------------
@@ -79,8 +91,14 @@ func _build_rooms() -> void:
 	_box(Vector3(RIGHT_X - LEFT_X, 0.12, 0.04),
 		Vector3((LEFT_X + RIGHT_X) / 2, 0.06, BACK_Z + 0.02), skirting)
 	# Боковые стены.
-	_solid_box(Vector3(0.2, WALL_HEIGHT, LIVING_FRONT_Z - BACK_Z),
-		Vector3(LEFT_X - 0.1, WALL_HEIGHT / 2, (BACK_Z + LIVING_FRONT_Z) / 2), wallpaper)
+	# Левая стена гостиной — с дверью в казино (и проём, и стена до неё).
+	_solid_box(Vector3(0.2, WALL_HEIGHT, CASINO_DOOR_FROM_Z - BACK_Z),
+		Vector3(LEFT_X - 0.1, WALL_HEIGHT / 2, (BACK_Z + CASINO_DOOR_FROM_Z) / 2), wallpaper)
+	_solid_box(Vector3(0.2, WALL_HEIGHT, LIVING_FRONT_Z - CASINO_DOOR_TO_Z),
+		Vector3(LEFT_X - 0.1, WALL_HEIGHT / 2, (CASINO_DOOR_TO_Z + LIVING_FRONT_Z) / 2), wallpaper)
+	_box(Vector3(0.2, WALL_HEIGHT - 2.4, CASINO_DOOR_TO_Z - CASINO_DOOR_FROM_Z),
+		Vector3(LEFT_X - 0.1, 2.4 + (WALL_HEIGHT - 2.4) / 2,
+		(CASINO_DOOR_FROM_Z + CASINO_DOOR_TO_Z) / 2), wallpaper)
 	_solid_box(Vector3(0.2, WALL_HEIGHT, BEDROOM_FRONT_Z - BACK_Z),
 		Vector3(RIGHT_X + 0.1, WALL_HEIGHT / 2, (BACK_Z + BEDROOM_FRONT_Z) / 2), wallpaper_bed)
 	# Перегородка с дверным проёмом.
@@ -98,8 +116,9 @@ func _build_rooms() -> void:
 		Vector3(PARTITION_X + 0.2, 1.5, (BEDROOM_FRONT_Z + LIVING_FRONT_Z) / 2))
 	# Потолок и передние стены — только для вида от первого лица.
 	var ceiling := _mat(Color("e8e2d2"), 0.9)
-	_fp_only(_box(Vector3(RIGHT_X - LEFT_X, 0.1, LIVING_FRONT_Z - BACK_Z),
-		Vector3((LEFT_X + RIGHT_X) / 2, WALL_HEIGHT + 0.05, (BACK_Z + LIVING_FRONT_Z) / 2), ceiling))
+	_fp_only(_box(Vector3(RIGHT_X - CASINO_LEFT_X, 0.1, LIVING_FRONT_Z - BACK_Z),
+		Vector3((CASINO_LEFT_X + RIGHT_X) / 2, WALL_HEIGHT + 0.05, (BACK_Z + LIVING_FRONT_Z) / 2),
+		ceiling))
 	_fp_only(_box(Vector3(living_w, WALL_HEIGHT, 0.2),
 		Vector3((LEFT_X + PARTITION_X) / 2, WALL_HEIGHT / 2, LIVING_FRONT_Z + 0.1), wallpaper))
 	_fp_only(_box(Vector3(bed_w, WALL_HEIGHT, 0.2),
@@ -194,6 +213,79 @@ func _build_bedroom() -> void:
 	_tippable("stool", Vector3(0.36, 0.47, 0.36), 0.24, Vector3(8.4, 0, -0.4), 2.0)
 	_breakable("book_stack", Vector3(8.6, 0.47, -0.4), [Color("992018"), Color("cc9918")], 0.4)
 	_place(_model("chandelier"), Vector3(6.2, 0, -1.4))
+
+
+# ---------------- Казино ----------------
+
+func _build_casino() -> void:
+	var carpet := _mat(Color("5a1018"), 0.95)
+	var wallpaper := _mat(Color("3a1a2a"), 0.9)
+	var width := LEFT_X - CASINO_LEFT_X
+	var depth := LIVING_FRONT_Z - CASINO_BACK_Z
+	var center_x := (CASINO_LEFT_X + LEFT_X) / 2
+	var center_z := (CASINO_BACK_Z + LIVING_FRONT_Z) / 2
+	_solid_box(Vector3(width, 0.2, depth), Vector3(center_x, -0.1, center_z), carpet)
+	_solid_box(Vector3(width, WALL_HEIGHT, 0.2),
+		Vector3(center_x, WALL_HEIGHT / 2, CASINO_BACK_Z - 0.1), wallpaper)
+	_solid_box(Vector3(0.2, WALL_HEIGHT, depth),
+		Vector3(CASINO_LEFT_X - 0.1, WALL_HEIGHT / 2, center_z), wallpaper)
+	# Со стороны гостиной стена у двери — своими обоями (казино тёмное).
+	_box(Vector3(0.02, WALL_HEIGHT, CASINO_DOOR_FROM_Z - CASINO_BACK_Z),
+		Vector3(LEFT_X - 0.21, WALL_HEIGHT / 2, (CASINO_BACK_Z + CASINO_DOOR_FROM_Z) / 2), wallpaper)
+	_invisible_wall(Vector3(width, 3, 0.4), Vector3(center_x, 1.5, LIVING_FRONT_Z + 0.2))
+	_fp_only(_box(Vector3(width, WALL_HEIGHT, 0.2),
+		Vector3(center_x, WALL_HEIGHT / 2, LIVING_FRONT_Z + 0.1), wallpaper))
+
+	casino_table = CasinoTable.new()
+	casino_table.position = CASINO_TABLE_POS
+	add_child(casino_table)
+	# Лампа над сукном — только от первого лица (сверху закрыла бы стол).
+	var lamp := _place(_casino_model("casino_lamp"), CASINO_TABLE_POS + Vector3(0.3, 0, 0))
+	_set_layers(lamp, FP_ONLY_LAYER)
+	var light := OmniLight3D.new()
+	light.light_color = Color(1.0, 0.9, 0.65)
+	light.light_energy = 1.6
+	light.omni_range = 4.5
+	light.position = CASINO_TABLE_POS + Vector3(0.3, 1.8, 0)
+	add_child(light)
+
+	# Игровые автоматы 90-х: два у задней стены, один у левой.
+	_solid(_casino_model("arcade_cabinet"), Vector3(0.7, 1.7, 0.6), 0.85,
+		Vector3(-10.9, 0, CASINO_BACK_Z + 0.4))
+	_solid(_casino_model("arcade_cabinet"), Vector3(0.7, 1.7, 0.6), 0.85,
+		Vector3(-10.1, 0, CASINO_BACK_Z + 0.4))
+	_solid(_casino_model("arcade_cabinet"), Vector3(0.7, 1.7, 0.6), 0.85,
+		Vector3(CASINO_LEFT_X + 0.4, 0, 2.3), PI / 2)
+
+	# Неоновые вывески: в казино и над дверью со стороны гостиной.
+	_neon("КАЗИНО", Vector3(-8.3, 2.35, CASINO_BACK_Z + 0.02), 0.0, 120)
+	_neon("КАЗИНО", Vector3(LEFT_X + 0.02, 2.65, (CASINO_DOOR_FROM_Z + CASINO_DOOR_TO_Z) / 2),
+		PI / 2, 60)
+
+
+func _neon(text: String, pos: Vector3, yaw: float, font_size: int) -> void:
+	var sign_label := Label3D.new()
+	sign_label.text = text
+	sign_label.font_size = font_size
+	sign_label.outline_size = font_size / 5
+	sign_label.modulate = Color(1.0, 0.35, 0.75)
+	sign_label.outline_modulate = Color(0.45, 0.0, 0.3)
+	sign_label.position = pos
+	sign_label.rotation.y = yaw
+	add_child(sign_label)
+
+
+func _casino_model(model_name: String) -> Node3D:
+	return (load("res://assets/models/casino/" + model_name + ".glb") as PackedScene) \
+		.instantiate() as Node3D
+
+
+## Задать слой видимости всем мешам внутри узла.
+func _set_layers(node: Node, layer: int) -> void:
+	if node is VisualInstance3D:
+		(node as VisualInstance3D).layers = layer
+	for child in node.get_children():
+		_set_layers(child, layer)
 
 
 # ---------------- Помощники ----------------

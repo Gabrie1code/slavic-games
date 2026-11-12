@@ -7,6 +7,8 @@ extends Node3D
 ## Когда готовы все — спросим про ботов (если есть места), потом отсчёт 5 сек и старт.
 ## Лобби — советская квартира (см. Apartment): в гостиной всё можно ломать, на диване — сидеть.
 ## Шкаф в спальне: подойти и нажать кнопку подтверждения — откроется примерочная.
+## Казино (дверь в левой стене гостиной): у стола рулетки та же кнопка
+## открывает стол крупным планом.
 ##
 ## Вид от первого лица (по умолчанию) или от третьего — F2 (пока идёт разработка).
 ## От первого лица у каждого живого игрока своя камера (экран делится):
@@ -22,6 +24,7 @@ const ROUNDS := 5
 ## Зоны в квартире (координаты — в Apartment).
 const WARDROBE_RADIUS := 1.2
 const TV_ZONE_RADIUS := 1.3
+const CASINO_RADIUS := 1.3
 const SEAT_RADIUS := 0.9
 const COUNTDOWN := 5.0
 ## Вид от первого лица: чувствительность мыши и скорость обзора правым стиком.
@@ -62,7 +65,7 @@ var _views: Dictionary = {}
 var _views_root: Control
 var _mouse_delta := Vector2.ZERO
 
-## Открытые примерочные: PlayerData.id -> DressingRoom
+## Открытые окна игроков (примерочная, стол казино): PlayerData.id -> LobbyRoom
 var _rooms: Dictionary = {}
 var _rooms_root: Control
 
@@ -74,7 +77,8 @@ var _rooms_root: Control
 
 
 func _ready() -> void:
-	_camera.look_at_from_position(Vector3(1.5, 12.0, 11.5), Vector3(1.5, 0, -0.6))
+	# Сверху видно всю квартиру: казино, гостиную и спальню.
+	_camera.look_at_from_position(Vector3(-1.2, 16.0, 15.0), Vector3(-1.2, 0, -0.5))
 	# Сверху не показываем потолок и передние стены.
 	_camera.cull_mask &= ~Apartment.FP_ONLY_LAYER & ~VIEWMODEL_LAYERS
 	var views_layer := CanvasLayer.new()
@@ -90,6 +94,8 @@ func _ready() -> void:
 		"ИГРАТЬ: встань в круг\nи нажми Пробел / Enter / A")
 	_build_zone(Apartment.WARDROBE_ZONE, WARDROBE_RADIUS, Color(0.96, 0.76, 0.26),
 		"ШКАФ: переодеться\nи купить одежду")
+	_build_zone(Apartment.CASINO_ZONE, CASINO_RADIUS, Color(1.0, 0.35, 0.75),
+		"КАЗИНО: рулетка\nставки каждые 20 сек")
 
 	# Боты прошлой партии в лобби не нужны: при старте спросим заново.
 	PlayerManager.remove_bots()
@@ -203,6 +209,8 @@ func _process(delta: float) -> void:
 		var seat := _free_seat_near(p)
 		if p.input.is_just_pressed("confirm") and _is_near(p, Apartment.WARDROBE_ZONE, WARDROBE_RADIUS):
 			_open_wardrobe(p)
+		elif p.input.is_just_pressed("confirm") and _near_casino(p):
+			_open_casino(p)
 		elif p.input.is_just_pressed("confirm") and at_tv:
 			_set_ready(p, not _ready_marks.has(p.id))
 		elif p.input.is_just_pressed("confirm") and seat >= 0:
@@ -359,7 +367,7 @@ func _test_add_money() -> void:
 	for p in PlayerManager.players:
 		PlayerManager.add_to_wallet(p, 500)
 		if _rooms.has(p.id):
-			(_rooms[p.id] as DressingRoom).refresh()
+			(_rooms[p.id] as LobbyRoom).refresh()
 
 
 func _open_wardrobe(p: PlayerData) -> void:
@@ -375,6 +383,29 @@ func _open_wardrobe(p: PlayerData) -> void:
 	_layout_rooms()
 
 
+func _open_casino(p: PlayerData) -> void:
+	var character: PlayerCharacter = _characters[p.id]
+	character.input_enabled = false
+	character.velocity = Vector3.ZERO
+	var screen := CasinoScreen.new()
+	screen.setup(p, character, _apartment.casino_table)
+	screen.closed.connect(_on_room_closed)
+	_rooms_root.add_child(screen)
+	_rooms[p.id] = screen
+	_layout_rooms()
+
+
+## Рядом со столом рулетки: в круге перед столом или вплотную к столу с любой стороны.
+func _near_casino(p: PlayerData) -> bool:
+	if _is_near(p, Apartment.CASINO_ZONE, CASINO_RADIUS):
+		return true
+	if not _characters.has(p.id):
+		return false
+	var table := _apartment.casino_table
+	var local := table.to_local((_characters[p.id] as Node3D).global_position)
+	return absf(local.x) < 2.4 and absf(local.z) < 1.3
+
+
 func _on_room_closed(p: PlayerData) -> void:
 	if not _rooms.has(p.id):
 		return
@@ -386,17 +417,17 @@ func _on_room_closed(p: PlayerData) -> void:
 
 
 func _close_all_wardrobes() -> void:
-	for room: DressingRoom in _rooms.values():
+	for room: LobbyRoom in _rooms.values():
 		room.close()
 
 
-## Одна примерочная — на весь экран, две — пополам, три-четыре — по четвертям.
+## Одно окно (примерочная или стол) — на весь экран, две — пополам, три-четыре — по четвертям.
 func _layout_rooms() -> void:
 	var screen := get_viewport().get_visible_rect().size
-	var rooms: Array[DressingRoom] = []
-	for room: DressingRoom in _rooms.values():
+	var rooms: Array[LobbyRoom] = []
+	for room: LobbyRoom in _rooms.values():
 		rooms.append(room)
-	rooms.sort_custom(func(a: DressingRoom, b: DressingRoom) -> bool:
+	rooms.sort_custom(func(a: LobbyRoom, b: LobbyRoom) -> bool:
 		return a.player.slot < b.player.slot)
 	var n := rooms.size()
 	for i in n:
@@ -565,17 +596,20 @@ func _update_first_person(delta: float) -> void:
 ## Подсказка внизу экрана игрока: что можно сделать здесь.
 func _prompt_for(p: PlayerData, character: PlayerCharacter) -> String:
 	var key := _confirm_key(p)
+	var action := ""
 	if character.sitting:
-		return "%s — встать" % key
-	if _is_near(p, Apartment.WARDROBE_ZONE, WARDROBE_RADIUS):
-		return "%s — открыть шкаф (переодеться)" % key
-	if _is_near(p, Apartment.TV_ZONE, TV_ZONE_RADIUS):
+		action = "встать"
+	elif _is_near(p, Apartment.WARDROBE_ZONE, WARDROBE_RADIUS):
+		action = "открыть шкаф (переодеться)"
+	elif _near_casino(p):
+		action = "сыграть в рулетку"
+	elif _is_near(p, Apartment.TV_ZONE, TV_ZONE_RADIUS):
 		if _ready_marks.has(p.id):
 			return "Ты ГОТОВ! Ждём остальных  (%s — отменить)" % key
-		return "%s — ГОТОВ к игре" % key
-	if _free_seat_near(p) >= 0:
-		return "%s — сесть на диван" % key
-	return ""
+		action = "ГОТОВ к игре"
+	elif _free_seat_near(p) >= 0:
+		action = "сесть на диван"
+	return "" if action == "" else "%s — %s" % [key, action]
 
 
 func _confirm_key(p: PlayerData) -> String:
