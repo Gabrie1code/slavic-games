@@ -42,6 +42,8 @@ var _button_focus := 1
 ## Вещь, на которую смотрит кнопка «Купить и надеть»: последняя выбранная строка одежды.
 var _item_row := 0
 var _saved: Dictionary = {}
+## Слоты, которые освободились из-за «занятости» (платье ↔ штаны) во время примерки.
+var _conflict_cleared: Array[int] = []
 var _message := ""
 var _message_color := GREEN
 var _time := 0.0
@@ -100,6 +102,15 @@ func close() -> void:
 				player.outfit.erase(slot)
 			else:
 				player.outfit[slot] = back
+			if lobby_character:
+				lobby_character.wear(slot, back)
+	# Вернуть вещи, снятые из-за некупленной примерки (например, штаны под платьем).
+	for slot in _conflict_cleared:
+		var back: String = _saved.get(slot, "")
+		if player.outfit.get(slot, "") == "" and back != "" \
+				and Cosmetics.covered_by(player.outfit, slot) == "":
+			player.outfit[slot] = back
+			_mannequin.wear(slot, back)
 			if lobby_character:
 				lobby_character.wear(slot, back)
 	PlayerManager.save_outfit(player)
@@ -199,10 +210,11 @@ func _cycle_item(step: int) -> void:
 	var options: Array[String] = [""]
 	options.append_array(Cosmetics.items_for_slot(slot as Cosmetics.Slot))
 	var next_id := options[posmod(options.find(_current_id()) + step, options.size())]
-	if next_id == "":
-		player.outfit.erase(slot)
-	else:
-		player.outfit[slot] = next_id
+	# Платье занимает и штаны: надели платье — штаны снялись (и наоборот). Запоминаем,
+	# что сняли, чтобы при выходе вернуть, если примерка не куплена.
+	for cleared in Cosmetics.equip(player.outfit, slot, next_id):
+		if not _conflict_cleared.has(cleared):
+			_conflict_cleared.append(cleared)
 	_mannequin.wear(slot, next_id)
 	if lobby_character:
 		lobby_character.wear(slot, next_id)
@@ -274,6 +286,9 @@ func _refresh() -> void:
 			var owned := PlayerManager.owns(player, id)
 			_row_names[i].text = Cosmetics.SLOT_NAMES[slot]
 			_row_items[i].text = Cosmetics.item_name(id)
+			var blocker := Cosmetics.covered_by(player.outfit, slot)
+			if id == "" and blocker != "":
+				_row_items[i].text = "Занято: " + Cosmetics.item_name(blocker)
 			_row_prices[i].text = "" if owned else "%d ₽" % Cosmetics.price(id)
 		var style := StyleBoxFlat.new()
 		style.set_corner_radius_all(10)

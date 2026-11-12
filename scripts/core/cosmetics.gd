@@ -77,6 +77,23 @@ const ITEMS := {
 	"back_bag": {"slot": Slot.NECK, "name": "Челночная сумка", "price": 200},
 	"back_guitar": {"slot": Slot.NECK, "name": "Гитара", "price": 300},
 	"neck_gold_chain": {"slot": Slot.NECK, "name": "Золотая цепь", "price": 400},
+	# Новые: очки, бабушка, футбол, гопник
+	"face_sunglasses": {"slot": Slot.FACE, "name": "Тёмные очки", "price": 150},
+	"face_round_glasses": {"slot": Slot.FACE, "name": "Круглые очки", "price": 50},
+	"hat_headscarf": {"slot": Slot.HAT, "name": "Платок в цветочек", "price": 0},
+	# Платье длинное: занимает и верх, и штаны (covers).
+	"jacket_dress": {
+		"slot": Slot.JACKET, "name": "Платье в цветочек", "price": 150, "covers": [Slot.PANTS],
+	},
+	"shoes_boty": {"slot": Slot.SHOES, "name": "Боты «прощай, молодость»", "price": 50},
+	# Номер на спине ставит игра: номер игрока (слот + 1).
+	"jacket_football": {
+		"slot": Slot.JACKET, "name": "Футболка с номером", "price": 100, "number": true,
+	},
+	"pants_football": {"slot": Slot.PANTS, "name": "Футбольные шорты", "price": 0},
+	"shoes_bootsy": {"slot": Slot.SHOES, "name": "Бутсы с гетрами", "price": 150},
+	"jacket_abibas_open": {"slot": Slot.JACKET, "name": "Олимпийка нараспашку", "price": 150},
+	"pants_jeans": {"slot": Slot.PANTS, "name": "Джинсы-варёнки", "price": 100},
 }
 
 
@@ -101,6 +118,41 @@ static func is_free(id: String) -> bool:
 	return id == "" or price(id) == 0
 
 
+## Какие ещё слоты занимает вещь (платье — и штаны). Пусто для обычных вещей.
+static func covers(id: String) -> Array:
+	return ITEMS[id].get("covers", []) if ITEMS.has(id) else []
+
+
+## Какая вещь из наряда занимает слот, хотя надета в другой (платье — штаны).
+## "" — никакая.
+static func covered_by(outfit: Dictionary, slot: int) -> String:
+	for other: int in outfit:
+		if other != slot and covers(outfit[other]).has(slot):
+			return outfit[other]
+	return ""
+
+
+## Надеть вещь в наряд с учётом «занятых» слотов: платье снимает штаны, штаны — платье.
+## Возвращает слоты, которые пришлось освободить.
+static func equip(outfit: Dictionary, slot: int, id: String) -> Array[int]:
+	var cleared: Array[int] = []
+	if id == "":
+		outfit.erase(slot)
+		return cleared
+	outfit[slot] = id
+	for covered: int in covers(id):
+		if outfit.has(covered):
+			outfit.erase(covered)
+			cleared.append(covered)
+	var blocker := covered_by(outfit, slot)
+	if blocker != "":
+		for other: int in outfit.keys():
+			if outfit[other] == blocker:
+				outfit.erase(other)
+				cleared.append(other)
+	return cleared
+
+
 static func load_item(id: String) -> PackedScene:
 	return load(DIR + id + ".glb") as PackedScene
 
@@ -111,5 +163,5 @@ static func random_outfit() -> Dictionary:
 	for slot: Slot in SLOT_NAMES:
 		var options := items_for_slot(slot)
 		if not options.is_empty() and randf() < 0.6:
-			outfit[slot] = options.pick_random()
+			equip(outfit, slot, options.pick_random())
 	return outfit

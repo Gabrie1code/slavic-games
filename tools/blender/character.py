@@ -1144,6 +1144,231 @@ def item_back_guitar():
     return [part("Torso", g)]
 
 
+# ======================= Новые вещи (очки, бабушка, футбол, гопник) =======================
+
+def glasses_arms(m, z=1.39, y_front=0.3):
+    """Дужки очков: от оправы назад к ушам."""
+    # Дужки прижаты к голове и уходят назад только до ушей (сзади не торчат).
+    arms = [box((0.016, y_front - 0.04, 0.016), (s * 0.29, (y_front + 0.04) / 2, z), m) for s in (-1, 1)]
+    for s in (-1, 1):                                                               # шарнир: оправа → дужка
+        arms.append(segment_box((s * 0.19, y_front + 0.02, z), (s * 0.29, y_front - 0.01, z), m,
+                                w=0.016, t=0.016))
+    return arms
+
+
+def item_face_sunglasses():
+    """Тёмные очки «как у Нового русского»: прямоугольные чёрные стёкла с бликом."""
+    FRAME = mat("ShadesFrame", (0.02, 0.02, 0.02), 0.3)
+    LENS = mat("ShadesLens", (0.04, 0.04, 0.06), 0.05, 0.6)
+    SHINE = mat("ShadesShine", (0.6, 0.65, 0.7), 0.1, 0.5)
+    pieces = []
+    for s in (-1, 1):
+        pieces.append(box((0.19, 0.03, 0.125), (s * 0.11, 0.315, 1.375), FRAME, bevel=0.025))
+        pieces.append(box((0.165, 0.02, 0.1), (s * 0.11, 0.326, 1.375), LENS, bevel=0.02))
+        pieces.append(box((0.016, 0.006, 0.035), (s * 0.11 - 0.05, 0.337, 1.405), SHINE, rot=(0, 0.6, 0)))
+    pieces.append(box((0.05, 0.02, 0.02), (0, 0.315, 1.4), FRAME))                    # перемычка
+    pieces += glasses_arms(FRAME, z=1.39, y_front=0.3)
+    return [part("Head", pieces)]
+
+
+def item_face_round_glasses():
+    """Круглые бабушкины очки в тонкой оправе (глаза видно)."""
+    FRAME = mat("RoundFrame", (0.35, 0.22, 0.1), 0.4, 0.3)
+    pieces = []
+    for s in (-1, 1):
+        bpy.ops.mesh.primitive_torus_add(major_radius=0.085, minor_radius=0.011, major_segments=20,
+                                         minor_segments=5, location=(s * 0.11, 0.31, 1.37),
+                                         rotation=(math.radians(90), 0, 0))
+        pieces.append(flat(bpy.context.object, FRAME))
+    pieces.append(box((0.05, 0.015, 0.015), (0, 0.31, 1.395), FRAME))
+    pieces += glasses_arms(FRAME, z=1.385, y_front=0.29)
+    return [part("Head", pieces)]
+
+
+def flower_dots(points, mats, r=0.02):
+    """«Цветочки» на ткани: маленькие приплюснутые шарики разных цветов."""
+    return [sphere(r, p, mats[i % len(mats)], scale=(1, 1, 0.6), segs=6, rings=4) for i, p in enumerate(points)]
+
+
+def item_hat_headscarf():
+    """Платок в цветочек, завязанный под подбородком (как у бабушки на лавочке)."""
+    CLOTH = mat("ScarfCream", (0.95, 0.9, 0.82), 0.9)
+    RED = mat("ScarfFlowerRed", (0.8, 0.15, 0.2), 0.8)
+    BLUE = mat("ScarfFlowerBlue", (0.2, 0.35, 0.8), 0.8)
+    GREEN = mat("ScarfLeaf", (0.25, 0.55, 0.25), 0.8)
+    # Капюшон-платок: сфера с овальным вырезом под лицо, снизу обхватывает подбородок.
+    # Почти вплотную к голове (r 0.3): иначе в вырезе видна тёмная щель.
+    scarf = sphere(0.312, (0, -0.012, 1.335), CLOTH, scale=(1.03, 1.0, 1.04), segs=24, rings=14)
+    bm = bmesh.new()
+    bm.from_mesh(scarf.data)
+    face = [v for v in bm.verts
+            if (v.co.y > 0.0 and (v.co.x / 0.22) ** 2 + ((v.co.z - 1.33) / 0.2) ** 2 < 1.0) or v.co.z < 1.03]
+    bmesh.ops.delete(bm, geom=face, context="VERTS")
+    bm.to_mesh(scarf.data)
+    bm.free()
+    solid = scarf.modifiers.new("Thick", "SOLIDIFY")                                # толщина ткани —
+    solid.thickness = 0.018                                                         # без чёрной изнанки
+    solid.offset = 1.0
+    pieces = [scarf]
+    pieces.append(sphere(0.045, (0, 0.2, 1.05), CLOTH, scale=(1.3, 0.8, 0.8), segs=10, rings=6))  # узел
+    for s in (-1, 1):                                                                             # концы
+        pieces.append(box((0.05, 0.02, 0.08), (s * 0.045, 0.22, 1.0), CLOTH, rot=(0, s * 0.4, 0)))
+    pts = []
+    for i in range(34):                                                                           # цветочки
+        a = i * 2.39996
+        z = 1.1 + (i % 11) * 0.05
+        rr = 0.333 * math.sqrt(max(0.0, 1 - ((z - 1.335) / 0.345) ** 2))
+        x, y = math.cos(a) * rr, math.sin(a) * rr - 0.015
+        if y > -0.02 and (x / 0.26) ** 2 + ((z - 1.33) / 0.24) ** 2 < 1.0:
+            continue
+        pts.append((x * 1.04, y, z))
+    pieces += flower_dots(pts, [RED, BLUE, RED, GREEN])
+    return [part("Head", pieces)]
+
+
+def item_jacket_dress():
+    """Платье в цветочек (сиреневое): лиф, юбка до середины голени, рукава-фонарики, белый воротник.
+    Занимает и верх, и низ (в игре снимает штаны)."""
+    DRESS = mat("DressLilac", (0.55, 0.42, 0.82), 0.85)
+    WHITE = mat("DressCollar", (0.96, 0.95, 0.92), 0.8)
+    YEL = mat("DressFlowerYellow", (0.98, 0.85, 0.3), 0.8)
+    PINK = mat("DressFlowerPink", (0.95, 0.6, 0.75), 0.8)
+    WHT = mat("DressFlowerWhite", (0.97, 0.97, 0.95), 0.8)
+    body = torso_shell(DRESS, 0.6, 1.06, extra=0.025)
+    body.append(cyl(torso_r(0.6) + 0.03, 0.48, (0, 0, 0.38), DRESS, verts=16, r2=0.42, scale=(1, 0.95, 1),
+                    rot=(math.pi, 0, 0)))                                                     # юбка
+    body.append(cyl(0.42, 0.03, (0, 0, 0.15), WHITE, verts=16, scale=(1, 0.95, 1)))          # кайма подола
+    for s in (-1, 1):                                                                         # воротник
+        body.append(box((0.13, 0.025, 0.07), (s * 0.07, 0.18, 1.085), WHITE, bevel=0.02,
+                        rot=(math.radians(-25), s * math.radians(-20), 0)))
+    body += [front_patch(WHITE, 0, z, 0.026, 0.026, extra=0.025, thick=0.02) for z in (0.8, 0.9, 1.0)]
+    pts = []
+    for i in range(40):
+        a = i * 2.39996
+        z = 0.2 + (i % 10) * 0.085
+        if z > 0.6:
+            r = torso_r(min(z, 1.0)) + 0.027
+            pts.append((math.cos(a) * r, math.sin(a) * r * 0.74, z))
+        else:
+            t = (0.62 - z) / 0.48
+            r = (torso_r(0.6) + 0.03) * (1 - t) + 0.42 * t + 0.004
+            pts.append((math.cos(a) * r, math.sin(a) * r * 0.95, z))
+    body += flower_dots(pts, [YEL, PINK, WHT], r=0.022)
+    def arm(x, s):
+        return [sphere(0.12, (x, 0, 0.94), DRESS, scale=(1, 1, 1.1), segs=10, rings=6),       # фонарик
+                cyl(0.11, 0.025, (x, 0, 0.83), WHITE, verts=10)]
+    return jacket(body, arm)
+
+
+def item_shoes_boty():
+    """Боты «прощай, молодость»: войлочные коричневые, до щиколотки, молния спереди, мех сверху."""
+    FELT = mat("BotyFelt", (0.35, 0.22, 0.14), 1.0)
+    SOLE = mat("BotySole", (0.08, 0.07, 0.06), 0.7)
+    FUR = mat("BotyFur", (0.88, 0.82, 0.7), 1.0)
+    ZIP = mat("BotyZip", (0.75, 0.72, 0.6), 0.4, 0.6)
+    def boot(x, s):
+        pieces = shoe_body(x, FELT, SOLE, w=0.22, d=0.33, h=0.14, sole_h=0.035, bevel=0.07)
+        pieces.append(cyl(0.12, 0.13, (x, -0.01, 0.2), FELT, verts=12))
+        pieces.append(cyl(0.128, 0.04, (x, -0.01, 0.27), FUR, verts=12))
+        pieces.append(box((0.015, 0.015, 0.16), (x, 0.118, 0.19), ZIP))
+        return pieces
+    return legs(boot)
+
+
+def item_jacket_football():
+    """Футболка футболиста: цвета игрока, белые рукава и V-ворот. Номер на спине ставит игра."""
+    P = primary()
+    W = mat("KitWhite", (0.96, 0.96, 0.95), 0.6)
+    body = torso_shell(P, 0.56, 1.06)
+    for s in (-1, 1):
+        body.append(front_patch(W, s * 0.035, 1.03, 0.028, 0.11, rot_y=s * 30))              # V-ворот
+    body.append(front_patch(W, 0.12, 0.9, 0.045, 0.055))                                      # эмблема
+    body.append(cyl(torso_r(0.56) + 0.025, 0.03, (0, 0, 0.575), W, verts=12, scale=(1, 0.76, 1)))
+    return jacket(body, lambda x, s: sleeve(x, W, z_bot=0.82, r=0.092) +
+                  [cyl(0.095, 0.03, (x, 0, 0.83), P, verts=10)])
+
+
+def item_pants_football():
+    """Футбольные шорты: белые, с полосами цвета игрока по бокам."""
+    W = mat("KitWhite", (0.96, 0.96, 0.95), 0.6)
+    P = primary()
+    waist = seat(W) + [cyl(0.257, 0.04, (0, 0, 0.63), P, verts=12, scale=(1, 0.76, 1))]   # пояс
+    return legs(lambda x, s: [striped_tube(x, s, 0.128, 0.3, 0.56, W, P),
+                              cyl(0.131, 0.025, (x, 0, 0.31), P, verts=16)], waist)
+
+
+def item_shoes_bootsy():
+    """Бутсы с гетрами: чёрные бутсы с белой полосой и шипами, гетры до колена цвета игрока."""
+    P = primary()
+    BLACK = mat("BootsyBlack", (0.03, 0.03, 0.035), 0.4)
+    W = mat("KitWhite", (0.96, 0.96, 0.95), 0.6)
+    def boot(x, s):
+        pieces = shoe_body(x, BLACK, W, h=0.12, sole_h=0.03, bevel=0.045)
+        pieces.append(box((0.006, 0.18, 0.03), (x + s * 0.103, 0.03, 0.08), W, rot=(math.radians(-15), 0, 0)))
+        pieces.append(cyl(0.11, 0.3, (x, -0.01, 0.27), P, verts=12))                          # гетры
+        for z in (0.33, 0.38):
+            pieces.append(cyl(0.112, 0.02, (x, -0.01, z), W, verts=12))
+        pieces.append(cyl(0.114, 0.03, (x, -0.01, 0.42), P, verts=12))                         # отворот
+        return pieces
+    return legs(boot)
+
+
+def cut_front_v(o, half_w_bottom, half_w_top, z_bot, z_top):
+    """Вырезать спереди V-раствор (расстёгнутая куртка): удалить грани посередине груди."""
+    bm = bmesh.new()
+    bm.from_mesh(o.data)
+    bad = []
+    for f in bm.faces:
+        c = f.calc_center_median()
+        if c.y <= 0 or c.z < z_bot:
+            continue
+        t = min(1.0, max(0.0, (c.z - z_bot) / (z_top - z_bot)))
+        if abs(c.x) < half_w_bottom + (half_w_top - half_w_bottom) * t:
+            bad.append(f)
+    bmesh.ops.delete(bm, geom=bad, context="FACES")
+    bm.to_mesh(o.data)
+    bm.free()
+    return o
+
+
+def item_jacket_abibas_open():
+    """Олимпийка «Абибас» нараспашку: чёрная, расстёгнута — видно тело, белые полосы и кант."""
+    BLACK = mat("TrackBlack", (0.04, 0.04, 0.05), 0.6)
+    W = mat("StripeWhite", (0.95, 0.95, 0.95), 0.5)
+    shell = cyl(torso_r(0.55) + 0.022, 0.51, (0, 0, 0.805), BLACK, verts=24, r2=torso_r(1.06) + 0.022,
+                scale=(1, 0.74, 1))
+    dome = sphere(0.292, (0, 0, 1.03), BLACK, scale=(1, 0.74, 0.36), segs=24, rings=6)
+    cut_front_v(shell, 0.035, 0.11, 0.55, 1.06)
+    cut_front_v(dome, 0.11, 0.16, 1.0, 1.14)
+    body = [shell, dome]
+    for s in (-1, 1):                                                                         # кант по краю
+        body.append(segment_box((s * 0.04, chest_y(0.04, 0.57, 0.024), 0.57),
+                                (s * 0.11, chest_y(0.11, 1.03, 0.024), 1.03), W, w=0.022, t=0.012))
+    body.append(cyl(torso_r(0.55) + 0.03, 0.06, (0, 0, 0.56), BLACK, verts=24, scale=(1, 0.76, 1)))
+    collar = cyl(0.165, 0.09, (0, 0, 1.11), BLACK, verts=24)                          # стойка, расстёгнута
+    body.append(cut_front_v(collar, 0.08, 0.1, 1.0, 1.2))
+    def arm(x, s):
+        return [striped_tube(x, s, 0.092, 0.7, 1.0, BLACK, W),
+                sphere(0.094, (x, 0, 1.0), BLACK, segs=10, rings=5),
+                cyl(0.098, 0.06, (x, 0, 0.68), BLACK, verts=10)]
+    return jacket(body, arm)
+
+
+def item_pants_jeans():
+    """Джинсы-варёнки: светлые, с потёртостями, рыжими швами и подвёрнутым низом."""
+    DENIM = mat("DenimLight", (0.33, 0.48, 0.72), 0.85)
+    WASH = mat("DenimLightWash", (0.58, 0.68, 0.84), 0.9)
+    SEAM = mat("DenimSeam", (0.8, 0.6, 0.25), 0.7)
+    w = seat(DENIM) + [cyl(0.256, 0.05, (0, 0, 0.62), DENIM, verts=12, scale=(1, 0.76, 1))]
+    w.append(front_patch(SEAM, 0, 0.6, 0.02, 0.06, extra=0.006))
+    def leg(x, s):
+        return [cyl(0.107, 0.41, (x, 0, 0.36), DENIM, verts=12),
+                cyl(0.115, 0.05, (x, 0, 0.16), DENIM, verts=12),                              # подворот
+                box((0.06, 0.02, 0.12), (x + s * 0.02, 0.1, 0.42), WASH),                      # потёртости
+                box((0.012, 0.012, 0.4), (x + s * 0.106, 0, 0.36), SEAM)]
+    return legs(leg, w)
+
+
 ITEMS = {
     # Шапки
     "hat_kepka": item_kepka,
@@ -1195,6 +1420,17 @@ ITEMS = {
     "back_bag": item_back_bag,
     "back_ranets": item_back_ranets,
     "back_guitar": item_back_guitar,
+    # Новые: очки, бабушка, футбол, гопник
+    "face_sunglasses": item_face_sunglasses,
+    "face_round_glasses": item_face_round_glasses,
+    "hat_headscarf": item_hat_headscarf,
+    "jacket_dress": item_jacket_dress,
+    "shoes_boty": item_shoes_boty,
+    "jacket_football": item_jacket_football,
+    "pants_football": item_pants_football,
+    "shoes_bootsy": item_shoes_bootsy,
+    "jacket_abibas_open": item_jacket_abibas_open,
+    "pants_jeans": item_pants_jeans,
 }
 
 

@@ -56,6 +56,8 @@ var _idle_time := 0.0
 var _primary_material: StandardMaterial3D
 ## Слот одежды -> надетые куски (чтобы снять при смене).
 var _worn: Dictionary = {}
+## Слот -> id надетой вещи (для правила «платье занимает и штаны»).
+var _worn_ids: Dictionary = {}
 ## Слой видимости модели (свою модель камера от первого лица не показывает).
 var _render_layer := 1
 
@@ -276,13 +278,17 @@ func apply_outfit(outfit: Dictionary) -> void:
 		wear(slot, outfit.get(slot, ""))
 
 
-## Надеть вещь в слот (пустой id — снять).
+## Надеть вещь в слот (пустой id — снять). Платье снимает штаны и наоборот (Cosmetics.covers).
 func wear(slot: int, item_id: String) -> void:
-	for piece: Node in _worn.get(slot, []):
-		piece.queue_free()
-	_worn.erase(slot)
+	_take_off(slot)
 	if item_id == "" or not Cosmetics.ITEMS.has(item_id):
 		return
+	for covered: int in Cosmetics.covers(item_id):
+		_take_off(covered)
+	var worn_slots: Array = _worn_ids.keys()
+	for other: int in worn_slots:
+		if Cosmetics.covers(_worn_ids[other]).has(slot):
+			_take_off(other)
 	var item := Cosmetics.load_item(item_id).instantiate()
 	var pieces: Array[Node] = []
 	# Каждый кусок вещи переезжает внутрь своей части тела.
@@ -297,7 +303,33 @@ func wear(slot: int, item_id: String) -> void:
 		_apply_layer(piece_3d)
 		pieces.append(piece_3d)
 	item.queue_free()
+	if Cosmetics.ITEMS[item_id].get("number", false):
+		pieces.append(_shirt_number())
 	_worn[slot] = pieces
+	_worn_ids[slot] = item_id
+
+
+func _take_off(slot: int) -> void:
+	for piece: Node in _worn.get(slot, []):
+		piece.queue_free()
+	_worn.erase(slot)
+	_worn_ids.erase(slot)
+
+
+## Номер на спине футболки — номер игрока (1–4).
+func _shirt_number() -> Label3D:
+	var number := Label3D.new()
+	number.text = str(player.slot + 1)
+	number.font_size = 120
+	number.outline_size = 16
+	number.modulate = Color.WHITE
+	number.outline_modulate = Color(0.1, 0.1, 0.12)
+	number.pixel_size = 0.0022
+	# Спина туловища: в координатах части Torso (сустав — таз).
+	number.position = Vector3(0, 0.3, 0.215)
+	_part("Torso").add_child(number)
+	_apply_layer(number)
+	return number
 
 
 ## Слой видимости всей модели персонажа (и надетой одежды).
