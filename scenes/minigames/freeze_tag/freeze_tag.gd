@@ -12,7 +12,7 @@ extends Node3D
 ## оставшееся время идёт водящему.
 ##
 ## Туман: водящий (если он живой игрок) видит площадку только рядом с собой — радиус
-## FOG_RADIUS = 1.5 × зона караула. Тогда экран делится: слева водящий в тумане,
+## FOG_RADIUS = 1.2 × зона караула. Тогда экран делится: слева водящий в тумане,
 ## справа бегущие видят всё. Бегущим туман не мешает.
 ## Площадка: горка (неуязвим, пока едешь, на выходе ускорение), качели (толкать; сесть на
 ## 1–5 сек — неуязвим), карусель (только раскручивать).
@@ -38,7 +38,7 @@ const ALERT := preload("res://assets/textures/fx/alert.png")
 const ARENA_HALF := Vector2(10.5, 6.5)
 ## Туман водящего: радиус обзора и слои (туман видит только камера водящего,
 ## надписи над головами — только общая камера бегущих).
-const FOG_RADIUS := ZONE_RADIUS * 1.5
+const FOG_RADIUS := ZONE_RADIUS * 1.2
 const FOG_LAYER := 1 << 17
 const HUD_LAYER := 1 << 16
 const FOG_SHADER := preload("res://scenes/minigames/freeze_tag/chaser_fog.gdshader")
@@ -94,6 +94,8 @@ var _zone_material: StandardMaterial3D
 var _yard: FreezeYard
 var _fog_material: ShaderMaterial
 var _chaser_camera: Camera3D
+## Половина экрана бегущих (когда водящий — живой игрок и экран разделён).
+var _runners_view: Control
 
 @onready var _camera: Camera3D = $Camera3D
 @onready var _sun: DirectionalLight3D = $Sun
@@ -700,9 +702,25 @@ func _setup_views() -> void:
 	(_chaser_camera.get_parent().get_parent() as Control).add_child(caption)
 	if humans_running:
 		var runners_camera := _add_view(layer, Vector2(0.5, 0), Vector2(1, 1), 0xFFFFF & ~FOG_LAYER)
+		_runners_view = runners_camera.get_parent().get_parent() as Control
 		runners_camera.look_at_from_position(Vector3(0, 24.0, 15.0), Vector3(0, 0, 0.5))
 	_camera.cull_mask = 0 # общий экран полностью закрыт видами
 	_update_fog()
+
+
+## Водящий (живой игрок) не должен знать, что кого-то размораживают: полоски «Серёга
+## размораживает Колю» переезжают на половину экрана бегущих, а без неё не показываются.
+func _hide_hud_bars_from_chaser() -> void:
+	if _chaser_camera == null:
+		return # водящий — бот, экран общий
+	if _runners_view == null:
+		_hud_bars_box.visible = false
+		return
+	_hud_bars_box.reparent(_runners_view, false)
+	_hud_bars_box.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+	_hud_bars_box.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	_hud_bars_box.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	_hud_bars_box.offset_bottom = -150
 
 
 ## Вид в части экрана (anchor_from..anchor_to — доли экрана) со своей камерой.
@@ -827,6 +845,7 @@ func _build_ui() -> void:
 	_hud_bars_box.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	_hud_bars_box.add_theme_constant_override("separation", 6)
 	column.add_child(_hud_bars_box)
+	_hide_hud_bars_from_chaser()
 
 	var row := HBoxContainer.new()
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
