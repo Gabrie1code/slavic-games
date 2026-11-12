@@ -51,7 +51,10 @@ var _time := 0.0
 var _mannequin: PlayerCharacter
 var _camera: Camera3D
 var _cam_target: Array = CAM_BODY
-var _wallet_label: Label
+var _wallet: MoneyLabel
+var _confirm: ConfirmDialog
+## Вещь, которую подтверждаем в окне покупки.
+var _pending_buy := ""
 var _title_label: Label
 var _message_label: Label
 var _hint_label: Label
@@ -117,6 +120,9 @@ func _handle_input() -> void:
 	# Первые доли секунды кнопки не слушаем: иначе нажатие, которым открыли
 	# примерочную, тут же её закроет.
 	if input == null or _time < 0.2:
+		return
+	# Пока открыто окно подтверждения — кнопки только для него.
+	if _confirm.handle_input(input):
 		return
 	if input.is_just_pressed("cancel"):
 		close()
@@ -206,13 +212,29 @@ func _cycle_item(step: int) -> void:
 	_refresh()
 
 
+## Купить: сначала окно «Купить … за … ₽?», покупка — только после «Да».
 func _buy_current() -> void:
 	var id := _current_id()
 	if PlayerManager.owns(player, id):
 		return
+	if PlayerManager.wallet(player) < Cosmetics.price(id):
+		_message = "Не хватает рублей"
+		_message_color = RED
+		_refresh()
+		return
+	_pending_buy = id
+	_confirm.ask("Купить «%s» за %d ₽?" % [Cosmetics.item_name(id), Cosmetics.price(id)])
+
+
+func _on_confirm_answered(yes: bool) -> void:
+	var id := _pending_buy
+	_pending_buy = ""
+	if not yes or id == "":
+		return
 	if PlayerManager.buy(player, id):
 		_message = "Куплено: %s!" % Cosmetics.item_name(id)
 		_message_color = GREEN
+		_wallet.set_amount(PlayerManager.wallet(player))
 	else:
 		_message = "Не хватает рублей"
 		_message_color = RED
@@ -235,7 +257,11 @@ func _on_row_clicked(event: InputEvent, row: int) -> void:
 
 func _refresh() -> void:
 	var wallet := PlayerManager.wallet(player)
-	_wallet_label.text = "%d ₽" % wallet
+	if _wallet.get_meta("ready", false) == false:
+		_wallet.set_amount(wallet, false)
+		_wallet.set_meta("ready", true)
+	elif _pending_buy == "":
+		_wallet.set_amount(wallet) # пополнили (F9) или потратили — анимация счётчика
 	var color_owner := PlayerManager.color_owner(_color_candidate, player)
 	for i in _row_count():
 		if i == COLOR_ROW:
@@ -356,8 +382,8 @@ func _build() -> void:
 	var wallet_caption := _label("Кошелёк", Color("c9b98f"))
 	wallet_caption.name = "WalletCaption"
 	wallet_box.add_child(wallet_caption)
-	_wallet_label = _label("", GOLD)
-	wallet_box.add_child(_wallet_label)
+	_wallet = MoneyLabel.new()
+	wallet_box.add_child(_wallet)
 	add_child(wallet_panel)
 
 	# Справа: список вещей и кнопки.
@@ -418,6 +444,14 @@ func _build() -> void:
 	_hint_label = _label("", Color(1, 1, 1, 0.6))
 	_hint_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	column.add_child(_hint_label)
+
+	_confirm = ConfirmDialog.new()
+	_confirm.visible = false
+	_confirm.set_anchors_preset(Control.PRESET_CENTER)
+	_confirm.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	_confirm.grow_vertical = Control.GROW_DIRECTION_BOTH
+	_confirm.answered.connect(_on_confirm_answered)
+	add_child(_confirm)
 
 	var frame := ReferenceRect.new()
 	frame.border_color = player.color
@@ -505,8 +539,8 @@ func _apply_font_sizes() -> void:
 	var k := clampf(size.y / 1080.0, 0.5, 1.0)
 	var base := int(34 * k)
 	_title_label.add_theme_font_size_override("font_size", int(base * 1.25))
-	_wallet_label.add_theme_font_size_override("font_size", int(base * 1.4))
-	(_wallet_label.get_parent().get_node("WalletCaption") as Label) \
+	_wallet.set_font_size(int(base * 1.2))
+	(_wallet.get_parent().get_node("WalletCaption") as Label) \
 		.add_theme_font_size_override("font_size", int(base * 0.6))
 	for i in _row_names.size():
 		_row_names[i].add_theme_font_size_override("font_size", int(base * 0.75))
