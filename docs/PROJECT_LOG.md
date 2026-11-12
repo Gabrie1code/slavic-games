@@ -572,6 +572,9 @@ docs/                        ROADMAP, MINIGAMES, COSMETICS, PROJECT_LOG (это�
    результат — нетипизированный `Array`, Godot не загружает скрипт («Could not parse global class»
    у всех, кто его использует). Писать через `if` и типизированную переменную. Было в
    `lobby_gadgets.gd` (`_can_hint`), из-за него падали и `local_lobby.gd`.
+   Там же: **`return []` в функции `-> Array[Dictionary]`** в Godot 4.7 возвращает обычный `Array`,
+   и `var x := f()` падает при запуске («Trying to assign an array of type Array…»). Пустой
+   результат — только через типизированную переменную (`_no_hint()` в lobby_gadgets.gd).
 1. **Тип через `:=` из нетипизированного массива** (`.duplicate()`, `.filter()`, `.values()`) — Godot
    не запускает скрипт. Копировать в типизированную переменную (`var a: Array[Node3D] = x.duplicate()`).
    Повторилось в `local_lobby.gd` (`for p in PlayerManager.players.duplicate()` → `var pressed := p.input…`):

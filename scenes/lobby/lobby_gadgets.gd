@@ -146,7 +146,7 @@ func release_can(p: PlayerData) -> void:
 ## Подсказка держащему баллончик (добавляется к остальным).
 func can_holder_hint(p: PlayerData) -> Array[Dictionary]:
 	if not holds_can(p):
-		return []
+		return _no_hint()
 	return [entry(attack_key(p), "Красить (зажать)"), entry(secondary_key(p), "Сменить цвет"),
 		entry(drop_key(p), "Бросить баллончик")]
 
@@ -175,12 +175,12 @@ func _use_cans(p: PlayerData, character: PlayerCharacter) -> bool:
 
 func _can_hint(p: PlayerData) -> Array[Dictionary]:
 	if holds_can(p):
-		return []
+		return _no_hint()
 	if _near_loose_can(p):
 		return [entry(confirm_key(p), "Подобрать баллончик")]
 	var stand := apartment.nightstand
 	if not _near(p, stand.front_point(), NIGHTSTAND_RADIUS):
-		return []
+		return _no_hint()
 	var text := "" # ящик «сломан» (открыт) и пуст — кнопки нет
 	var disabled := false
 	if stand.can_take():
@@ -194,6 +194,13 @@ func _can_hint(p: PlayerData) -> Array[Dictionary]:
 	if text != "":
 		result.append(entry(confirm_key(p), text, disabled))
 	return result
+
+
+## Пустая подсказка. Именно типизированный массив: `return []` Godot 4.7 возвращает как
+## обычный Array, и `var x := …` с ним падает («Array» в «Array[Dictionary]»).
+func _no_hint() -> Array[Dictionary]:
+	var none: Array[Dictionary] = []
+	return none
 
 
 ## Брошенный баллончик рядом, на который игрок смотрит (null — нет).
@@ -296,7 +303,7 @@ func _furniture_hint(p: PlayerData) -> Array[Dictionary]:
 func _arcade_hint(p: PlayerData) -> Array[Dictionary]:
 	var arcade := _near_arcade(p)
 	if arcade == null:
-		return []
+		return _no_hint()
 	if arcade.is_working():
 		return [entry(confirm_key(p), "Сломать автомат")]
 	return [entry(confirm_key(p), "Автомат чинится…", true)]
