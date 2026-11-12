@@ -28,6 +28,12 @@ const MINIGAMES: Array[Dictionary] = [
 		"tagline": "Все против всех",
 		"color": Color("2f5f8a"),
 	},
+	{
+		"scene": "res://scenes/minigames/freeze_tag/freeze_tag.tscn",
+		"title": "Морожка",
+		"tagline": "Догонялки\n1 водящий против всех",
+		"color": Color("2a8fa8"),
+	},
 ]
 
 var in_progress := false

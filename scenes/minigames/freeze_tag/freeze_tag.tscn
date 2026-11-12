@@ -1,0 +1,253 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scenes/minigames/freeze_tag/freeze_tag.gd" id="1_script"]
+
+[sub_resource type="Environment" id="Environment_yard"]
+background_mode = 1
+background_color = Color(0.62, 0.74, 0.85, 1)
+ambient_light_source = 2
+ambient_light_color = Color(0.95, 0.92, 0.86, 1)
+ambient_light_energy = 0.6
+tonemap_mode = 2
+ssao_enabled = true
+
+[sub_resource type="StandardMaterial3D" id="Mat_ground"]
+albedo_color = Color(0.4, 0.56, 0.3, 1)
+roughness = 0.95
+
+[sub_resource type="StandardMaterial3D" id="Mat_path"]
+albedo_color = Color(0.55, 0.5, 0.42, 1)
+roughness = 0.95
+
+[sub_resource type="StandardMaterial3D" id="Mat_fence"]
+albedo_color = Color(0.25, 0.45, 0.32, 1)
+roughness = 0.7
+
+[sub_resource type="StandardMaterial3D" id="Mat_sand"]
+albedo_color = Color(0.86, 0.76, 0.5, 1)
+roughness = 1.0
+
+[sub_resource type="StandardMaterial3D" id="Mat_wood_red"]
+albedo_color = Color(0.7, 0.18, 0.12, 1)
+roughness = 0.7
+
+[sub_resource type="StandardMaterial3D" id="Mat_metal"]
+albedo_color = Color(0.3, 0.5, 0.75, 1)
+roughness = 0.4
+metallic = 0.5
+
+[sub_resource type="StandardMaterial3D" id="Mat_bench"]
+albedo_color = Color(0.55, 0.36, 0.2, 1)
+roughness = 0.8
+
+[sub_resource type="StandardMaterial3D" id="Mat_trunk"]
+albedo_color = Color(0.35, 0.24, 0.16, 1)
+roughness = 0.9
+
+[sub_resource type="StandardMaterial3D" id="Mat_leaves"]
+albedo_color = Color(0.25, 0.48, 0.2, 1)
+roughness = 0.9
+
+[sub_resource type="BoxMesh" id="BoxMesh_ground"]
+material = SubResource("Mat_ground")
+size = Vector3(60, 0.2, 60)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_ground"]
+size = Vector3(60, 0.2, 60)
+
+[sub_resource type="BoxMesh" id="BoxMesh_path"]
+material = SubResource("Mat_path")
+size = Vector3(22, 0.02, 14)
+
+[sub_resource type="BoxMesh" id="BoxMesh_fence_long"]
+material = SubResource("Mat_fence")
+size = Vector3(22.6, 0.9, 0.15)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_fence_long"]
+size = Vector3(22.6, 3, 0.4)
+
+[sub_resource type="BoxMesh" id="BoxMesh_fence_short"]
+material = SubResource("Mat_fence")
+size = Vector3(0.15, 0.9, 14.6)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_fence_short"]
+size = Vector3(0.4, 3, 14.6)
+
+[sub_resource type="BoxMesh" id="BoxMesh_sandbox"]
+material = SubResource("Mat_wood_red")
+size = Vector3(3, 0.4, 3)
+
+[sub_resource type="BoxMesh" id="BoxMesh_sand"]
+material = SubResource("Mat_sand")
+size = Vector3(2.7, 0.05, 2.7)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_sandbox"]
+size = Vector3(3, 1.5, 3)
+
+[sub_resource type="BoxMesh" id="BoxMesh_slide"]
+material = SubResource("Mat_metal")
+size = Vector3(1.2, 1.6, 3.2)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_slide"]
+size = Vector3(1.2, 2, 3.2)
+
+[sub_resource type="BoxMesh" id="BoxMesh_bench"]
+material = SubResource("Mat_bench")
+size = Vector3(2.6, 0.5, 0.6)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_bench"]
+size = Vector3(2.6, 1.5, 0.6)
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_trunk"]
+material = SubResource("Mat_trunk")
+top_radius = 0.22
+bottom_radius = 0.3
+height = 2.4
+radial_segments = 6
+rings = 1
+
+[sub_resource type="CylinderShape3D" id="CylinderShape3D_trunk"]
+height = 3.0
+radius = 0.35
+
+[sub_resource type="SphereMesh" id="SphereMesh_leaves"]
+material = SubResource("Mat_leaves")
+radius = 1.4
+height = 2.4
+radial_segments = 8
+rings = 4
+
+[node name="FreezeTag" type="Node3D"]
+script = ExtResource("1_script")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_yard")
+
+[node name="Sun" type="DirectionalLight3D" parent="."]
+light_color = Color(1, 0.95, 0.86, 1)
+shadow_enabled = true
+
+[node name="Camera3D" type="Camera3D" parent="."]
+fov = 50.0
+
+[node name="Ground" type="StaticBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.1, 0)
+
+[node name="Mesh" type="MeshInstance3D" parent="Ground"]
+mesh = SubResource("BoxMesh_ground")
+
+[node name="Collision" type="CollisionShape3D" parent="Ground"]
+shape = SubResource("BoxShape3D_ground")
+
+[node name="Path" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.01, 0)
+mesh = SubResource("BoxMesh_path")
+
+[node name="FenceNorth" type="StaticBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.45, -7.2)
+
+[node name="Mesh" type="MeshInstance3D" parent="FenceNorth"]
+mesh = SubResource("BoxMesh_fence_long")
+
+[node name="Collision" type="CollisionShape3D" parent="FenceNorth"]
+shape = SubResource("BoxShape3D_fence_long")
+
+[node name="FenceSouth" type="StaticBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.45, 7.2)
+
+[node name="Mesh" type="MeshInstance3D" parent="FenceSouth"]
+mesh = SubResource("BoxMesh_fence_long")
+
+[node name="Collision" type="CollisionShape3D" parent="FenceSouth"]
+shape = SubResource("BoxShape3D_fence_long")
+
+[node name="FenceWest" type="StaticBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -11.2, 0.45, 0)
+
+[node name="Mesh" type="MeshInstance3D" parent="FenceWest"]
+mesh = SubResource("BoxMesh_fence_short")
+
+[node name="Collision" type="CollisionShape3D" parent="FenceWest"]
+shape = SubResource("BoxShape3D_fence_short")
+
+[node name="FenceEast" type="StaticBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 11.2, 0.45, 0)
+
+[node name="Mesh" type="MeshInstance3D" parent="FenceEast"]
+mesh = SubResource("BoxMesh_fence_short")
+
+[node name="Collision" type="CollisionShape3D" parent="FenceEast"]
+shape = SubResource("BoxShape3D_fence_short")
+
+[node name="Sandbox" type="StaticBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.8, 0.2, -2)
+
+[node name="Mesh" type="MeshInstance3D" parent="Sandbox"]
+mesh = SubResource("BoxMesh_sandbox")
+
+[node name="Sand" type="MeshInstance3D" parent="Sandbox"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.2, 0)
+mesh = SubResource("BoxMesh_sand")
+
+[node name="Collision" type="CollisionShape3D" parent="Sandbox"]
+shape = SubResource("BoxShape3D_sandbox")
+
+[node name="Slide" type="StaticBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 0.8, 1.8)
+
+[node name="Mesh" type="MeshInstance3D" parent="Slide"]
+mesh = SubResource("BoxMesh_slide")
+
+[node name="Collision" type="CollisionShape3D" parent="Slide"]
+shape = SubResource("BoxShape3D_slide")
+
+[node name="BenchNorth" type="StaticBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, 0.25, -4.6)
+
+[node name="Mesh" type="MeshInstance3D" parent="BenchNorth"]
+mesh = SubResource("BoxMesh_bench")
+
+[node name="Collision" type="CollisionShape3D" parent="BenchNorth"]
+shape = SubResource("BoxShape3D_bench")
+
+[node name="BenchSouth" type="StaticBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.5, 0.25, 4.6)
+
+[node name="Mesh" type="MeshInstance3D" parent="BenchSouth"]
+mesh = SubResource("BoxMesh_bench")
+
+[node name="Collision" type="CollisionShape3D" parent="BenchSouth"]
+shape = SubResource("BoxShape3D_bench")
+
+[node name="TreeWest" type="StaticBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -8, 0, 3.2)
+
+[node name="Trunk" type="MeshInstance3D" parent="TreeWest"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.2, 0)
+mesh = SubResource("CylinderMesh_trunk")
+
+[node name="Leaves" type="MeshInstance3D" parent="TreeWest"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.0, 0)
+mesh = SubResource("SphereMesh_leaves")
+
+[node name="Collision" type="CollisionShape3D" parent="TreeWest"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, 0)
+shape = SubResource("CylinderShape3D_trunk")
+
+[node name="TreeEast" type="StaticBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 0, -3.2)
+
+[node name="Trunk" type="MeshInstance3D" parent="TreeEast"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.2, 0)
+mesh = SubResource("CylinderMesh_trunk")
+
+[node name="Leaves" type="MeshInstance3D" parent="TreeEast"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.0, 0)
+mesh = SubResource("SphereMesh_leaves")
+
+[node name="Collision" type="CollisionShape3D" parent="TreeEast"]
+shape = SubResource("CylinderShape3D_trunk")
+
+[node name="Racers" type="Node3D" parent="."]
+
+[node name="UI" type="CanvasLayer" parent="."]
