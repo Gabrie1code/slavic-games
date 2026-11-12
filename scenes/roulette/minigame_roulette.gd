@@ -9,6 +9,8 @@ const CARD_GAP := 30.0
 const MIN_CARDS_IN_STRIP := 36
 const SPIN_TIME := 4.5
 const PLAYED_TINT := Color(0.4, 0.4, 0.4)
+## Карточки, которые не выпали, после остановки рулетки (темнее сыгранных).
+const NOT_PICKED_TINT := Color(0.22, 0.22, 0.22)
 ## Картинки карточек: <id мини-игры>.png. Размер — вертикальный 3:4 (например 900×1200).
 const CARD_IMAGES_DIR := "res://assets/ui/minigames/"
 
@@ -68,6 +70,12 @@ func _spin(picked: int) -> void:
 		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	await snap.finished
 
+	# Выбор сделан: остальные карточки плавно темнеют — сильнее, чем «сыгранные» (PLAYED_TINT),
+	# чтобы выбранная сразу бросалась в глаза.
+	var dim := create_tween().set_parallel(true)
+	for child in _strip.get_children():
+		if child != card:
+			dim.tween_property(child, "modulate", NOT_PICKED_TINT, 0.35)
 	card.pivot_offset = card.size / 2.0
 	var pulse := create_tween().set_loops(3)
 	pulse.tween_property(card, "scale", Vector2.ONE * 1.12, 0.15)
