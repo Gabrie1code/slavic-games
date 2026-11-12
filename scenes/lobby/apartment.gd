@@ -243,8 +243,9 @@ func _build_living_room() -> void:
 	var table_pos := Vector3(-2.6, 0, -0.25)
 	_solid(_model("coffee_table"), Vector3(1.0, 0.5, 0.55), 0.25, table_pos)
 	_breakable("crystal_vase", table_pos + Vector3(-0.25, 0.47, 0.0), [CRYSTAL], 0.4, 0.05)
-	var books_a := [Color("992018"), Color("1a4080"), Color("2a6a2a")]
-	_breakable("book_stack", table_pos + Vector3(0.25, 0.47, 0.0), books_a, 0.4)
+	# Стопки книг везде разные (tools/blender/decor.py): тома с очками, журналы, высокая стопка.
+	_breakable("book_stack_tomes", table_pos + Vector3(0.25, 0.47, 0.0),
+		[Color("2a6a2a"), Color("333338"), Color("d9a640")], 0.4)
 	_solid(_model("armchair"), Vector3(0.9, 0.6, 0.9), 0.3, Vector3(-5.2, 0, -0.3), PI / 2)
 	# В кресло тоже можно сесть (лицом в комнату, +X); третий бот садится сюда.
 	var chair_pos := Vector3(-5.14, 0.08, -0.3)
@@ -266,7 +267,7 @@ func _build_living_room() -> void:
 	gramophone = _tippable("gramophone", Vector3(0.36, 0.14, 0.36), 0.07,
 		dining + Vector3(0.05, 0.8, -0.05), 2.0, 17.0)
 	var books_b := [Color("cc9918"), Color("6a2a6a"), Color("1a4080")]
-	_breakable("book_stack", dining + Vector3(0.45, 0.78, 0.15), books_b, 0.4)
+	_breakable("book_stack_mags", dining + Vector3(0.45, 0.78, 0.15), books_b, 0.4)
 
 	# Банки с заготовками у серванта.
 	for i in 3:
@@ -295,7 +296,8 @@ func _build_bedroom() -> void:
 	_place(_model("floor_rug_oval"), Vector3(6.3, 0.005, -0.8)).rotation_degrees.y = 90.0
 	_tippable("dumbbell", Vector3(0.34, 0.12, 0.12), 0.06, Vector3(8.5, 0, 0.6), 3.0, 30.0)
 	_tippable("stool", Vector3(0.36, 0.47, 0.36), 0.24, Vector3(8.4, 0, -0.4), 2.0)
-	_breakable("book_stack", Vector3(8.4, 0.47, -0.4), [Color("992018"), Color("cc9918")], 0.4)
+	_breakable("book_stack_tall", Vector3(8.4, 0.47, -0.4),
+		[Color("992018"), Color("cc9918"), Color("26262e"), Color("4d8c99")], 0.4)
 	_no_shadow(_place(_model("chandelier"), Vector3(6.2, 0, -1.4)))
 
 

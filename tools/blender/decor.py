@@ -8,7 +8,10 @@
   wall_carpet_green.glb — второй ковёр на стену (зелёно-бежевый с рядами «гёлей»), как wall_carpet
                           по размеру (2.6 × 1.7, лежит в плоскости XZ лицом к −Y);
   floor_rug_oval.glb    — овальный плетёный половик (кольца разных цветов);
-  floor_runner.glb      — ковровая дорожка 3 × 0.8 с полосами по краям.
+  floor_runner.glb      — ковровая дорожка 3 × 0.8 с полосами по краям;
+  book_stack_tall.glb   — высокая стопка тонких книг вразнобой;
+  book_stack_tomes.glb  — два толстых старых тома с золотыми полосками и очки сверху;
+  book_stack_mags.glb   — журналы («Огонёк»-подобные, без названий) и раскрытая книга сверху.
 Полки: задняя сторона у стены в y = 0 (смотрят на −Y, в Godot +Z), низ полки на z = 0.
 
 Запуск:
@@ -239,6 +242,44 @@ for y in (-0.3, 0.3):
 for i in range(8):
     P.append(box((0.12, 0.12, 0.016), (-1.3 + i * 0.37, 0, 0.008), BEIGE, rot=(0, 0, math.radians(45))))
 export("floor_runner", P)
+
+# ---- Стопки книг (разные, чтобы не повторялись) ----
+MORE = BOOKS + [mat("Book%d" % i, c, 0.8) for i, c in enumerate(
+    [(0.9, 0.85, 0.75), (0.15, 0.15, 0.18), (0.75, 0.35, 0.1), (0.3, 0.55, 0.6)], start=5)]
+GOLD_STRIPE = mat("BookGold", (0.85, 0.65, 0.2), 0.4)
+PAGES = mat("Pages", (0.95, 0.92, 0.82), 0.9)
+P, z = [], 0.0
+for i in range(8):
+    h = random.uniform(0.018, 0.032)
+    P.append(box((random.uniform(0.17, 0.24), random.uniform(0.12, 0.16), h),
+                 (random.uniform(-0.025, 0.025), random.uniform(-0.02, 0.02), z + h / 2),
+                 MORE[(i * 4) % len(MORE)], rot=(0, 0, random.uniform(-0.35, 0.35))))
+    z += h
+export("book_stack_tall", P)
+
+P, z = [], 0.0
+for i, (w, d, h, m) in enumerate([(0.32, 0.23, 0.075, MORE[6]), (0.28, 0.2, 0.065, MORE[2])]):
+    P.append(box((w, d, h), (0, 0, z + h / 2), m, rot=(0, 0, 0.12 * (i * 2 - 1))))
+    P.append(box((w * 0.98, d + 0.004, 0.008), (0, 0, z + h * 0.25), GOLD_STRIPE, rot=(0, 0, 0.12 * (i * 2 - 1))))
+    P.append(box((w * 0.98, d + 0.004, 0.008), (0, 0, z + h * 0.75), GOLD_STRIPE, rot=(0, 0, 0.12 * (i * 2 - 1))))
+    z += h
+for x in (-0.035, 0.035):                                                    # очки
+    bpy.ops.mesh.primitive_torus_add(major_radius=0.025, minor_radius=0.004, major_segments=12,
+                                     minor_segments=4, location=(x, 0, z + 0.004))
+    P.append(flat(bpy.context.object, IRON))
+P.append(box((0.02, 0.004, 0.004), (0, 0, z + 0.004), IRON))
+export("book_stack_tomes", P)
+
+P, z = [], 0.0
+for i in range(4):                                                          # журналы
+    h = 0.008
+    P.append(box((0.26, 0.2, h), (random.uniform(-0.02, 0.02), random.uniform(-0.02, 0.02), z + h / 2),
+                 MORE[(i + 2) % len(MORE)], rot=(0, 0, random.uniform(-0.5, 0.5))))
+    z += h
+for side in (-1, 1):                                                        # раскрытая книга
+    P.append(box((0.13, 0.17, 0.012), (side * 0.065, 0, z + 0.01), PAGES, rot=(0, side * -0.12, 0.2)))
+P.append(box((0.27, 0.18, 0.006), (0, 0, z + 0.003), MORE[1], rot=(0, 0, 0.2)))
+export("book_stack_mags", P)
 
 if not RENDER:
     sys.exit(0)
