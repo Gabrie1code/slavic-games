@@ -20,7 +20,7 @@ const SLOTS: Array[int] = [
 ## Для этих слотов камера показывает голову крупным планом.
 const CLOSEUP_SLOTS: Array[int] = [Cosmetics.Slot.HAT, Cosmetics.Slot.FACE]
 const CAM_BODY := [Vector3(0, 1.0, 3.3), Vector3(0, 0.85, 0)]
-const CAM_HEAD := [Vector3(0, 1.42, 1.3), Vector3(0, 1.32, 0)]
+const CAM_HEAD := [Vector3(0, 1.36, 2.4), Vector3(0, 1.22, 0)]
 const GOLD := Color("f6c343")
 
 var player: PlayerData

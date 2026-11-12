@@ -278,6 +278,74 @@ def shoulder_straps(m, xs=(-0.13, 0.13), z_front=0.8, z_back=0.8, w=0.055, extra
     return pieces
 
 
+def segment_box(p1, p2, m, w=0.05, t=0.014):
+    """Плоская лента от точки p1 до p2 (лямки, ремни)."""
+    a, b = Vector(p1), Vector(p2)
+    d = b - a
+    o = box((w, t, d.length + 0.01), (0, 0, 0), m)
+    o.rotation_euler = d.to_track_quat("Z", "Y").to_euler()
+    o.location = (a + b) / 2
+    bpy.ops.object.select_all(action="DESELECT")
+    o.select_set(True)
+    bpy.context.view_layer.objects.active = o
+    bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
+    return o
+
+
+def strap_path(points, m, w=0.05, t=0.014):
+    """Лента по ломаной: соседние точки соединяются кусками."""
+    return [segment_box(points[i], points[i + 1], m, w, t) for i in range(len(points) - 1)]
+
+
+def chest_y(x, z, extra=0.0):
+    """Передняя поверхность тела (туловище + купол плеч) на высоте z."""
+    if z > 1.03:
+        k = max(0.0, 1 - ((z - 1.03) / (0.36 * 0.27)) ** 2)
+        rx, ry = 0.27 * math.sqrt(k) + extra, 0.2 * math.sqrt(k) + extra
+    else:
+        rx = torso_r(z) + extra
+        ry = 0.74 * rx
+    return ry * math.sqrt(max(0.0, 1 - (x / max(rx, 0.01)) ** 2))
+
+
+def print_dot(center, normal_angle, r, m, depth=0.004, stretch=1.0, spin=0.0):
+    """Плоское «напечатанное» пятно вплотную к ткани (горошек, камуфляж)."""
+    o = cyl(r, depth, (0, 0, 0), m, verts=8, rot=(math.radians(90), 0, 0), scale=(1, 1, 1))
+    o.scale = (1, 1, stretch)
+    o.rotation_euler = (0, spin, normal_angle - math.pi / 2)
+    o.location = center
+    bpy.ops.object.select_all(action="DESELECT")
+    o.select_set(True)
+    bpy.context.view_layer.objects.active = o
+    bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
+    return o
+
+
+def dots_on_tube(x, r, zs, m, per_ring=6, dot=0.022, stretch=1.0, offset=30, mats=None):
+    """Горошек/пятна по трубе (штанине) — вплотную к ткани."""
+    pieces = []
+    for j, z in enumerate(zs):
+        for k in range(per_ring):
+            a = math.radians(k * 360 / per_ring + j * offset)
+            center = (x + math.cos(a) * (r + 0.001), math.sin(a) * (r + 0.001), z)
+            mm = mats[(j + k) % len(mats)] if mats else m
+            pieces.append(print_dot(center, a, dot, mm, stretch=stretch, spin=math.radians(17 * k)))
+    return pieces
+
+
+def dots_on_seat(zs, m, per_ring=8, dot=0.022, stretch=1.0, mats=None):
+    pieces = []
+    for j, z in enumerate(zs):
+        for k in range(per_ring):
+            a = math.radians(k * 360 / per_ring + j * 22)
+            rx, ry = 0.253, 0.253 * 0.76
+            px, py = math.cos(a) * rx, math.sin(a) * ry
+            normal = math.atan2(py / ry ** 2, px / rx ** 2)
+            mm = mats[(j + k) % len(mats)] if mats else m
+            pieces.append(print_dot((px, py, z), normal, dot, mm, stretch=stretch))
+    return pieces
+
+
 def rotate_pieces(pieces, angle_y, center):
     """Повернуть набор кусков вокруг оси Y относительно точки (наклон гитары и т.п.)."""
     from mathutils import Matrix
@@ -339,11 +407,12 @@ def item_hat_panama():
 
 
 def item_hat_pilotka():
+    """Пилотка: вытянутая «лодочка» со скруглёнными концами."""
     KHAKI = mat("Khaki", (0.33, 0.35, 0.18), 0.85)
     STAR = mat("Star", (0.85, 0.08, 0.05), 0.4, 0.3)
-    pieces = [box((0.3, 0.58, 0.17), (0, 0, 1.6), KHAKI, bevel=0.06)]
-    pieces.append(box((0.34, 0.54, 0.06), (0, 0, 1.54), KHAKI, bevel=0.02))
-    pieces.append(cyl(0.04, 0.02, (0, 0.285, 1.58), STAR, verts=5, rot=(math.radians(90), 0, 0)))
+    pieces = [sphere_cap(0.3, (0, 0, 1.53), KHAKI, 1.53, scale=(0.55, 1.1, 0.5), segs=16, rings=8)]
+    pieces.append(cyl(0.3, 0.07, (0, 0, 1.555), KHAKI, verts=16, scale=(0.58, 1.12, 1)))
+    pieces.append(cyl(0.04, 0.02, (0, 0.33, 1.57), STAR, verts=5, rot=(math.radians(90), 0, 0)))
     return [part("Head", pieces)]
 
 
@@ -372,7 +441,7 @@ def item_hat_tubeteika():
 
 
 def item_hat_pompom():
-    P = primary()
+    P = mat("KnitNavy", (0.03, 0.06, 0.2), 0.95)
     W = mat("KnitWhite", (0.92, 0.92, 0.9), 0.95)
     pieces = [sphere_cap(0.315, (0, -0.01, 1.36), P, 1.44)]
     pieces.append(cyl(0.32, 0.1, (0, -0.01, 1.47), W, verts=12))
@@ -412,14 +481,44 @@ def item_abibas_jacket():
 
 
 def item_jacket_alkogolichka():
-    """Майка-алкоголичка: глубокие проймы и тонкие лямки."""
-    WHITE = mat("Undershirt", (0.93, 0.93, 0.9), 0.9)
-    body = torso_shell(WHITE, 0.6, 0.95, extra=0.012, shoulders=False)
-    body += shoulder_straps(WHITE, xs=(-0.12, 0.12), z_front=0.92, z_back=0.92, w=0.05, extra=0.012)
-    for x in (-0.1, -0.05, 0.0, 0.05, 0.1):                                        # рубчик
-        body.append(front_patch(mat("UndershirtRib", (0.85, 0.85, 0.82), 0.9), x, 0.77, 0.008, 0.32, extra=0.012,
-                                thick=0.006))
-    return jacket(body)
+    """Майка-алкоголичка: круглый вырез, глубокие проймы, лямки — часть майки."""
+    WHITE = mat("Undershirt", (0.95, 0.95, 0.93), 0.9)
+    TRIM = mat("UndershirtTrim", (0.82, 0.82, 0.8), 0.9)
+    e = 0.014
+    shell = [cyl(torso_r(0.58) + e, 0.475, (0, 0, 0.8175), WHITE, verts=48, r2=torso_r(1.055) + e,
+                 scale=(1, 0.74, 1)),
+             sphere(0.27 + e, (0, 0, 1.03), WHITE, scale=(1, 0.74, 0.36), segs=48, rings=14)]
+
+    def neck_z(x):
+        return 0.88 + 2.8 * x * x                                                    # U-образный вырез
+
+    def keep(c, normal_z):
+        ax = abs(c.x)
+        if abs(normal_z) > 0.95 and (c.z < 0.6 or c.z > 1.1):
+            return False                                                             # торцы
+        if c.z > 1.035 and not (0.115 < ax < 0.2):
+            return False                                                             # над плечом — только лямка
+        if c.y > 0 and ax < 0.125 and c.z > neck_z(ax):
+            return False                                                             # вырез спереди
+        if c.y < 0 and ax < 0.12 and c.z > 0.98:
+            return False                                                             # вырез сзади
+        side = ax / (torso_r(min(c.z, 1.05)) + e)
+        if side > 0.7 and c.z > 0.84 - (side - 0.7) * 0.25:
+            return False                                                             # проймы
+        return True
+
+    for o in shell:
+        bm = bmesh.new()
+        bm.from_mesh(o.data)
+        vertical = [ed for ed in bm.edges if abs(ed.verts[0].co.z - ed.verts[1].co.z) > 0.05]
+        if vertical:
+            bmesh.ops.subdivide_edges(bm, edges=vertical, cuts=26, use_grid_fill=True)
+        kill = [f for f in bm.faces if not keep(f.calc_center_median(), f.normal.z)]
+        bmesh.ops.delete(bm, geom=kill, context="FACES")
+        bm.to_mesh(o.data)
+        bm.free()
+    shell.append(cyl(torso_r(0.6) + e + 0.003, 0.025, (0, 0, 0.595), TRIM, verts=32, scale=(1, 0.74, 1)))
+    return jacket(shell)
 
 
 def item_jacket_dutik():
@@ -432,7 +531,10 @@ def item_jacket_dutik():
         body.append(cyl(torso_r(z) + 0.05, 0.012, (0, 0, z + 0.068), SEAM, verts=14, scale=(1, 0.8, 1)))
     body.append(sphere(0.34, (0, 0, 1.03), NAVY, scale=(1, 0.8, 0.36), segs=14, rings=6))
     body.append(cyl(0.18, 0.14, (0, 0, 1.12), NAVY, verts=12))
-    body.append(front_patch(SEAM, 0, 0.82, 0.014, 0.55, extra=0.08))
+    ZIP = mat("ZipSilver", (0.85, 0.85, 0.88), 0.25, 1.0)
+    body.append(front_patch(SEAM, 0, 0.82, 0.05, 0.56, extra=0.085, thick=0.02))     # планка
+    body.append(front_patch(ZIP, 0, 0.82, 0.018, 0.56, extra=0.085, thick=0.03))     # молния
+    body.append(front_patch(ZIP, 0, 1.0, 0.03, 0.06, extra=0.11, thick=0.02))        # бегунок
     def puffy(x, s):
         pieces = [sphere(0.115, (x, 0, z), NAVY, scale=(1, 1, 0.65), segs=10, rings=5) for z in (0.94, 0.84, 0.74)]
         pieces.append(sphere(0.12, (x, 0, 1.0), NAVY, segs=10, rings=5))
@@ -587,23 +689,12 @@ def item_pants_sharovary():
 
 
 def item_pants_family():
-    """Семейные трусы: белые в тёмно-синий горошек."""
+    """Семейные трусы: белые в тёмно-синий горошек (горошек — рисунок на ткани)."""
     BASE = mat("ShortsWhite", (0.93, 0.93, 0.92), 0.9)
     DOT = mat("NavyDot", (0.03, 0.06, 0.28), 0.7)
-    def dots_on_tube(x, r, zs):
-        pieces = []
-        for j, z in enumerate(zs):
-            for k in range(6):
-                a = math.radians(k * 60 + j * 30)
-                pieces.append(sphere(0.02, (x + math.cos(a) * r, math.sin(a) * r, z), DOT, scale=(1, 1, 1),
-                                     segs=6, rings=4))
-        return pieces
-    w = seat(BASE)
-    for j, z in enumerate((0.5, 0.58)):
-        for k in range(8):
-            a = math.radians(k * 45 + j * 22)
-            w.append(sphere(0.02, (math.cos(a) * 0.255, math.sin(a) * 0.19, z), DOT, segs=6, rings=4))
-    return legs(lambda x, s: [cyl(0.125, 0.18, (x, 0, 0.46), BASE, verts=12)] + dots_on_tube(x, 0.125, (0.42, 0.5)), w)
+    w = seat(BASE) + dots_on_seat((0.5, 0.57), DOT, per_ring=10)
+    return legs(lambda x, s: [cyl(0.125, 0.18, (x, 0, 0.46), BASE, verts=12)] +
+                dots_on_tube(x, 0.125, (0.41, 0.48), DOT, per_ring=7), w)
 
 
 def item_pants_overalls():
@@ -625,41 +716,53 @@ def item_pants_school():
                               box((0.01, 0.02, 0.4), (x, 0.104, 0.36), CREASE)], seat(GREY))
 
 
+def camo_paint(o, mats, scale=9.0, cuts=10):
+    """Раскрасить грани в камуфляж: мелкая сетка граней + цвет по шуму. Узор — часть ткани."""
+    from mathutils import noise
+    for m in mats[1:]:
+        o.data.materials.append(m)
+    bm = bmesh.new()
+    bm.from_mesh(o.data)
+    vertical = [e for e in bm.edges if abs(e.verts[0].co.z - e.verts[1].co.z) > 0.03]
+    if vertical:
+        bmesh.ops.subdivide_edges(bm, edges=vertical, cuts=cuts, use_grid_fill=True)
+    for f in bm.faces:
+        c = f.calc_center_median()
+        n = noise.noise(Vector((c.x * scale, c.y * scale, c.z * scale * 1.4)))
+        n2 = noise.noise(Vector((c.x * scale * 2 + 5, c.y * scale * 2, c.z * scale * 2)))
+        if n > 0.25:
+            f.material_index = 1
+        elif n < -0.25:
+            f.material_index = 2
+        elif n2 > 0.35:
+            f.material_index = 3
+    bm.to_mesh(o.data)
+    bm.free()
+    return o
+
+
 def item_pants_camo():
-    """Камуфляж: пятна вплотную к ткани и накладные карманы-«карго» на бёдрах."""
+    """Камуфляж: пятна — раскраска самой ткани, плоские карманы-«карго»."""
     GREEN = mat("CamoGreen", (0.25, 0.32, 0.16), 0.9)
-    DARK = mat("CamoDark", (0.1, 0.12, 0.06), 0.9)
-    BROWN = mat("CamoBrown", (0.33, 0.24, 0.13), 0.9)
-    SAND = mat("CamoSand", (0.55, 0.5, 0.33), 0.9)
-    patch_mats = (DARK, BROWN, SAND)
+    DARK = mat("CamoDark", (0.08, 0.1, 0.05), 0.9)
+    BROWN = mat("CamoBrown", (0.3, 0.21, 0.11), 0.9)
+    SAND = mat("CamoSand", (0.45, 0.42, 0.27), 0.9)
+    mats = [GREEN, DARK, BROWN, SAND]
     def leg(x, s):
-        r = 0.108
-        pieces = [cyl(r, 0.43, (x, 0, 0.355), GREEN, verts=12)]
-        for i, (a, z) in enumerate(((20, 0.5), (110, 0.44), (200, 0.37), (290, 0.3), (60, 0.24), (160, 0.2), (250, 0.48))):
-            ang = math.radians(a)
-            px, py = x + math.cos(ang) * (r - 0.004), math.sin(ang) * (r - 0.004)
-            o = sphere(0.055, (px, py, z), patch_mats[i % 3], scale=(1, 0.22, 0.75), segs=8, rings=4)
-            o.rotation_euler.z = ang + math.pi / 2
-            bpy.ops.object.select_all(action="DESELECT")
-            o.select_set(True)
-            bpy.context.view_layer.objects.active = o
-            bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
-            pieces.append(o)
-        pieces.append(box((0.04, 0.12, 0.12), (x + s * 0.115, 0, 0.36), GREEN, bevel=0.01))   # карман
-        pieces.append(box((0.045, 0.13, 0.025), (x + s * 0.117, 0, 0.425), DARK))            # клапан
-        return pieces
-    return legs(leg, seat(GREEN))
+        tube = camo_paint(cyl(0.108, 0.43, (x, 0, 0.355), GREEN, verts=16), mats)
+        side = 0.0 if s > 0 else math.pi
+        pocket = print_dot((x + s * 0.111, 0, 0.35), side, 0.055, BROWN, depth=0.01, stretch=1.2)
+        flap = box((0.016, 0.115, 0.03), (x + s * 0.113, 0, 0.42), DARK)
+        return [tube, pocket, flap]
+    waist = [camo_paint(o, mats, cuts=6) for o in seat(GREEN)]
+    return legs(leg, waist)
 
 
 def item_pants_pe_shorts():
-    """Синие шорты физрука с белым кантом по шву."""
+    """Синие шорты физрука."""
     BLUE = mat("PEBlue", (0.08, 0.2, 0.6), 0.7)
-    W = mat("StripeWhite", (0.95, 0.95, 0.95), 0.5)
-    w = seat(BLUE) + [cyl(0.257, 0.05, (0, 0, 0.625), W, verts=12, scale=(1, 0.76, 1))]
-    return legs(lambda x, s: [striped_tube(x, s, 0.122, 0.38, 0.56, BLUE, W)], w)
+    return legs(lambda x, s: [cyl(0.122, 0.18, (x, 0, 0.47), BLUE, verts=12)], seat(BLUE))
 
-
-# ======================= Обувь (каждая пара — цельная, нога внутри) =======================
 
 def shoe_body(x, upper, sole, w=0.205, d=0.315, h=0.13, sole_h=0.03, y=0.04, bevel=0.04):
     """Цельный ботинок: подошва и верх одного размера — без «платформы»."""
@@ -822,26 +925,35 @@ def item_face_welder_mask():
 # ======================= Аксессуары: шея и спина =======================
 
 def item_neck_gold_chain():
-    """Толстая золотая цепь «с палец»: крупные звенья по груди и медальон."""
-    GOLD = mat("Gold", (0.85, 0.65, 0.2), 0.25, 1.0)
-    pieces = []
-    n = 17
-    for i in range(n):
+    """Толстая золотая цепь: петля вокруг шеи с провисом на грудь и медальоном."""
+    GOLD = mat("GoldBright", (1.0, 0.82, 0.38), 0.2, 1.0)
+    pts = []
+    n = 15
+    for i in range(n):                                                               # провис спереди
         t = i / (n - 1) * 2 - 1
-        x, z = 0.16 * t, 0.87 + 0.21 * t * t
-        y = torso_front_y(x, z) + 0.012
-        tilt = math.atan2(-0.42 * t, 0.16)
-        bpy.ops.mesh.primitive_torus_add(major_radius=0.03, minor_radius=0.013, major_segments=8, minor_segments=5,
-                                         location=(x, y, z),
-                                         rotation=(math.radians(90) if i % 2 else 0, tilt, 0))
-        pieces.append(flat(bpy.context.object, GOLD))
-    pieces.append(cyl(0.045, 0.015, (0, torso_front_y(0, 0.8) + 0.015, 0.8), GOLD, verts=12,
-                      rot=(math.radians(90), 0, 0)))                                  # медальон
+        x, z = 0.16 * t, 1.1 - 0.15 * (1 - t * t)
+        pts.append((x, chest_y(x, z) + 0.016, z))
+    for i in range(1, 8):                                                            # сзади вокруг шеи
+        b = math.radians(180 + i * 180 / 8)
+        pts.append((-0.165 * math.cos(b), 0.13 * math.sin(b), 1.11))
+    pieces = []
+    for i, p in enumerate(pts):
+        nxt = pts[(i + 1) % len(pts)]
+        d = Vector(nxt) - Vector(p)
+        bpy.ops.mesh.primitive_torus_add(major_radius=0.026, minor_radius=0.011, major_segments=8,
+                                         minor_segments=5, location=p)
+        o = bpy.context.object
+        # Звено вдоль цепи; соседние звенья повёрнуты на 90° друг к другу.
+        o.rotation_euler = d.to_track_quat("X", "Z").to_euler()
+        o.rotation_euler.rotate_axis("X", math.radians(90 if i % 2 else 0))
+        pieces.append(flat(o, GOLD))
+    pieces.append(cyl(0.045, 0.015, (0, chest_y(0, 0.92) + 0.03, 0.9), GOLD, verts=12,
+                      rot=(math.radians(90), 0, 0)))
     return [part("Torso", pieces)]
 
 
 def item_back_bag():
-    """Челночная сумка в клетку за спиной, лямка наискосок через грудь."""
+    """Челночная сумка в клетку за спиной, лямка наискосок через грудь до сумки."""
     RED = mat("BagRed", (0.75, 0.12, 0.1), 0.8)
     BLUE = mat("BagBlue", (0.12, 0.2, 0.6), 0.8)
     WHITE = mat("BagWhite", (0.9, 0.9, 0.88), 0.8)
@@ -855,24 +967,32 @@ def item_back_bag():
     for face_x in (-W / 2, W / 2):
         for i, z in enumerate((-0.15, -0.05, 0.05, 0.15)):
             pieces.append(box((0.012, D, 0.04), (face_x, Y, Z + z), BLUE if i % 2 else RED))
-    # Лямка: с правого плеча через грудь к левому боку.
-    for i in range(11):
-        t = i / 10
-        x, z = 0.17 - 0.36 * t, 1.07 - 0.42 * t
-        pieces.append(front_patch(BLUE, x, z, 0.06, 0.075, extra=0.025, thick=0.014, rot_y=41))
-    pieces.append(box((0.06, 0.4, 0.03), (0.17, -0.02, 1.1), BLUE))                  # через плечо назад
+    # Лямка: верх сумки → через правое плечо → наискосок по груди → под левой рукой → низ сумки.
+    path = [(0.15, Y + D / 2, Z + H / 2), (0.16, 0.0, 1.13)]
+    for i in range(7):
+        t = i / 6
+        x, z = 0.16 - 0.38 * t, 1.08 - 0.46 * t
+        path.append((x, chest_y(x, z, 0.02) + 0.01, z))
+    path += [(-0.27, 0.0, 0.6), (-0.2, Y + D / 2, Z - H / 2 + 0.03)]
+    pieces += strap_path(path, BLUE, w=0.06)
     return [part("Torso", pieces)]
 
 
 def item_back_ranets():
-    """Школьный ранец: лямки через плечи видны спереди."""
+    """Школьный ранец: лямки через плечи, по груди и под руками к низу ранца."""
     BROWN = mat("RanetsBrown", (0.35, 0.18, 0.08), 0.6)
     REFLECT = mat("Reflector", (0.95, 0.75, 0.1), 0.3)
     STRAP = mat("Strap", (0.15, 0.1, 0.06), 0.7)
     pieces = [box((0.36, 0.16, 0.38), (0, -0.28, 0.82), BROWN, bevel=0.04)]
     pieces.append(box((0.32, 0.03, 0.18), (0, -0.37, 0.86), BROWN, bevel=0.02))
     pieces.append(box((0.1, 0.02, 0.06), (0, -0.39, 0.8), REFLECT))
-    pieces += shoulder_straps(STRAP, xs=(-0.13, 0.13), z_front=0.72, z_back=0.95, w=0.05, extra=0.025)
+    for s in (-1, 1):
+        x = s * 0.13
+        path = [(x, -0.2, 1.0), (x, 0.0, 1.13)]
+        for z in (1.06, 0.95, 0.84, 0.74):
+            path.append((x, chest_y(x, z, 0.02) + 0.01, z))
+        path += [(s * 0.27, 0.0, 0.68), (s * 0.15, -0.2, 0.66)]
+        pieces += strap_path(path, STRAP, w=0.05)
     return [part("Torso", pieces)]
 
 
@@ -889,11 +1009,14 @@ def item_back_guitar():
          box((0.07, 0.04, 0.48), (0, Y, 1.24), DARK),
          box((0.1, 0.05, 0.14), (0, Y, 1.53), DARK, bevel=0.015)]
     g = rotate_pieces(g, math.radians(-28), (0, Y, 0.85))
-    for i in range(11):                                                              # ремень спереди
-        t = i / 10
-        x, z = -0.17 + 0.36 * t, 1.07 - 0.42 * t
-        g.append(front_patch(STRAP, x, z, 0.05, 0.075, extra=0.025, thick=0.012, rot_y=-41))
-    g.append(box((0.05, 0.4, 0.03), (-0.17, -0.02, 1.1), STRAP))
+    # Ремень: гриф за левым плечом → наискосок по груди → под правой рукой → к корпусу.
+    path = [(-0.16, -0.25, 1.08), (-0.16, 0.0, 1.13)]
+    for i in range(7):
+        t = i / 6
+        x, z = -0.16 + 0.38 * t, 1.08 - 0.46 * t
+        path.append((x, chest_y(x, z, 0.02) + 0.01, z))
+    path += [(0.27, 0.0, 0.6), (0.18, Y + 0.02, 0.6)]
+    g += strap_path(path, STRAP, w=0.05)
     return [part("Torso", g)]
 
 
@@ -1034,6 +1157,13 @@ def with_cam(fn):
 
 
 render_lineup = with_cam(render_lineup)
+ONLY = [a.split("=", 1)[1] for a in sys.argv if a.startswith("--only=")]
+if ONLY:
+    scene.render.resolution_x, scene.render.resolution_y = 1200, 900
+    render_lineup("_preview_only.png", [[k] for k in ONLY[0].split(",")])
+    render_lineup("_preview_only_back.png", [[k] for k in ONLY[0].split(",")], back_view=True)
+    print("DONE")
+    sys.exit(0)
 by_prefix = lambda p: [[k] for k in ITEMS if k.startswith(p)]
 render_lineup("_preview_hats.png", by_prefix("hat_"))
 render_lineup("_preview_jackets.png", by_prefix("jacket_"))
