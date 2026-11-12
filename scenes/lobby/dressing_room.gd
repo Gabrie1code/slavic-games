@@ -30,6 +30,12 @@ const BUTTONS_ROW := 7
 const GOLD := Color("f6c343")
 const GREEN := Color("8fd694")
 const RED := Color("ff7a6b")
+## Покупка «всего выбранного» в окне подтверждения (вместо id одной вещи).
+const BUY_ALL := "*all*"
+## Сколько секунд после ручного поворота мышкой персонаж стоит, как его повернули.
+const MANUAL_HOLD := 5.0
+const AUTO_SWAY := 0.9
+const BUY_TAG := preload("res://assets/ui/icons/buy_tag.png")
 
 ## Персонаж игрока в лобби: одежда меняется и на нём.
 var lobby_character: PlayerCharacter
@@ -37,7 +43,7 @@ var lobby_character: PlayerCharacter
 var _row := 0
 ## Какой цвет сейчас показан в строке «Цвет» (может быть занятый — тогда не применён).
 var _color_candidate := 0
-## В строке кнопок: 0 — «Купить и надеть», 1 — «Готово».
+## В строке кнопок: 0 — «Купить и надеть», 1 — «Готово», 2 — «Купить всё выбранное».
 var _button_focus := 1
 ## Вещь, на которую смотрит кнопка «Купить и надеть»: последняя выбранная строка одежды.
 var _item_row := 0
@@ -47,6 +53,10 @@ var _conflict_cleared: Array[int] = []
 var _message := ""
 var _message_color := GREEN
 var _time := 0.0
+## Поворот персонажа (от «лицом к нам»): мышкой вручную, иначе сам покачивается.
+var _yaw := 0.0
+var _sway_phase := 0.0
+var _last_drag := -100.0
 
 var _mannequin: PlayerCharacter
 var _camera: Camera3D
@@ -59,6 +69,8 @@ var _title_label: Label
 var _message_label: Label
 var _hint_label: Label
 var _buy_button: Button
+var _buy_all_button: Button
+var _row_icons: Array[TextureRect] = []
 var _done_button: Button
 var _shortage_label: Label
 var _row_panels: Array[PanelContainer] = []
@@ -84,8 +96,12 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	_time += delta
-	# Персонаж покачивается, поворачиваясь то одним, то другим боком.
-	_mannequin.rotation.y = PI + sin(_time * 0.8) * 0.9
+	# Персонаж покачивается, поворачиваясь то одним, то другим боком. Если его крутили мышкой,
+	# MANUAL_HOLD сек стоит как повернули, потом с того же положения снова покачивается.
+	if _time - _last_drag > MANUAL_HOLD:
+		_sway_phase += delta * 0.8
+		_yaw = move_toward(_yaw, sin(_sway_phase) * AUTO_SWAY, delta * 1.2)
+	_mannequin.rotation.y = PI + _yaw
 	var pos: Vector3 = _cam_target[0]
 	_camera.position = _camera.position.lerp(pos, minf(1.0, delta * 6.0))
 	_camera.look_at(_camera.position + (Vector3(_cam_target[1]) - pos))
@@ -139,6 +155,8 @@ func _handle_input() -> void:
 		if _row == BUTTONS_ROW:
 			if _button_focus == 0:
 				_buy_current()
+			elif _button_focus == 2:
+				_buy_all()
 			else:
 				close()
 		elif _row == COLOR_ROW:
@@ -203,7 +221,11 @@ func _cycle_item(step: int) -> void:
 		_cycle_color(step)
 		return
 	if _row == BUTTONS_ROW:
-		_button_focus = posmod(_button_focus + step, 2)
+		# По кругу: «Купить и надеть» → «Купить всё» (если есть) → «Готово».
+		var order: Array[int] = [0, 1]
+		if _buy_all_button.visible:
+			order = [0, 2, 1]
+		_button_focus = order[posmod(order.find(_button_focus) + step, order.size())]
 		_refresh()
 		return
 	var slot := _slot_at(_row)
@@ -236,10 +258,52 @@ func _buy_current() -> void:
 	_confirm.ask("Купить «%s» за %d ₽?" % [Cosmetics.item_name(id), Cosmetics.price(id)])
 
 
+## Купить всё некупленное, что сейчас надето (одним подтверждением).
+func _buy_all() -> void:
+	var items := _unowned_items()
+	if items.is_empty():
+		return
+	var total := _total_price(items)
+	if PlayerManager.wallet(player) < total:
+		_message = "Не хватает рублей на всё: нужно %d ₽" % total
+		_message_color = RED
+		_refresh()
+		return
+	_pending_buy = BUY_ALL
+	_confirm.ask("Купить всё выбранное (%d шт.) за %d ₽?" % [items.size(), total])
+
+
+## Надетые, но ещё не купленные вещи.
+func _unowned_items() -> Array[String]:
+	var items: Array[String] = []
+	for slot: int in SLOTS:
+		var id: String = player.outfit.get(slot, "")
+		if id != "" and not PlayerManager.owns(player, id):
+			items.append(id)
+	return items
+
+
+func _total_price(items: Array[String]) -> int:
+	var total := 0
+	for id in items:
+		total += Cosmetics.price(id)
+	return total
+
+
 func _on_confirm_answered(yes: bool) -> void:
 	var id := _pending_buy
 	_pending_buy = ""
 	if not yes or id == "":
+		return
+	if id == BUY_ALL:
+		var bought := 0
+		for item in _unowned_items():
+			if PlayerManager.buy(player, item):
+				bought += 1
+		_message = "Куплено вещей: %d!" % bought
+		_message_color = GREEN
+		_wallet.set_amount(PlayerManager.wallet(player))
+		_refresh()
 		return
 	if PlayerManager.buy(player, id):
 		_message = "Куплено: %s!" % Cosmetics.item_name(id)
@@ -249,6 +313,17 @@ func _on_confirm_answered(yes: bool) -> void:
 		_message = "Не хватает рублей"
 		_message_color = RED
 	_refresh()
+
+
+## Зажать левую кнопку мыши на персонаже и вести влево-вправо — повернуть его (до 180°).
+func _on_view_input(event: InputEvent) -> void:
+	var motion := event as InputEventMouseMotion
+	if motion == null or not (motion.button_mask & MOUSE_BUTTON_MASK_LEFT):
+		return
+	_yaw = clampf(_yaw + motion.relative.x * 0.01, -PI, PI)
+	_last_drag = _time
+	# Когда снова начнёт покачиваться — продолжит с этого положения.
+	_sway_phase = asin(clampf(_yaw / AUTO_SWAY, -1.0, 1.0))
 
 
 func _on_arrow(row: int, step: int) -> void:
@@ -280,6 +355,7 @@ func _refresh() -> void:
 			_row_items[i].add_theme_color_override("font_color",
 				PlayerManager.COLORS[_color_candidate].lightened(0.15))
 			_row_prices[i].text = "Занято" if color_owner else ""
+			_row_icons[i].visible = false
 		else:
 			var slot := _slot_at(i)
 			var id: String = player.outfit.get(slot, "")
@@ -290,6 +366,7 @@ func _refresh() -> void:
 			if id == "" and blocker != "":
 				_row_items[i].text = "Занято: " + Cosmetics.item_name(blocker)
 			_row_prices[i].text = "" if owned else "%d ₽" % Cosmetics.price(id)
+			_row_icons[i].visible = not owned # значок «ценник» у некупленной вещи
 		var style := StyleBoxFlat.new()
 		style.set_corner_radius_all(10)
 		style.set_content_margin_all(8)
@@ -332,10 +409,30 @@ func _refresh() -> void:
 		_set_button_colors(_buy_button, Color("8a5a12") if enough else Color("4a4a4a"),
 			Color.WHITE if enough else Color(1, 1, 1, 0.5))
 		_shortage_label.text = "" if enough else "Не хватает: %d ₽" % (cost - wallet)
+	_refresh_buy_all(wallet)
 	_message_label.text = _message
 	_message_label.add_theme_color_override("font_color", _message_color)
 	_hint_label.text = ("↑↓ — что меняем (внизу — цвет и кнопки)   ←→ — листать\n"
-		+ "Подтвердить — купить / готово   Отмена — выйти")
+		+ "Подтвердить — купить / готово   Отмена — выйти   Мышь (зажать) — повернуть")
+
+
+## «Купить всё выбранное»: видна, если надето что-то некупленное (кроме случая, когда это
+## одна-единственная вещь и для неё уже есть кнопка «Купить и надеть»).
+func _refresh_buy_all(wallet: int) -> void:
+	var items := _unowned_items()
+	var only_current := items.size() == 1 and items[0] == _current_id() and _row != COLOR_ROW
+	_buy_all_button.visible = not items.is_empty() and not only_current
+	if not _buy_all_button.visible:
+		if _button_focus == 2:
+			_button_focus = 1
+		return
+	var total := _total_price(items)
+	_buy_all_button.text = "Купить всё выбранное (%d шт.) — %d ₽" % [items.size(), total]
+	var enough := wallet >= total
+	_buy_all_button.disabled = not enough
+	_style_focus(_buy_all_button, _row == BUTTONS_ROW and _button_focus == 2)
+	_set_button_colors(_buy_all_button, Color("8a5a12") if enough else Color("4a4a4a"),
+		Color.WHITE if enough else Color(1, 1, 1, 0.5))
 
 
 ## Рамка «выбрано с клавиатуры» у кнопки (на строке кнопок).
@@ -373,6 +470,8 @@ func _build() -> void:
 	var view_container := SubViewportContainer.new()
 	view_container.stretch = true
 	view_container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	view_container.mouse_filter = Control.MOUSE_FILTER_STOP
+	view_container.gui_input.connect(_on_view_input)
 	split.add_child(view_container)
 	var viewport := SubViewport.new()
 	viewport.own_world_3d = true
@@ -430,7 +529,15 @@ func _build() -> void:
 		var right := _arrow_button("▶")
 		right.pressed.connect(_on_arrow.bind(i, 1))
 		var price_label := _label("", Color("ff9f5a"))
-		for child in [name_label, left, item_label, right, price_label]:
+		var tag := TextureRect.new()
+		tag.texture = BUY_TAG
+		tag.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		tag.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		tag.custom_minimum_size = Vector2(28, 28)
+		tag.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		tag.visible = false
+		_row_icons.append(tag)
+		for child in [name_label, left, item_label, tag, right, price_label]:
 			row.add_child(child)
 		column.add_child(panel)
 		_row_panels.append(panel)
@@ -443,6 +550,11 @@ func _build() -> void:
 	_buy_button.focus_mode = Control.FOCUS_NONE
 	_buy_button.pressed.connect(_buy_current)
 	column.add_child(_buy_button)
+	_buy_all_button = Button.new()
+	_buy_all_button.focus_mode = Control.FOCUS_NONE
+	_buy_all_button.visible = false
+	_buy_all_button.pressed.connect(_buy_all)
+	column.add_child(_buy_all_button)
 	_shortage_label = _label("", RED)
 	column.add_child(_shortage_label)
 	_message_label = _label("", GREEN)
@@ -564,6 +676,7 @@ func _apply_font_sizes() -> void:
 		button.add_theme_font_size_override("font_size", base)
 		button.custom_minimum_size = Vector2(52, 44) * k
 	_buy_button.add_theme_font_size_override("font_size", base)
+	_buy_all_button.add_theme_font_size_override("font_size", int(base * 0.85))
 	_done_button.add_theme_font_size_override("font_size", int(base * 0.85))
 	_shortage_label.add_theme_font_size_override("font_size", int(base * 0.8))
 	_message_label.add_theme_font_size_override("font_size", int(base * 0.8))
