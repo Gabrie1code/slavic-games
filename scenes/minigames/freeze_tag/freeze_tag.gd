@@ -33,10 +33,6 @@ const ZONE_RADIUS := 3.0
 const ZONE_LIMIT := 3.0
 const ZONE_PUSH := 13.0
 const STUN_TIME := 1.0
-## Ледяная глыба: радиус и высота (персонаж целиком внутри).
-const ICE_RADIUS := 0.78
-const ICE_HEIGHT := 2.25
-const SNOWFLAKE := preload("res://assets/textures/fx/snowflake.png")
 const ALERT := preload("res://assets/textures/fx/alert.png")
 ## Арена: прямоугольник внутри забора.
 const ARENA_HALF := Vector2(10.5, 6.5)
@@ -88,12 +84,9 @@ var _timer_label: Label
 var _message_label: Label
 var _score_labels: Dictionary = {} # PlayerData.id -> Label
 
-var _ice_material: StandardMaterial3D
-var _ice_core_material: StandardMaterial3D
-var _ice_edge_material: StandardMaterial3D
 var _run_fx: RunEffects
-var _flake_material: StandardMaterial3D
-var _shard_material: StandardMaterial3D
+## Строит ледяные глыбы (материалы создаются один раз).
+var _ice: IceBuilder
 ## Крупные полоски разморозки внизу экрана: PlayerData.id -> {"box", "bar"}.
 var _hud_bars: Dictionary = {}
 var _hud_bars_box: VBoxContainer
@@ -325,7 +318,7 @@ func _freeze(r: Racer) -> void:
 		r.player.bot_input().move = Vector2.ZERO
 		r.player.bot_input().hold("confirm", false)
 
-	r.ice = _build_ice()
+	r.ice = _ice.build()
 	r.character.add_child(r.ice)
 	r.character.set_tint(Color(0.45, 0.75, 1.0, 0.45)) # внутри льда — синеватый
 	r.ice.scale = Vector3.ONE * 0.2
@@ -346,101 +339,6 @@ func _freeze(r: Racer) -> void:
 
 	r.status.text = ""
 	_show_message("%s заморожен!" % r.player.display_name)
-
-
-## Ледяная глыба как на картинке режима: высокая прозрачная шестигранная призма во весь рост
-## (персонаж внутри хорошо виден и подкрашен синим), яркие светлые рёбра, матовая крышка,
-## гроздь кристаллов у основания и кружащиеся снежинки.
-func _build_ice() -> Node3D:
-	var root := Node3D.new()
-	var block := MeshInstance3D.new()
-	var block_mesh := CylinderMesh.new()
-	block_mesh.top_radius = ICE_RADIUS
-	block_mesh.bottom_radius = ICE_RADIUS
-	block_mesh.height = ICE_HEIGHT
-	block_mesh.radial_segments = 6
-	block_mesh.rings = 1
-	block.mesh = block_mesh
-	block.material_override = _ice_material
-	block.position.y = ICE_HEIGHT / 2.0
-	root.add_child(block)
-	var cap := MeshInstance3D.new()
-	var cap_mesh := CylinderMesh.new()
-	cap_mesh.top_radius = ICE_RADIUS * 0.97
-	cap_mesh.bottom_radius = ICE_RADIUS * 0.97
-	cap_mesh.height = 0.04
-	cap_mesh.radial_segments = 6
-	cap.mesh = cap_mesh
-	cap.material_override = _ice_core_material
-	cap.position.y = ICE_HEIGHT - 0.02
-	root.add_child(cap)
-	# Светлые рёбра: 6 вертикальных и по 6 по верхнему и нижнему краю.
-	for i in 6:
-		var a := TAU * i / 6.0
-		var corner := Vector3(sin(a), 0.0, cos(a)) * ICE_RADIUS
-		var next := Vector3(sin(a + TAU / 6.0), 0.0, cos(a + TAU / 6.0)) * ICE_RADIUS
-		root.add_child(_ice_edge(corner, corner + Vector3.UP * ICE_HEIGHT))
-		for y: float in [0.02, ICE_HEIGHT]:
-			root.add_child(_ice_edge(corner + Vector3.UP * y, next + Vector3.UP * y))
-	# Кристаллы у основания: гроздьями, наружу и вверх.
-	for i in 14:
-		var shard := MeshInstance3D.new()
-		var shard_mesh := CylinderMesh.new()
-		shard_mesh.top_radius = 0.0
-		shard_mesh.bottom_radius = randf_range(0.07, 0.15)
-		shard_mesh.height = randf_range(0.3, 0.75)
-		shard_mesh.radial_segments = 6
-		shard.mesh = shard_mesh
-		shard.material_override = _shard_material
-		var a := TAU * i / 14.0 + randf_range(-0.15, 0.15)
-		var dist := ICE_RADIUS + randf_range(-0.05, 0.12)
-		shard.position = Vector3(sin(a) * dist, shard_mesh.height * 0.3, cos(a) * dist)
-		var tilt := randf_range(0.35, 0.8)
-		shard.rotation = Vector3(cos(a) * tilt, randf() * TAU, -sin(a) * tilt)
-		root.add_child(shard)
-	root.add_child(_snowflakes())
-	return root
-
-
-## Светлое ребро льда между точками a и b.
-func _ice_edge(a: Vector3, b: Vector3) -> MeshInstance3D:
-	var edge := MeshInstance3D.new()
-	var mesh := BoxMesh.new()
-	mesh.size = Vector3(0.045, 0.045, a.distance_to(b))
-	edge.mesh = mesh
-	edge.material_override = _ice_edge_material
-	edge.position = (a + b) / 2.0
-	var dir := (b - a).normalized()
-	var up := Vector3.RIGHT if absf(dir.y) > 0.9 else Vector3.UP
-	edge.basis = Basis.looking_at(dir, up)
-	return edge
-
-
-## Снежинки, медленно кружащие вокруг глыбы. CPU-частицы: в отличие от GPU-частиц им не нужно
-## собирать шейдер в момент заморозки (из-за этого раньше игра на миг подвисала).
-func _snowflakes() -> CPUParticles3D:
-	var flakes := CPUParticles3D.new()
-	flakes.amount = 10
-	flakes.lifetime = 2.2
-	flakes.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
-	flakes.emission_box_extents = Vector3(ICE_RADIUS + 0.15, ICE_HEIGHT / 2.0, ICE_RADIUS + 0.15)
-	flakes.gravity = Vector3(0, 0.12, 0)
-	flakes.initial_velocity_min = 0.05
-	flakes.initial_velocity_max = 0.2
-	flakes.scale_amount_min = 0.6
-	flakes.scale_amount_max = 1.3
-	var fade := Gradient.new()
-	fade.set_color(0, Color(1, 1, 1, 0))
-	fade.set_color(1, Color(1, 1, 1, 0))
-	fade.add_point(0.25, Color(1, 1, 1, 1))
-	fade.add_point(0.75, Color(1, 1, 1, 1))
-	flakes.color_ramp = fade
-	var quad := QuadMesh.new()
-	quad.size = Vector2(0.2, 0.2)
-	quad.material = _flake_material
-	flakes.mesh = quad
-	flakes.position.y = ICE_HEIGHT / 2.0
-	return flakes
 
 
 ## Полоска разморозки над головой (поворачивается к камере в _face_bars).
@@ -477,6 +375,8 @@ func _build_bar(r: Racer) -> void:
 
 func _set_unfreeze_bar(r: Racer, progress: float, helper: Racer) -> void:
 	if r.bar_fill:
+		# Полоска видна только пока кто-то размораживает (пустая висела чёрной чертой над льдом).
+		r.bar.visible = progress > 0.001
 		# Заполнение растёт слева направо.
 		var p := clampf(progress, 0.0, 1.0)
 		r.bar_fill.scale.x = maxf(p, 0.001)
@@ -686,7 +586,7 @@ func _prewarm_effects() -> void:
 	var warm := Node3D.new()
 	warm.position = Vector3(0, -3.0, 0) # под землёй: не видно, но рисуется
 	add_child(warm)
-	warm.add_child(_build_ice())
+	warm.add_child(_ice.build())
 	var zone := MeshInstance3D.new()
 	var zone_mesh := CylinderMesh.new()
 	zone_mesh.top_radius = ZONE_RADIUS
@@ -864,44 +764,7 @@ func _add_chaser_hat(character: PlayerCharacter) -> void:
 
 
 func _make_materials() -> void:
-	_ice_material = StandardMaterial3D.new()
-	_ice_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	_ice_material.albedo_color = Color(0.6, 0.86, 1.0, 0.42)
-	_ice_material.roughness = 0.05
-	_ice_material.metallic_specular = 1.0
-	_ice_material.rim_enabled = true
-	_ice_material.rim = 1.0
-	_ice_material.rim_tint = 0.2
-	_ice_material.emission_enabled = true
-	_ice_material.emission = Color(0.35, 0.65, 0.95)
-	_ice_material.emission_energy_multiplier = 0.35
-	_ice_core_material = StandardMaterial3D.new()
-	_ice_core_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	_ice_core_material.albedo_color = Color(0.92, 0.97, 1.0, 0.25)
-	_ice_core_material.emission_enabled = true
-	_ice_core_material.emission = Color(0.7, 0.85, 1.0)
-	_ice_core_material.emission_energy_multiplier = 0.4
-	_ice_material.cull_mode = BaseMaterial3D.CULL_DISABLED # видны и дальние грани — «объём»
-	_ice_material.albedo_color = Color(0.62, 0.86, 1.0, 0.24)
-	_ice_core_material.albedo_color = Color(0.92, 0.97, 1.0, 0.55)
-	_ice_edge_material = StandardMaterial3D.new()
-	_ice_edge_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	_ice_edge_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	_ice_edge_material.albedo_color = Color(0.9, 0.97, 1.0, 0.85)
-	_shard_material = StandardMaterial3D.new()
-	_shard_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	_shard_material.albedo_color = Color(0.75, 0.93, 1.0, 0.75)
-	_shard_material.roughness = 0.05
-	_shard_material.emission_enabled = true
-	_shard_material.emission = Color(0.45, 0.75, 1.0)
-	_shard_material.emission_energy_multiplier = 0.5
-
-	_flake_material = StandardMaterial3D.new()
-	_flake_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	_flake_material.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
-	_flake_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	_flake_material.albedo_texture = SNOWFLAKE
-	_flake_material.vertex_color_use_as_albedo = true
+	_ice = IceBuilder.new()
 
 	_zone_material = StandardMaterial3D.new()
 	_zone_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA

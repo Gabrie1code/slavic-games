@@ -490,6 +490,7 @@ func _build_ui() -> void:
 
 	_timer_bar = ProgressBar.new()
 	_timer_bar.max_value = 1.0
+	_timer_bar.step = 0.0 # без округления: полоска течёт плавно, а не рывками
 	_timer_bar.value = 1.0
 	_timer_bar.show_percentage = false
 	_timer_bar.custom_minimum_size = Vector2(0, 14)
