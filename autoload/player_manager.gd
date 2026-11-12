@@ -6,7 +6,8 @@ extends Node
 signal player_joined(player: PlayerData)
 signal player_left(player: PlayerData)
 
-const MAX_PLAYERS := 8
+## Партия и мини-игры рассчитаны на 1–4 игроков (пустые места позже займут боты).
+const MAX_PLAYERS := 4
 
 ## Цвета игроков по слотам.
 const SLOT_COLORS: Array[Color] = [

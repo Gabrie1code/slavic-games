@@ -9,7 +9,10 @@ Party-игра на Godot 4.7 (GDScript), стилизованный low-poly, �
 - Сцены `.tscn` можно писать вручную, но держать их простыми; сложную сборку UI делать в коде.
 
 ## Архитектура
-- `PlayerManager` (autoload): список `PlayerData`, вход/выход, слоты.
+- `PlayerManager` (autoload): список `PlayerData`, вход/выход, слоты. Максимум 4 игрока.
+- `MatchState` (autoload): состояние партии (раунды, рубли, дефицит, позиции), живёт между сценами.
+  Мини-игра по окончании вызывает `MatchState.finish_minigame(places)`.
+- Мини-игры: `scenes/minigames/<name>/`, список в `MatchState.MINIGAMES`, дизайн в `docs/MINIGAMES.md`.
 - Ввод: у каждого локального игрока свои действия `pN_<action>` (см. `InputSetup`),
   читать только через `player.input` (`PlayerInput`), никогда не через общие действия.
 - **Готовность к сети:** `PlayerData` хранит только сериализуемые данные (+ `peer_id`).

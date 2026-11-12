@@ -1,0 +1,62 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scenes/board/board_game.gd" id="1_script"]
+[ext_resource type="PackedScene" path="res://assets/models/props/soviet_tv.glb" id="2_tv"]
+
+[sub_resource type="Environment" id="Environment_board"]
+background_mode = 1
+background_color = Color(0.55, 0.7, 0.82, 1)
+ambient_light_source = 2
+ambient_light_color = Color(0.95, 0.92, 0.85, 1)
+ambient_light_energy = 0.6
+tonemap_mode = 2
+ssao_enabled = true
+
+[sub_resource type="StandardMaterial3D" id="Mat_asphalt"]
+albedo_color = Color(0.36, 0.37, 0.36, 1)
+roughness = 0.95
+
+[sub_resource type="StandardMaterial3D" id="Mat_grass"]
+albedo_color = Color(0.38, 0.55, 0.27, 1)
+roughness = 0.95
+
+[sub_resource type="BoxMesh" id="BoxMesh_grass"]
+material = SubResource("Mat_grass")
+size = Vector3(60, 0.2, 60)
+
+[sub_resource type="BoxMesh" id="BoxMesh_asphalt"]
+material = SubResource("Mat_asphalt")
+size = Vector3(24, 0.1, 17)
+
+[node name="BoardGame" type="Node3D"]
+script = ExtResource("1_script")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_board")
+
+[node name="Sun" type="DirectionalLight3D" parent="."]
+light_color = Color(1, 0.94, 0.84, 1)
+shadow_enabled = true
+
+[node name="Camera3D" type="Camera3D" parent="."]
+fov = 50.0
+
+[node name="Grass" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.15, 0)
+mesh = SubResource("BoxMesh_grass")
+
+[node name="Asphalt" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.04, 0)
+mesh = SubResource("BoxMesh_asphalt")
+
+[node name="TV1" parent="." instance=ExtResource("2_tv")]
+transform = Transform3D(1.5, 0, 0, 0, 1.5, 0, 0, 0, 1.5, -13.5, 0, -9.5)
+
+[node name="TV2" parent="." instance=ExtResource("2_tv")]
+transform = Transform3D(1.5, 0, 0, 0, 1.5, 0, 0, 0, 1.5, 13.5, 0, -9.5)
+
+[node name="Spaces" type="Node3D" parent="."]
+
+[node name="Pawns" type="Node3D" parent="."]
+
+[node name="UI" type="CanvasLayer" parent="."]

@@ -3,9 +3,11 @@ extends Node3D
 ##
 ## Вход:  Пробел/E — левая клавиатура, Enter — правая клавиатура, A — геймпад.
 ## Выход: Q, Backspace/Shift или B на геймпаде.
+## Начать партию: Tab или Start на геймпаде.
 
 const CHARACTER_SCENE := preload("res://scenes/characters/test_character.tscn")
 const SPAWN_RADIUS := 3.0
+const ROUNDS := 5
 
 var _characters: Dictionary = {} # PlayerData.id -> персонаж
 var _slot_panels: Array[PanelContainer] = []
@@ -38,6 +40,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		if key.physical_keycode == KEY_ESCAPE:
 			get_tree().quit()
 			return
+		if key.physical_keycode == KEY_TAB:
+			_start_match()
+			return
 		var scheme := InputSetup.keyboard_join_scheme(key.physical_keycode)
 		if scheme != -1:
 			PlayerManager.add_local_player(scheme as PlayerData.DeviceKind)
@@ -45,6 +50,15 @@ func _unhandled_input(event: InputEvent) -> void:
 		var button := event as InputEventJoypadButton
 		if button.button_index == JOY_BUTTON_A:
 			PlayerManager.add_local_player(PlayerData.DeviceKind.JOYPAD, button.device)
+		elif button.button_index == JOY_BUTTON_START:
+			_start_match()
+
+
+func _start_match() -> void:
+	if PlayerManager.players.is_empty():
+		return
+	MatchState.start_new_match(ROUNDS)
+	SceneManager.change_scene(MatchState.SCENE_BOARD)
 
 
 func _process(_delta: float) -> void:
@@ -94,7 +108,8 @@ func _build_ui() -> void:
 
 	var hint := Label.new()
 	hint.text = ("Вход: Пробел (WASD) · Enter (стрелки) · A (геймпад)\n"
-		+ "Прыжок: та же кнопка · Выйти: Q / Backspace / B · Закрыть игру: Esc")
+		+ "Прыжок: та же кнопка · Выйти: Q / Backspace / B · Закрыть игру: Esc\n"
+		+ "НАЧАТЬ ПАРТИЮ: Tab или Start на геймпаде")
 	hint.add_theme_font_size_override("font_size", 22)
 	hint.add_theme_color_override("font_outline_color", Color.BLACK)
 	hint.add_theme_constant_override("outline_size", 8)
@@ -111,7 +126,7 @@ func _build_ui() -> void:
 	column.add_child(slots)
 	for i in PlayerManager.MAX_PLAYERS:
 		var panel := PanelContainer.new()
-		panel.custom_minimum_size = Vector2(190, 84)
+		panel.custom_minimum_size = Vector2(280, 90)
 		var label := Label.new()
 		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
