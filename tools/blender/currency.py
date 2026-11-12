@@ -1,9 +1,11 @@
-"""Наша валюта: монета-рубль и фишки игры на рубли (модели + картинки-значки для интерфейса).
+"""Наша валюта: пачка рублей (как пачка денег, выпадающая в боевиках, но в нашем стиле) и фишки
+игры на рубли (модели + картинки-значки для интерфейса).
+Знак ₽ — настоящая буква из шрифта DejaVu Sans Bold (выдавлена в 3D), без наслоений.
 
 Запуск:
     python tools/blender/currency.py assets
-    -> assets/models/props/ruble_coin.glb, chip_10.glb, chip_50.glb, chip_100.glb, chip_500.glb
-    -> assets/ui/icons/ruble.png, chip_10.png, chip_50.png, chip_100.png, chip_500.png
+    -> assets/models/props/money_stack.glb, chip_10.glb, chip_50.glb, chip_100.glb, chip_500.glb
+    -> assets/ui/icons/ruble.png (пачка), chip_10.png, chip_50.png, chip_100.png, chip_500.png
 """
 import bpy, math, sys, os
 from mathutils import Vector
@@ -50,19 +52,29 @@ def box(size, loc, m, rot=(0, 0, 0)):
     return flat(o, m)
 
 
-def ruble_sign(z, size, m, depth=0.004):
-    """Знак ₽ из простых форм, лежит на плоскости z (смотрит вверх)."""
-    s = size
-    parts = [box((0.16 * s, 0.9 * s, depth), (-0.12 * s, 0, z), m)]                   # ножка
-    bpy.ops.mesh.primitive_torus_add(major_radius=0.2 * s, minor_radius=0.075 * s, major_segments=16,
-                                     minor_segments=4, location=(0.02 * s, 0.22 * s, z))
-    bowl = bpy.context.object
-    bowl.scale.z = depth / (0.15 * s)
-    bpy.ops.object.transform_apply(scale=True)
-    parts.append(flat(bowl, m))
-    # Перекладина чуть толще ножки: иначе совпадающие грани дают чёрную точку.
-    parts.append(box((0.55 * s, 0.13 * s, depth + 0.002), (-0.02 * s, -0.12 * s, z + 0.0005), m))
-    return parts
+FONT = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+
+
+def ruble_sign(z, size, m, depth=0.004, rot_z=0.0, loc=(0, 0)):
+    """Знак ₽ из шрифта: высота size, лежит на плоскости z (смотрит вверх)."""
+    curve = bpy.data.curves.new("Rub", "FONT")
+    curve.body = "\u20bd"
+    curve.font = bpy.data.fonts.load(FONT, check_existing=True)
+    curve.align_x = "CENTER"
+    curve.align_y = "CENTER"
+    curve.size = size * 1.35
+    curve.extrude = depth / 2
+    o = bpy.data.objects.new("Rub", curve)
+    bpy.context.collection.objects.link(o)
+    o.location = (loc[0], loc[1], z + depth / 2)
+    o.rotation_euler.z = rot_z
+    bpy.context.view_layer.objects.active = o
+    bpy.ops.object.select_all(action="DESELECT")
+    o.select_set(True)
+    bpy.ops.object.convert(target="MESH")
+    o = bpy.context.object
+    bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
+    return [flat(o, m)]
 
 
 def join(name, parts):
@@ -84,21 +96,30 @@ def export(o, name):
     print("EXPORTED", name)
 
 
-# ---------------- Монета ----------------
-BRASS = mat("Brass", (0.95, 0.7, 0.25), 0.25, 1.0)
-BRASS_D = mat("BrassDark", (0.6, 0.38, 0.1), 0.35, 1.0)
-R, T = 0.1, 0.02
-P = [cyl(R, T, (0, 0, 0), BRASS, verts=32)]
-bpy.ops.mesh.primitive_torus_add(major_radius=R * 0.86, minor_radius=0.006, major_segments=32, minor_segments=4,
-                                 location=(0, 0, T / 2))
-P.append(flat(bpy.context.object, BRASS_D))                                              # ободок
-for i in range(12):                                                                       # лучи-звезда
-    a = i * math.pi / 6
-    P.append(box((0.012, 0.03, 0.003), (math.cos(a) * R * 0.66, math.sin(a) * R * 0.66, T / 2 + 0.001),
-                 BRASS_D, rot=(0, 0, a + math.pi / 2)))
-P += ruble_sign(T / 2 + 0.002, R * 0.95, BRASS_D)
-coin = join("RubleCoin", P)
-export(coin, "ruble_coin")
+# ---------------- Пачка денег ----------------
+# Купюры светло-зелёные (как старые рубли), пачка перехвачена бумажной лентой с ₽.
+BILL = mat("Bill", (0.36, 0.6, 0.32), 0.7)
+BILL_EDGE = mat("BillEdge", (0.78, 0.86, 0.68), 0.8)
+BILL_INK = mat("BillInk", (0.12, 0.3, 0.14), 0.6)
+BAND = mat("Band", (0.96, 0.93, 0.85), 0.7)
+BAND_RED = mat("BandRed", (0.75, 0.12, 0.1), 0.6)
+L, W, H = 0.16, 0.075, 0.045
+P = [box((L, W, H), (0, 0, H / 2), BILL_EDGE)]                       # торцы — светлые листы
+P.append(box((L - 0.004, W - 0.004, H + 0.002), (0, 0, H / 2), BILL))  # бока чуть темнее
+for k in range(4):                                                    # «листы» на торце
+    P.append(box((L + 0.001, 0.002, 0.0015), (0, W / 2, 0.006 + k * 0.007), BILL_INK))
+# Верхняя купюра чуть сдвинута — пачка не идеальная.
+P.append(box((L, W, 0.003), (0.006, 0.002, H + 0.0015), BILL, rot=(0, 0, 0.05)))
+P.append(box((L - 0.02, W - 0.016, 0.001), (0.006, 0.002, H + 0.0035), BILL_INK, rot=(0, 0, 0.05)))
+P.append(box((L - 0.026, W - 0.022, 0.0012), (0.006, 0.002, H + 0.0038), BILL, rot=(0, 0, 0.05)))
+P.append(cyl(0.017, 0.0014, (0.05, 0.004, H + 0.0042), BILL_INK, verts=16))  # медальон
+# Бумажная лента посередине.
+P.append(box((0.04, W + 0.004, H + 0.006), (0, 0, H / 2 + 0.001), BAND))
+for x in (-0.017, 0.017):
+    P.append(box((0.004, W + 0.005, H + 0.007), (x, 0, H / 2 + 0.001), BAND_RED))
+P += ruble_sign(H + 0.004, 0.026, BAND_RED, depth=0.0015)
+coin = join("MoneyStack", P)
+export(coin, "money_stack")
 
 # ---------------- Фишки ----------------
 CHIPS = {10: (0.92, 0.92, 0.9), 50: (0.75, 0.08, 0.06), 100: (0.1, 0.25, 0.65), 500: (0.08, 0.08, 0.09)}
@@ -106,7 +127,7 @@ chips = {}
 for value, color in CHIPS.items():
     base = mat("Chip%d" % value, color, 0.45)
     edge = mat("ChipEdge", (0.96, 0.94, 0.88), 0.45) if value != 10 else mat("ChipEdge10", (0.75, 0.08, 0.06), 0.45)
-    gold = mat("ChipGold", (0.95, 0.75, 0.3), 0.3, 1.0)
+    sign_color = mat("ChipSign", (0.97, 0.97, 0.95), 0.4) if value != 10 else mat("ChipSign10", (0.75, 0.08, 0.06), 0.45)
     cr, ct = 0.11, 0.025
     P = [cyl(cr, ct, (0, 0, 0), base, verts=32)]
     for i in range(8):                                                                    # насечки по краю
@@ -115,7 +136,7 @@ for value, color in CHIPS.items():
                      edge, rot=(0, 0, a + math.pi / 2)))
     P.append(cyl(cr * 0.62, ct + 0.002, (0, 0, 0), edge, verts=32))                      # вставка
     P.append(cyl(cr * 0.55, ct + 0.004, (0, 0, 0), base, verts=32))
-    P += ruble_sign(ct / 2 + 0.004, cr * 0.7, gold)
+    P += ruble_sign(ct / 2 + 0.0025, cr * 0.75, sign_color, depth=0.003)
     chips[value] = join("Chip%d" % value, P)
     export(chips[value], "chip_%d" % value)
 
@@ -144,11 +165,13 @@ scene.camera = cam
 cam.location = (0, -0.25, 0.42)
 cam.rotation_euler = (Vector((0, 0, 0)) - cam.location).to_track_quat("-Z", "Y").to_euler()
 everything = [coin] + list(chips.values())
+coin.rotation_euler.z = 0.5
 for o in everything:
     o.hide_render = True
 for o, name in [(coin, "ruble")] + [(chips[v], "chip_%d" % v) for v in CHIPS]:
     o.hide_render = False
     o.location = (0, 0, 0)
+    cam.data.ortho_scale = 0.2 if o == coin else 0.26                 # пачку — крупнее
     scene.render.filepath = os.path.join(ICONS, name + ".png")
     bpy.ops.render.render(write_still=True)
     o.hide_render = True
