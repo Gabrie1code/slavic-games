@@ -154,8 +154,11 @@ func _build_rooms() -> void:
 		Vector3((PARTITION_X + RIGHT_X) / 2, WALL_HEIGHT / 2, BEDROOM_FRONT_Z + 0.1), wallpaper_bed))
 	_fp_only(_box(Vector3(0.2, WALL_HEIGHT, LIVING_FRONT_Z - BEDROOM_FRONT_Z),
 		Vector3(PARTITION_X, WALL_HEIGHT / 2, (BEDROOM_FRONT_Z + LIVING_FRONT_Z) / 2), wallpaper))
-	_fp_only(_box(Vector3(0.16, WALL_HEIGHT - 2.4, DOOR_TO_Z - DOOR_FROM_Z),
-		Vector3(PARTITION_X, 2.4 + (WALL_HEIGHT - 2.4) / 2, (DOOR_FROM_Z + DOOR_TO_Z) / 2), wallpaper))
+	# Перегородка между комнатами низкая (2.4 м — сверху видно обе комнаты). От первого лица
+	# верх перегородки до потолка закрыт по всей длине (раньше закрыт был только проём — дыры).
+	_fp_only(_box(Vector3(0.16, WALL_HEIGHT - 2.4, BEDROOM_FRONT_Z - BACK_Z),
+		Vector3(PARTITION_X, 2.4 + (WALL_HEIGHT - 2.4) / 2, (BACK_Z + BEDROOM_FRONT_Z) / 2),
+		wallpaper))
 
 
 # ---------------- Гостиная ----------------
@@ -227,7 +230,7 @@ func _build_living_room() -> void:
 	_place(_model("wall_carpet"), Vector3(LEFT_X + 0.08, 0.85, -0.3)).rotation_degrees.y = 90.0
 	floor_lamp = _tippable("floor_lamp", Vector3(0.5, 1.75, 0.5), 0.88, Vector3(-1.0, 0, 1.45), 6.0)
 	_build_lamp_light()
-	_place(_model("chandelier"), Vector3(-2.4, 0, -0.6))
+	_no_shadow(_place(_model("chandelier"), Vector3(-2.4, 0, -0.6))) # странная тень на полу
 
 	# Обеденный стол у перегородки: варенье, ваза, книги; стулья и табурет падают.
 	var dining := Vector3(1.6, 0, 2.0)
@@ -255,7 +258,8 @@ func _build_bedroom() -> void:
 	_solid(_model("wardrobe"), Vector3(1.5, 2.2, 0.6), 1.1, WARDROBE_POS)
 	var bed_pos := Vector3(7.8, 0, -2.9)
 	_solid(_model("bed"), Vector3(1.1, 0.7, 2.05), 0.35, bed_pos)
-	_place(_model("wall_carpet"), Vector3(bed_pos.x, 0.75, BACK_Z + 0.08))
+	# Ковёр левее кровати на 0.35 м: при ширине 2.6 м иначе заезжает в правую стену.
+	_place(_model("wall_carpet"), Vector3(bed_pos.x - 0.35, 0.75, BACK_Z + 0.08))
 	var stand_pos := Vector3(6.75, 0, -3.65)
 	_solid(_model("nightstand"), Vector3(0.45, 0.6, 0.4), 0.3, stand_pos)
 	_breakable("table_lamp", stand_pos + Vector3(0, 0.6, 0), [Color("2a7040"), Color("c0a050")], 0.4)
@@ -263,7 +267,7 @@ func _build_bedroom() -> void:
 	_tippable("dumbbell", Vector3(0.34, 0.12, 0.12), 0.06, Vector3(8.5, 0, 0.6), 3.0, 30.0)
 	_tippable("stool", Vector3(0.36, 0.47, 0.36), 0.24, Vector3(8.4, 0, -0.4), 2.0)
 	_breakable("book_stack", Vector3(8.6, 0.47, -0.4), [Color("992018"), Color("cc9918")], 0.4)
-	_place(_model("chandelier"), Vector3(6.2, 0, -1.4))
+	_no_shadow(_place(_model("chandelier"), Vector3(6.2, 0, -1.4)))
 
 
 func _process(delta: float) -> void:
@@ -416,13 +420,19 @@ func _build_rubgame() -> void:
 	light.position = RUBGAME_TABLE_POS + Vector3(0.3, 1.8, 0)
 	add_child(light)
 
-	# Игровые автоматы 90-х: два у задней стены, один у левой.
-	_solid(_rubgame_model("arcade_cabinet"), Vector3(0.7, 1.7, 0.6), 0.85,
-		Vector3(-10.9, 0, RUBGAME_BACK_Z + 0.4))
-	_solid(_rubgame_model("arcade_cabinet"), Vector3(0.7, 1.7, 0.6), 0.85,
-		Vector3(-10.1, 0, RUBGAME_BACK_Z + 0.4))
-	_solid(_rubgame_model("arcade_cabinet"), Vector3(0.7, 1.7, 0.6), 0.85,
-		Vector3(RUBGAME_LEFT_X + 0.4, 0, 2.3), PI / 2)
+	# Игровые автоматы 90-х: два у задней стены, один у левой. На экранах — спокойные
+	# пиксельные «демо-игры» (блоки, космос, змейка).
+	var arcades := [
+		[Vector3(-10.9, 0, RUBGAME_BACK_Z + 0.4), 0.0],
+		[Vector3(-10.1, 0, RUBGAME_BACK_Z + 0.4), 0.0],
+		[Vector3(RUBGAME_LEFT_X + 0.4, 0, 2.3), PI / 2],
+	]
+	for i in arcades.size():
+		var cabinet := _solid(_rubgame_model("arcade_cabinet"), Vector3(0.7, 1.7, 0.6), 0.85,
+			arcades[i][0], arcades[i][1])
+		var screen := ArcadeScreen.new().setup(i, Vector2(0.48, 0.38))
+		screen.position = Vector3(0, 1.3, 0.334) # перед экраном модели
+		cabinet.add_child(screen)
 
 	# Неоновые вывески: в игровой и над дверью со стороны гостиной.
 	_neon("ИГРА НА РУБЛИ", Vector3(-8.3, 2.35, RUBGAME_BACK_Z + 0.02), 0.0, 80)
@@ -445,6 +455,14 @@ func _neon(text: String, pos: Vector3, yaw: float, font_size: int) -> void:
 func _rubgame_model(model_name: String) -> Node3D:
 	return (load("res://assets/models/rubgame/" + model_name + ".glb") as PackedScene) \
 		.instantiate() as Node3D
+
+
+## Вещь не отбрасывает тень (люстры: их тень от солнца ложилась на пол странным пятном).
+func _no_shadow(node: Node) -> void:
+	if node is GeometryInstance3D:
+		(node as GeometryInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	for child in node.get_children():
+		_no_shadow(child)
 
 
 ## Задать слой видимости всем мешам внутри узла.
