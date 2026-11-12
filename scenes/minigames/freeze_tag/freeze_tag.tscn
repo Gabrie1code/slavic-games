@@ -50,28 +50,28 @@ roughness = 0.9
 
 [sub_resource type="BoxMesh" id="BoxMesh_ground"]
 material = SubResource("Mat_ground")
-size = Vector3(60, 0.2, 60)
+size = Vector3(90, 0.2, 90)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_ground"]
-size = Vector3(60, 0.2, 60)
+size = Vector3(90, 0.2, 90)
 
 [sub_resource type="BoxMesh" id="BoxMesh_path"]
 material = SubResource("Mat_path")
-size = Vector3(22, 0.02, 14)
+size = Vector3(33, 0.02, 21)
 
 [sub_resource type="BoxMesh" id="BoxMesh_fence_long"]
 material = SubResource("Mat_fence")
-size = Vector3(22.6, 0.9, 0.15)
+size = Vector3(34.2, 0.9, 0.15)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_fence_long"]
-size = Vector3(22.6, 3, 0.4)
+size = Vector3(34.2, 3, 0.4)
 
 [sub_resource type="BoxMesh" id="BoxMesh_fence_short"]
 material = SubResource("Mat_fence")
-size = Vector3(0.15, 0.9, 14.6)
+size = Vector3(0.15, 0.9, 22.2)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_fence_short"]
-size = Vector3(0.4, 3, 14.6)
+size = Vector3(0.4, 3, 22.2)
 
 [sub_resource type="BoxMesh" id="BoxMesh_sandbox"]
 material = SubResource("Mat_wood_red")
@@ -144,7 +144,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.01, 0)
 mesh = SubResource("BoxMesh_path")
 
 [node name="FenceNorth" type="StaticBody3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.45, -7.2)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.45, -11)
 
 [node name="Mesh" type="MeshInstance3D" parent="FenceNorth"]
 mesh = SubResource("BoxMesh_fence_long")
@@ -153,7 +153,7 @@ mesh = SubResource("BoxMesh_fence_long")
 shape = SubResource("BoxShape3D_fence_long")
 
 [node name="FenceSouth" type="StaticBody3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.45, 7.2)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.45, 11)
 
 [node name="Mesh" type="MeshInstance3D" parent="FenceSouth"]
 mesh = SubResource("BoxMesh_fence_long")
@@ -162,7 +162,7 @@ mesh = SubResource("BoxMesh_fence_long")
 shape = SubResource("BoxShape3D_fence_long")
 
 [node name="FenceWest" type="StaticBody3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -11.2, 0.45, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -17, 0.45, 0)
 
 [node name="Mesh" type="MeshInstance3D" parent="FenceWest"]
 mesh = SubResource("BoxMesh_fence_short")
@@ -171,7 +171,7 @@ mesh = SubResource("BoxMesh_fence_short")
 shape = SubResource("BoxShape3D_fence_short")
 
 [node name="FenceEast" type="StaticBody3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 11.2, 0.45, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 17, 0.45, 0)
 
 [node name="Mesh" type="MeshInstance3D" parent="FenceEast"]
 mesh = SubResource("BoxMesh_fence_short")

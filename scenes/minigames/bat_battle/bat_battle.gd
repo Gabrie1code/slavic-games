@@ -33,7 +33,9 @@ const REST_ARM_Z := 0.42
 const REST_ARM_X := 0.9 # рука согнута вперёд, кисть перед грудью
 const REST_BAT_X := 2.76 # ≈158°: бита смотрит вверх и назад, за плечо
 const HIT_RADIUS := 2.1
-const HIT_DAMAGE := 20
+## Урон обычной битой — случайный в этих пределах (каждый удар свой).
+const HIT_DAMAGE_MIN := 13
+const HIT_DAMAGE_MAX := 20
 const HIT_KNOCKBACK := 9.0
 ## С улучшенной битой.
 const SUPER_RADIUS := 2.6
@@ -231,7 +233,6 @@ func _spin(f: Fighter) -> void:
 		_rest_pose(f, 0.2))
 
 	var radius := SUPER_RADIUS if is_super else HIT_RADIUS
-	var damage := SUPER_DAMAGE if is_super else HIT_DAMAGE
 	var force := SUPER_KNOCKBACK if is_super else HIT_KNOCKBACK
 	var origin := f.character.global_position
 	for other in _fighters:
@@ -243,6 +244,7 @@ func _spin(f: Fighter) -> void:
 			continue
 		var dir := offset.normalized() if offset.length() > 0.01 else Vector3.FORWARD
 		other.character.apply_knockback(dir * force + Vector3.UP * 4.0)
+		var damage := SUPER_DAMAGE if is_super else randi_range(HIT_DAMAGE_MIN, HIT_DAMAGE_MAX)
 		var dealt := mini(other.hp, damage)
 		other.hp -= dealt
 		_update_hp(other)

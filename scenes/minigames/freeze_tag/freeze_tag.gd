@@ -38,7 +38,7 @@ const ZONE_PUSH := 13.0
 const STUN_TIME := 1.0
 const ALERT := preload("res://assets/textures/fx/alert.png")
 ## Арена: прямоугольник внутри забора.
-const ARENA_HALF := Vector2(10.5, 6.5)
+const ARENA_HALF := Vector2(15.75, 9.75) # двор увеличен в 1.5 раза
 ## Туман водящего: радиус обзора и слои (туман видит только камера водящего,
 ## надписи над головами — только общая камера бегущих).
 const FOG_RADIUS := ZONE_RADIUS * 1.2
@@ -46,7 +46,8 @@ const FOG_LAYER := 1 << 17
 const HUD_LAYER := 1 << 16
 const FOG_SHADER := preload("res://scenes/minigames/freeze_tag/chaser_fog.gdshader")
 const RUNNER_SPAWNS: Array[Vector3] = [
-	Vector3(-8.5, 0.3, -4.5), Vector3(8.5, 0.3, -4.5), Vector3(-8.5, 0.3, 4.5), Vector3(8.5, 0.3, 4.5),
+	Vector3(-12.75, 0.3, -6.75), Vector3(12.75, 0.3, -6.75), Vector3(-12.75, 0.3, 6.75),
+	Vector3(12.75, 0.3, 6.75),
 ]
 const CHASER_SPAWN := Vector3(0, 0.3, 0)
 
@@ -117,7 +118,7 @@ func _ready() -> void:
 		MatchState.start_new_match(1)
 
 	_sun.rotation_degrees = Vector3(-60, -25, 0)
-	_camera.look_at_from_position(Vector3(0, 17.0, 12.5), Vector3(0, 0, 0.8))
+	_camera.look_at_from_position(Vector3(0, 25.5, 18.75), Vector3(0, 0, 1.2))
 	_make_materials()
 	for fence in ["FenceNorth", "FenceSouth", "FenceWest", "FenceEast"]:
 		(get_node(fence + "/Mesh") as Node3D).visible = false # вместо них — модели забора
@@ -749,7 +750,7 @@ func _setup_views() -> void:
 	if humans_running:
 		var runners_camera := _add_view(layer, Vector2(0.5, 0), Vector2(1, 1), 0xFFFFF & ~FOG_LAYER)
 		_runners_view = runners_camera.get_parent().get_parent() as Control
-		runners_camera.look_at_from_position(Vector3(0, 24.0, 15.0), Vector3(0, 0, 0.5))
+		runners_camera.look_at_from_position(Vector3(0, 36.0, 22.5), Vector3(0, 0, 0.75))
 	_camera.cull_mask = 0 # общий экран полностью закрыт видами
 	_update_fog()
 
