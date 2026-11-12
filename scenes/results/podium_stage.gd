@@ -41,10 +41,23 @@ func setup(standings: Array[PlayerData]) -> void:
 	camera.fov = 36.0
 	world.add_child(camera)
 	camera.look_at_from_position(Vector3(0, 2.6, 7.4), Vector3(0, 1.8, 0))
+	_add_collider(world, Vector3(20, 0.2, 20), Vector3(0, -0.1, 0)) # пол
 	for place in mini(standings.size(), 3):
 		_build_step(world, place)
 	for place in standings.size():
 		_spawn(world, standings[place], place)
+
+
+## Невидимое твёрдое тело (пол, ступень), чтобы персонажи не проваливались.
+func _add_collider(world: Node3D, size: Vector3, pos: Vector3) -> void:
+	var body := StaticBody3D.new()
+	var shape := CollisionShape3D.new()
+	var box := BoxShape3D.new()
+	box.size = size
+	shape.shape = box
+	body.add_child(shape)
+	body.position = pos
+	world.add_child(body)
 
 
 func _build_lights(world: Node3D) -> void:
@@ -85,6 +98,7 @@ func _build_step(world: Node3D, place: int) -> void:
 	step.material_override = mat
 	step.position = Vector3(STEP_X[place], height / 2.0, 0)
 	world.add_child(step)
+	_add_collider(world, Vector3(STEP_SIZE.x, height, STEP_SIZE.y), step.position)
 	# Светлая кромка сверху.
 	var rim := MeshInstance3D.new()
 	var rim_box := BoxMesh.new()
@@ -113,8 +127,11 @@ func _spawn(world: Node3D, p: PlayerData, place: int) -> void:
 	world.add_child(character)
 	# Физику выключаем после _ready персонажа (иначе Godot включит её обратно и он упадёт:
 	# ступени — только картинка, без столкновений).
+	# Физику выключаем ещё и на следующем кадре (Godot включает её сам при появлении); а на
+	# случай, если она всё же работает, под ногами есть пол и ступени со столкновениями.
 	character.ready.connect(character.set_physics_process.bind(false))
-	character.set_physics_process(false)
+	character.ready.connect(func() -> void: character.set_physics_process.call_deferred(false))
+	character.respawn_on_fall = false
 	character.input_enabled = false
 	character.rotation.y = PI # лицом к камере
 	var cup: Node3D = null

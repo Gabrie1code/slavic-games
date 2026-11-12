@@ -29,8 +29,17 @@ func setup(p: PlayerData, size_px: float) -> PlayerPortrait:
 	# После _ready персонажа: Godot сам включает физику, если у скрипта есть _physics_process —
 	# выключенная до этого физика включалась обратно, и персонаж падал (без пола) и
 	# появлялся снова снизу вверх. Имя над головой прячем тут же (надпись есть только после _ready).
+	_character.respawn_on_fall = false
+	var ground := StaticBody3D.new() # пол под ногами — на случай, если физика всё же работает
+	var shape := CollisionShape3D.new()
+	var box := BoxShape3D.new()
+	box.size = Vector3(4, 0.2, 4)
+	shape.shape = box
+	ground.add_child(shape)
+	ground.position.y = -0.1
+	world.add_child(ground)
 	_character.ready.connect(func() -> void:
-		_character.set_physics_process(false)
+		_character.set_physics_process.call_deferred(false)
 		_character.show_name(false))
 	_character.rotation.y = PI # лицом к камере
 	var camera := Camera3D.new()
