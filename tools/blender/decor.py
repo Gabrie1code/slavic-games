@@ -1,7 +1,8 @@
 """Уют для квартиры: настенные полки и комнатные растения (низкополигонально).
 
-  wall_shelf_books.glb  — полка на кронштейнах: книги, матрёшка, слоник-статуэтка;
-  wall_shelf_plants.glb — полка: два горшка, традесканция свисает вниз, баночка;
+  wall_shelf.glb        — пустая полка на кронштейнах; вещи для неё — отдельные модели (бьются):
+                          shelf_books, shelf_matryoshka, shelf_elephant, shelf_plant, shelf_cactus,
+                          shelf_jar (точка (0,0,0) — под вещью на полке);
   plant_ficus.glb       — фикус в кадке (~1.5 м);
   plant_snake.glb       — «тёщин язык» (сансевиерия) в горшке (~0.8 м);
   plant_palm.glb        — пальма в кадке (~1.3 м);
@@ -116,7 +117,22 @@ def leaf(base, length, width, yaw, pitch, m):
 
 
 def pot(r, h, m=CLAY):
-    return [cyl(r, h, (0, 0, h / 2), m, verts=10, r2=r * 1.25), cyl(r * 1.15, 0.02, (0, 0, h - 0.01), SOIL)]
+    """Горшок без крышки (стенки + дно) и земля чуть ниже края. Раньше верх горшка и земля были
+    в одной плоскости и в игре мерцали (светлые треугольники на земле)."""
+    bpy.ops.mesh.primitive_cone_add(vertices=10, radius1=r, radius2=r * 1.25, depth=h,
+                                    location=(0, 0, h / 2), end_fill_type="NOTHING")
+    walls = flat(bpy.context.object, m)
+    bottom = cyl(r, 0.01, (0, 0, 0.005), m, verts=10)
+    soil_z = h - 0.03
+    soil_r = r + r * 0.25 * soil_z / h - 0.004
+    return [walls, bottom, cyl(soil_r, 0.01, (0, 0, soil_z - 0.005), SOIL, verts=10)]
+
+
+def export_item(name, parts, origin):
+    """Вещь с полки отдельной моделью (её можно разбить): точка (0,0,0) — под вещью на полке."""
+    for o in parts:
+        o.location -= Vector(origin)
+    return export(name, parts)
 
 
 def export(name, parts):
@@ -148,42 +164,51 @@ def matryoshka(x, y, s):
             cyl(0.046 * s, 0.012 * s, (x, y, 0.03 + 0.06 * s), MATR_GOLD, verts=10)]
 
 
-# ---- Полка с книгами ----
-P = shelf_base()
+# ---- Полка на кронштейнах (пустая) и вещи для неё — отдельно, каждую можно разбить ----
+export("wall_shelf", shelf_base())
+
+P = []
 x = -0.4
 for i in range(7):
     h = random.uniform(0.16, 0.21)
     tilt = 0.25 if i == 6 else 0.0
     P.append(box((0.035, 0.15, h), (x, -0.1, 0.03 + h / 2), BOOKS[i % 5], rot=(0, tilt, 0)))
     x += 0.04
-P += matryoshka(0.05, -0.1, 1.0) + matryoshka(0.15, -0.1, 0.75) + matryoshka(0.23, -0.1, 0.55)
-P.append(blob(0.05, (0.36, -0.1, 0.09), WHITE, scale=(1.3, 0.8, 0.9)))              # слоник
-P.append(cyl(0.012, 0.05, (0.42, -0.1, 0.1), WHITE, verts=6, r2=0.008, rot=(0, 0.9, 0)))
+export_item("shelf_books", P, (-0.28, -0.1, 0.03))
+export_item("shelf_matryoshka",
+            matryoshka(0.05, -0.1, 1.0) + matryoshka(0.15, -0.1, 0.75) + matryoshka(0.23, -0.1, 0.55),
+            (0.13, -0.1, 0.03))
+P = [blob(0.05, (0.36, -0.1, 0.09), WHITE, scale=(1.3, 0.8, 0.9)),                # слоник
+     cyl(0.012, 0.05, (0.42, -0.1, 0.1), WHITE, verts=6, r2=0.008, rot=(0, 0.9, 0))]
 for lx in (0.31, 0.41):
     P.append(cyl(0.012, 0.05, (lx, -0.1, 0.055), WHITE, verts=6))
-export("wall_shelf_books", P)
+export_item("shelf_elephant", P, (0.36, -0.1, 0.03))
 
-# ---- Полка с растениями ----
-P = shelf_base()
-for px in (-0.28, 0.2):
-    for o in pot(0.055, 0.1):
-        o.location += Vector((px, -0.11, 0.03))
-        P.append(o)
+P = []
+for o in pot(0.055, 0.1):
+    o.location += Vector((-0.28, -0.11, 0.03))
+    P.append(o)
 for k in range(12):                                                       # традесканция
     # Растёт из горшка вверх и в стороны; несколько плетей свешиваются через край вперёд
     # (не назад — там стена).
     hang = k >= 8
     a = random.uniform(-2.6, -0.5) if hang else k / 8 * math.tau
     rim = Vector((math.cos(a) * 0.05, math.sin(a) * 0.05, 0))
-    base = Vector((-0.28, -0.11, 0.14)) + (rim if hang else rim * 0.3)
+    base = Vector((-0.28, -0.11, 0.12)) + (rim if hang else rim * 0.3)
     pitch = random.uniform(1.75, 2.05) if hang else random.uniform(0.35, 1.05)
     P.append(leaf(tuple(base), random.uniform(0.12, 0.2), 0.05, a, pitch, LEAF2 if k % 2 else LEAF3))
-for k in range(6):                                                        # кактус-«мышка» справа
-    P.append(blob(0.035, (0.2 + random.uniform(-0.03, 0.03), -0.11, 0.15 + k * 0.025), LEAF,
+export_item("shelf_plant", P, (-0.28, -0.11, 0.03))
+P = []
+for o in pot(0.055, 0.1):
+    o.location += Vector((0.2, -0.11, 0.03))
+    P.append(o)
+for k in range(6):                                                        # кактус-«мышка»
+    P.append(blob(0.035, (0.2 + random.uniform(-0.03, 0.03), -0.11, 0.14 + k * 0.025), LEAF,
                   scale=(1, 1, 1.3)))
-P.append(cyl(0.035, 0.09, (-0.02, -0.1, 0.075), GLASS, verts=10))           # баночка с пуговицами
-P.append(cyl(0.037, 0.015, (-0.02, -0.1, 0.125), MATR_RED, verts=10))
-export("wall_shelf_plants", P)
+export_item("shelf_cactus", P, (0.2, -0.11, 0.03))
+P = [cyl(0.035, 0.09, (-0.02, -0.1, 0.075), GLASS, verts=10),               # баночка с пуговицами
+     cyl(0.037, 0.015, (-0.02, -0.1, 0.125), MATR_RED, verts=10)]
+export_item("shelf_jar", P, (-0.02, -0.1, 0.03))
 
 # ---- Фикус ----
 random.seed(21) # у каждой модели свой «посев»: правка одной не меняет другие
@@ -300,7 +325,7 @@ export("book_stack_mags", P)
 if not RENDER:
     sys.exit(0)
 scene = bpy.context.scene
-for i, name in enumerate(["wall_shelf_books", "wall_shelf_plants", "plant_ficus", "plant_snake", "plant_palm"]):
+for i, name in enumerate(["wall_shelf", "shelf_books", "plant_ficus", "plant_snake", "plant_palm"]):
     o = bpy.data.objects[name]
     o.location = (i * 1.0 - 2.0, 0, 1.0 if name.startswith("wall") else 0)
 bpy.data.objects["wall_carpet_green"].location = (2.6, -0.02, 0.4)

@@ -203,10 +203,11 @@ func _build_sink() -> void:
 		knob.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 	# Зеркало в деревянной рамке.
 	_box(Vector3(0.03, 0.62, 0.5), Vector3(X1 - 0.015, 1.55, z), _mat(Color("6b4423")))
-	var mirror := _mat(Color(0.75, 0.82, 0.86))
-	mirror.metallic = 1.0
-	mirror.roughness = 0.03
-	_box(Vector3(0.01, 0.54, 0.42), Vector3(X1 - 0.035, 1.55, z), mirror)
+	# Настоящее отражение (Mirror): видно себя и других. Зеркало смотрит в комнату (−X).
+	var mirror := Mirror.new().setup(Vector2(0.42, 0.54))
+	mirror.position = Vector3(X1 - 0.032, 1.55, z)
+	mirror.rotation.y = -PI / 2.0
+	add_child(mirror)
 	# Мыло на краю чаши.
 	_box(Vector3(0.06, 0.03, 0.09), Vector3(x - 0.12, 0.9, z - 0.17), _mat(Color("e8c870")))
 

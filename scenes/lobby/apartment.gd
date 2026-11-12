@@ -279,8 +279,8 @@ func _build_bedroom() -> void:
 	var bed_pos := Vector3(7.8, 0, -2.9)
 	_solid(_model("bed"), Vector3(1.1, 0.7, 2.05), 0.35, bed_pos)
 	# Ковёр левее кровати на 0.35 м: при ширине 2.6 м иначе заезжает в правую стену.
-	# Свой ковёр в спальне (зелёный, с «гёлями») — не такой, как в гостиной.
-	_place(_model("wall_carpet_green"), Vector3(bed_pos.x - 0.35, 0.75, BACK_Z + 0.08))
+	# Над кроватью — ковёр-гобелен «Олени у озера» (tools/textures/carpet_deer.py).
+	_tapestry(Vector3(bed_pos.x - 0.35, 1.6, BACK_Z + 0.03), Vector2(2.6, 1.7))
 	var stand_pos := Vector3(6.75, 0, -3.65)
 	# Тумбочка с ящиком: в ящике баллончик с краской (Nightstand, SprayCan).
 	nightstand = Nightstand.new()
@@ -460,24 +460,65 @@ func _hide_window_sky(node: Node) -> void:
 func _build_decor() -> void:
 	# Растения (в кадках — твёрдые, обходить).
 	var plant_size := Vector3(0.45, 1.0, 0.45)
-	_solid(_model("plant_ficus"), plant_size, 0.5, Vector3(-1.65, 0, -3.62))
+	# Фикус — у левой стены рядом с креслом (между телевизором и шкафом он влезал в мебель).
+	_solid(_model("plant_ficus"), plant_size, 0.5, Vector3(-5.5, 0, -1.55))
 	_solid(_model("plant_palm"), plant_size, 0.5, Vector3(2.62, 0, -3.6))
 	_solid(_model("plant_snake"), plant_size, 0.5, Vector3(-5.6, 0, 3.15))
 	_solid(_model("plant_snake"), plant_size, 0.5, Vector3(3.5, 0, -3.7), 0.8)
 	_solid(_model("plant_ficus"), plant_size, 0.5, Vector3(8.65, 0, 1.15), 1.3)
 	# Настенные полки (задняя сторона модели — к стене; модель смотрит на +Z).
-	_place(_model("wall_shelf_books"), Vector3(PARTITION_X - 0.08, 1.55, -3.0)).rotation.y = -PI / 2
-	_place(_model("wall_shelf_books"), Vector3(RIGHT_X, 1.5, -0.9)).rotation.y = -PI / 2
-	_place(_model("wall_shelf_plants"), Vector3(RIGHT_X, 1.55, 0.5)).rotation.y = -PI / 2
-	_place(_model("wall_shelf_plants"), Vector3(PARTITION_X + 0.08, 1.6, -3.0)).rotation.y = PI / 2
+	# Вещи на полках — отдельные, бьются как хрусталь (и через время появляются снова).
+	var book_shelf := [
+		["shelf_books", -0.28, 0.1, [Color("992018"), Color("1a4080"), Color("cc9918")]],
+		["shelf_matryoshka", 0.13, 0.1, [Color("cc1a14"), Color("e6c040")]],
+		["shelf_elephant", 0.36, 0.1, [Color("ebebe6")]],
+	]
+	var plant_shelf := [
+		["shelf_plant", -0.28, 0.11, [Color("a64d26"), Color("408c33")]],
+		["shelf_jar", -0.02, 0.1, [GLASS, Color("cc1a14")]],
+		["shelf_cactus", 0.2, 0.11, [Color("a64d26"), Color("26592a")]],
+	]
+	_wall_shelf(Vector3(PARTITION_X - 0.08, 1.55, -3.0), -PI / 2, book_shelf)
+	_wall_shelf(Vector3(RIGHT_X, 1.5, -0.9), -PI / 2, book_shelf)
+	_wall_shelf(Vector3(RIGHT_X, 1.55, 0.5), -PI / 2, plant_shelf)
+	_wall_shelf(Vector3(PARTITION_X + 0.08, 1.6, -3.0), PI / 2, plant_shelf)
 	# Плакаты.
 	var size := Vector2(0.5, 0.7)
 	_poster("home_space", size, Vector3(PARTITION_X - 0.085, 1.65, 0.65), -PI / 2)
-	_poster("home_kefir", size, Vector3(LEFT_X + 0.012, 1.65, -2.5), PI / 2)
+	_poster("home_kefir", size, Vector3(LEFT_X + 0.012, 1.65, -2.65), PI / 2)
 	_poster("home_calendar", size, Vector3(5.75, 1.6, BACK_Z + 0.012), 0.0)
 	_poster("home_hockey", size, Vector3(PARTITION_X + 0.085, 1.6, 0.65), PI / 2)
 	# Ковровая дорожка к двери в спальню.
 	_place(_model("floor_runner"), Vector3(1.55, 0.004, -1.0))
+
+
+## Ковёр-картина на стене: тонкая основа и картинка спереди, снизу — бахрома.
+func _tapestry(center: Vector3, size: Vector2) -> void:
+	_box(Vector3(size.x, size.y, 0.02), center, _mat(Color("5a1612"), 0.95))
+	var quad := MeshInstance3D.new()
+	var mesh := QuadMesh.new()
+	mesh.size = size - Vector2(0.02, 0.02)
+	quad.mesh = mesh
+	var mat := StandardMaterial3D.new()
+	mat.albedo_texture = load("res://assets/textures/carpet_deer.png")
+	mat.roughness = 0.95
+	quad.material_override = mat
+	quad.position = center + Vector3(0, 0, 0.011)
+	add_child(quad)
+	var fringe := _mat(Color("dcc896"), 0.9)
+	for i in 13:
+		var x := center.x - size.x / 2.0 + 0.1 + i * (size.x - 0.2) / 12.0
+		_box(Vector3(0.03, 0.08, 0.01), Vector3(x, center.y - size.y / 2.0 - 0.04, center.z), fringe)
+
+
+## Настенная полка: пустая полка-модель и вещи на ней (Breakable). items — [[модель, x, z, цвета
+## осколков], …] в координатах полки (вдоль полки — x, от стены — z).
+func _wall_shelf(pos: Vector3, yaw: float, items: Array) -> void:
+	_place(_model("wall_shelf"), pos).rotation.y = yaw
+	for item: Array in items:
+		var local := Vector3(item[1], 0.03, item[2]).rotated(Vector3.UP, yaw)
+		var thing := _breakable(item[0], pos + local, item[3], 0.12, 0.03)
+		thing.rotation.y = yaw
 
 
 # ---------------- Телефон, часы, кот ----------------

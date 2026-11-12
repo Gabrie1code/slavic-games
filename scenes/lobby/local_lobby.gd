@@ -581,6 +581,7 @@ func _create_view(p: PlayerData) -> void:
 	var camera := Camera3D.new()
 	camera.fov = 75.0
 	# Своё тело не рисуем, чужие «кулаки в кадре» — тоже; свой кулак — рисуем.
+	camera.add_to_group(Mirror.VIEWER_GROUP) # зеркала отражают то, что видят эти глаза
 	camera.cull_mask = (0xFFFFF & ~_player_layer(p) & ~VIEWMODEL_LAYERS
 		& ~Apartment.OVERVIEW_ONLY_LAYER) | _viewmodel_layer(p)
 	viewport.add_child(camera)
@@ -722,7 +723,12 @@ func _update_first_person(delta: float) -> void:
 			Basis.from_euler(Vector3(character.fp_pitch, character.rotation.y, 0.0)), eye)
 		var entries := _prompt_for(p, character)
 		entries.append_array(_gadgets.can_holder_hint(p))
-		(_views[id]["prompt"] as KeyPrompt).set_entries(entries)
+		var prompt: KeyPrompt = _views[id]["prompt"]
+		prompt.set_entries(entries)
+		# Во время отсчёта кнопка «Отменить «Готов»» — по центру под надписью «Начинаем через…».
+		var under_timer := _countdown >= 0.0 and _ready_marks.has(p.id)
+		var shift := Vector2(-prompt.size.x / 2.0, 64.0) if under_timer else Vector2(36.0, 20.0)
+		prompt.position = prompt.get_parent_control().size / 2.0 + shift # размер не меняется
 		var on_phone := _gadgets.holds_phone(p)
 		var holds_can := _gadgets.holds_can(p)
 		(_views[id]["fist"] as Node3D).visible = not on_phone and not holds_can
