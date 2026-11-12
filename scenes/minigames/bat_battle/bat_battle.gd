@@ -268,7 +268,9 @@ func _update_boosts(delta: float) -> void:
 		if _boosts.size() < MAX_BOOSTS:
 			_spawn_boost(Boost.values().pick_random())
 
-	for boost in _boosts.duplicate():
+	# Копия списка с явным типом: в цикле бусты могут удаляться.
+	var boosts: Array[Node3D] = _boosts.duplicate()
+	for boost in boosts:
 		boost.rotate_y(2.0 * delta)
 		for f in _fighters:
 			if not f.alive:
