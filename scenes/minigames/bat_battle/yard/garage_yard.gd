@@ -5,8 +5,9 @@ extends Node3D
 ##   сзади — хрущёвка с бельём, тарелками и антеннами; по бокам — деревья и фонари;
 ##   спереди — разбитый асфальт и лужи, чёрный «гелик» (без эмблем), «копейка» на кирпичах,
 ##   мусорные баки, бочки, ящики, лестница к крыше; на воротах — номера, замки и надписи.
-## Голуби сидят только по краям крыши и улетают (сами или если рядом боец);
-## под гаражами бродит собака.
+## Голуби сидят по краям крыши и на мусорных баках и улетают (сами или если рядом боец);
+## под гаражами бродит собака. У баков — чёрные мусорные мешки.
+## За партию 1–2 раза случайная дверь подъезда хрущёвки сама открывается и закрывается.
 ## Если боец падает на гелик — у гелика мигают фары и поворотники (но падение всё равно выбивает).
 
 const DIR := "res://assets/models/courtyard/"
@@ -17,6 +18,12 @@ const DOOR_X: Array[float] = [-6.375, -2.125, 2.125, 6.375]
 const DOOR_Z := 4.58
 const GELIK_POS := Vector3(4.6, GROUND_Y, 6.35)
 const PIGEON_COUNT := 6
+## Мусорные баки (на них тоже садятся голуби).
+const BINS: Array[Vector3] = [Vector3(-10.4, GROUND_Y, 6.4), Vector3(-12.1, GROUND_Y, 6.3)]
+## Хрущёвка сзади и её подъезды (x дверей — как в tools/blender/courtyard.py).
+const HOUSE_POS := Vector3(0, GROUND_Y, -13.5)
+const ENTRANCE_X: Array[float] = [-8.145, 1.164, 10.473]
+const ENTRANCE_Z := 5.57
 const GARAGE_NUMBERS: Array[int] = [17, 18, 21, 23]
 ## Граффити на воротах (имена картинок в assets/textures/garage/).
 const GRAFFITI: Array[String] = [
@@ -42,6 +49,8 @@ func _ready() -> void:
 	add_child(dog)
 	for i in PIGEON_COUNT:
 		_spawn_pigeon(false)
+	_build_trash_bags()
+	_schedule_doors()
 
 
 func _process(delta: float) -> void:
@@ -91,9 +100,12 @@ func _on_pigeon_flown(pigeon: YardPigeon) -> void:
 	get_tree().create_timer(randf_range(6.0, 14.0)).timeout.connect(_spawn_pigeon.bind(true))
 
 
-## Случайная точка на краю крыши (только по краям, не посередине).
+## Случайная точка на краю крыши (только по краям, не посередине) или на мусорном баке.
 func _edge_spot() -> Vector3:
 	var inset := 0.18
+	if randf() < 0.25:
+		var bin: Vector3 = BINS.pick_random()
+		return bin + Vector3(randf_range(-0.55, 0.55), 1.22, randf_range(-0.3, 0.3))
 	if randf() < 0.5:
 		var x := randf_range(-ROOF_HALF.x + 0.5, ROOF_HALF.x - 0.5)
 		var z := (ROOF_HALF.y - inset) * (1.0 if randf() < 0.5 else -1.0)
@@ -101,6 +113,77 @@ func _edge_spot() -> Vector3:
 	var z2 := randf_range(-ROOF_HALF.y + 0.5, ROOF_HALF.y - 0.5)
 	var x2 := (ROOF_HALF.x - inset) * (1.0 if randf() < 0.5 else -1.0)
 	return Vector3(x2, 0.0, z2)
+
+
+# ---------------- Двери подъездов и мешки ----------------
+
+## 1–2 раза за партию случайная дверь подъезда открывается (кто-то вышел) и закрывается.
+func _schedule_doors() -> void:
+	var doors: Array[Node3D] = []
+	var door_mat := _mat(Color(0.35, 0.2, 0.1), 0.7)
+	var dark := _mat(Color(0.04, 0.035, 0.03), 1.0)
+	for x in ENTRANCE_X:
+		var base := HOUSE_POS + Vector3(x, 0, ENTRANCE_Z)
+		_box(Vector3(1.2, 2.1, 0.02), base + Vector3(0, 1.05, 0.01), dark) # темнота за дверью
+		# Створка поворачивается на петле у левого края.
+		var hinge := Node3D.new()
+		hinge.position = base + Vector3(-0.65, 0, 0.05)
+		add_child(hinge)
+		var leaf := MeshInstance3D.new()
+		var mesh := BoxMesh.new()
+		mesh.size = Vector3(1.3, 2.2, 0.06)
+		leaf.mesh = mesh
+		leaf.material_override = door_mat
+		leaf.position = Vector3(0.65, 1.1, 0)
+		hinge.add_child(leaf)
+		var handle := MeshInstance3D.new()
+		var handle_mesh := BoxMesh.new()
+		handle_mesh.size = Vector3(0.04, 0.2, 0.05)
+		handle.mesh = handle_mesh
+		handle.material_override = _mat(Color(0.75, 0.75, 0.7), 0.4)
+		handle.position = Vector3(1.15, 1.0, 0.05)
+		hinge.add_child(handle)
+		doors.append(hinge)
+	for i in randi_range(1, 2):
+		var door: Node3D = doors.pick_random()
+		var tween := create_tween()
+		tween.tween_interval(randf_range(4.0, 40.0) + i * 10.0)
+		tween.tween_property(door, "rotation:y", -1.7, 0.7).set_trans(Tween.TRANS_SINE)
+		tween.tween_interval(randf_range(1.5, 3.0))
+		tween.tween_property(door, "rotation:y", 0.0, 0.5).set_trans(Tween.TRANS_BACK) \
+			.set_ease(Tween.EASE_IN)
+
+
+## Чёрные мусорные мешки у баков (завязаны сверху «хвостиком»).
+func _build_trash_bags() -> void:
+	var bag_mat := _mat(Color(0.05, 0.05, 0.06), 0.25)
+	var spots: Array[Vector3] = [
+		Vector3(-9.35, 0, 6.9), Vector3(-9.6, 0, 7.5), Vector3(-11.3, 0, 7.2),
+		Vector3(-13.1, 0, 6.9), Vector3(-12.7, 0, 7.5),
+	]
+	for i in spots.size():
+		var bag := MeshInstance3D.new()
+		var sphere := SphereMesh.new()
+		sphere.radius = 0.32
+		sphere.height = 0.5
+		sphere.radial_segments = 10
+		sphere.rings = 6
+		bag.mesh = sphere
+		bag.material_override = bag_mat
+		bag.position = Vector3(spots[i].x, GROUND_Y + 0.24, spots[i].z)
+		bag.scale = Vector3(1.0 + (i % 2) * 0.2, 1.0, 0.9)
+		bag.rotation.y = i * 1.3
+		add_child(bag)
+		var knot := MeshInstance3D.new()
+		var cone := CylinderMesh.new()
+		cone.top_radius = 0.02
+		cone.bottom_radius = 0.07
+		cone.height = 0.14
+		cone.radial_segments = 6
+		knot.mesh = cone
+		knot.material_override = bag_mat
+		knot.position = Vector3(0, 0.29, 0)
+		bag.add_child(knot)
 
 
 # ---------------- Земля ----------------
