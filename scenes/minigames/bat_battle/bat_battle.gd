@@ -43,6 +43,8 @@ const DRINK_HEAL := 20
 const BOOST_INTERVAL := 7.0
 const MAX_BOOSTS := 2
 const PICKUP_RADIUS := 1.1
+## Боты: шанс ударить в каждом физическом кадре, когда враг рядом (~0.2 сек реакции).
+const BOT_ATTACK_CHANCE := 0.08
 
 
 ## Состояние одного бойца.
@@ -157,6 +159,8 @@ func _physics_process(delta: float) -> void:
 			f.has_super_bat = false
 			f.character.hold_item(BAT_SCENE.instantiate())
 
+		if f.player.is_bot():
+			_bot_think(f)
 		if f.player.input and f.player.input.is_just_pressed("confirm") and f.cooldown == 0.0:
 			_spin(f)
 
@@ -202,6 +206,45 @@ func _spin(f: Fighter) -> void:
 			_eliminate(other, "выбит")
 
 
+## Мозги бота: идти к ближайшему врагу (или к бусту, если он ближе),
+## не подходить к краю крыши и крутиться, когда враг в зоне удара.
+func _bot_think(f: Fighter) -> void:
+	var bot := f.player.bot_input()
+	var pos := f.character.global_position
+	var target := Vector3.ZERO
+	var enemy_dist := INF
+	for other in _fighters:
+		if other == f or not other.alive:
+			continue
+		var d := pos.distance_to(other.character.global_position)
+		if d < enemy_dist:
+			enemy_dist = d
+			target = other.character.global_position
+	var chasing_enemy := enemy_dist < INF
+	var boost_dist := INF
+	for boost in _boosts:
+		var d := pos.distance_to(boost.global_position)
+		if d < enemy_dist * 0.8 and d < boost_dist:
+			boost_dist = d
+			target = boost.global_position
+			chasing_enemy = false
+
+	var to_target := Vector2(target.x - pos.x, target.z - pos.z)
+	var move := to_target.normalized() if to_target.length() > 0.2 else Vector2.ZERO
+	# Вплотную к врагу не лезем: стоим на дистанции удара.
+	if chasing_enemy and enemy_dist < HIT_RADIUS * 0.6:
+		move *= 0.2
+	# Близко к краю — тянем к центру крыши.
+	var edge := Vector2(pos.x / ROOF_HALF.x, pos.z / ROOF_HALF.y)
+	if absf(edge.x) > 0.75 or absf(edge.y) > 0.75:
+		move += Vector2(-pos.x, -pos.z).normalized() * 1.2
+	bot.move = move.limit_length(1.0)
+
+	var reach := SUPER_RADIUS if f.has_super_bat else HIT_RADIUS
+	if enemy_dist < reach * 0.9 and f.cooldown == 0.0 and randf() < BOT_ATTACK_CHANCE:
+		bot.press("confirm")
+
+
 func _eliminate(f: Fighter, reason: String) -> void:
 	if not f.alive:
 		return
@@ -210,6 +253,8 @@ func _eliminate(f: Fighter, reason: String) -> void:
 	_update_hp(f)
 	_out_order.append(f.player)
 	f.character.input_enabled = false
+	if f.player.is_bot():
+		f.player.bot_input().move = Vector2.ZERO
 	f.hp_label.text = "ВЫБЫЛ"
 	_message_label.text = "%s %s!" % [f.player.display_name, reason]
 	# Выбитого (не упавшего) уносит с крыши.

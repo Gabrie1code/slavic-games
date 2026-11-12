@@ -11,6 +11,7 @@ enum DeviceKind {
 	KEYBOARD_ARROWS, ## Правая половина клавиатуры: стрелки + Enter
 	JOYPAD,          ## Геймпад (номер в joypad_id)
 	REMOTE,          ## Игрок по сети (появится на этапе онлайна)
+	BOT,             ## Бот (управляется компьютером на этом ПК)
 }
 
 ## Уникальный id игрока в рамках матча.
@@ -34,6 +35,15 @@ func is_local() -> bool:
 	return device_kind != DeviceKind.REMOTE
 
 
+func is_bot() -> bool:
+	return device_kind == DeviceKind.BOT
+
+
+## Управление бота (его «виртуальный геймпад»). У людей = null.
+func bot_input() -> BotInput:
+	return input as BotInput if is_bot() else null
+
+
 func device_label() -> String:
 	match device_kind:
 		DeviceKind.KEYBOARD_WASD:
@@ -42,5 +52,7 @@ func device_label() -> String:
 			return "Клавиатура стрелки"
 		DeviceKind.JOYPAD:
 			return "Геймпад %d" % (joypad_id + 1)
+		DeviceKind.BOT:
+			return "Бот"
 		_:
 			return "Сеть"

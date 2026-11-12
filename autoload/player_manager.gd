@@ -21,6 +21,9 @@ const SLOT_COLORS: Array[Color] = [
 	Color("e86aa8"), # розовый
 ]
 
+## Имена ботов.
+const BOT_NAMES: Array[String] = ["Колян", "Серёга", "Вовчик", "Лёха"]
+
 var players: Array[PlayerData] = []
 var _next_id := 1
 
@@ -55,11 +58,44 @@ func add_local_player(kind: PlayerData.DeviceKind, joypad_id: int = -1) -> Playe
 	return p
 
 
+## Добавляет бота в свободный слот. Возвращает null, если мест нет.
+func add_bot() -> PlayerData:
+	if not can_join():
+		return null
+	var p := PlayerData.new()
+	p.id = _next_id
+	_next_id += 1
+	p.slot = _free_slot()
+	p.color = SLOT_COLORS[p.slot]
+	p.device_kind = PlayerData.DeviceKind.BOT
+	p.input = BotInput.new()
+	var taken: Array[String] = []
+	for other in players:
+		taken.append(other.display_name)
+	for bot_name in BOT_NAMES:
+		if not taken.has(bot_name):
+			p.display_name = bot_name
+			break
+	players.append(p)
+	player_joined.emit(p)
+	return p
+
+
+func free_slots() -> int:
+	return MAX_PLAYERS - players.size()
+
+
+func remove_bots() -> void:
+	for p in players.duplicate():
+		if p.is_bot():
+			remove_player(p)
+
+
 func remove_player(p: PlayerData) -> void:
 	if not players.has(p):
 		return
 	players.erase(p)
-	if p.is_local():
+	if p.is_local() and not p.is_bot():
 		InputSetup.unregister_slot(p.slot)
 	player_left.emit(p)
 

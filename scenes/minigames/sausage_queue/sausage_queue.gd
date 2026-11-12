@@ -13,6 +13,9 @@ const SAUSAGE_SCENE := preload("res://assets/models/props/sausage.glb")
 const GO_TIMEOUT := 2.5
 const PLAYER_SPACING := 1.5
 const PLAYERS_Z := 0.4
+## Боты: время реакции (сек) и шанс фальстарта.
+const BOT_REACTION := Vector2(0.28, 0.65)
+const BOT_FALSE_START_CHANCE := 0.12
 
 var _phase := Phase.INTRO
 var _go_time_ms := 0
@@ -79,12 +82,19 @@ func _run() -> void:
 
 	_phase = Phase.WAIT
 	_say("Ждём завоза...")
-	await get_tree().create_timer(randf_range(1.5, 4.0)).timeout
+	var wait := randf_range(1.5, 4.0)
+	for p in MatchState.turn_order():
+		if p.is_bot() and randf() < BOT_FALSE_START_CHANCE:
+			_bot_press_later(p, randf_range(0.3, wait - 0.1))
+	await get_tree().create_timer(wait).timeout
 
 	_phase = Phase.GO
 	_go_time_ms = Time.get_ticks_msec()
 	_say("КОЛБАСА!", Color("ffe14d"), 200)
 	_seller.raise_hand(true, 0.1)
+	for p in MatchState.turn_order():
+		if p.is_bot():
+			_bot_press_later(p, randf_range(BOT_REACTION.x, BOT_REACTION.y))
 
 	var waited := 0.0
 	var total := MatchState.turn_order().size()
@@ -117,6 +127,13 @@ func _run() -> void:
 
 	await get_tree().create_timer(3.0).timeout
 	MatchState.finish_minigame(places)
+
+
+## Бот нажимает кнопку через delay секунд (если ещё не нажимал).
+func _bot_press_later(p: PlayerData, delay: float) -> void:
+	await get_tree().create_timer(delay).timeout
+	if _phase in [Phase.WAIT, Phase.GO] and not _pressed.has(p) and not _false_starts.has(p):
+		p.bot_input().press("confirm")
 
 
 func _lower_hand_later(character: PlayerCharacter) -> void:

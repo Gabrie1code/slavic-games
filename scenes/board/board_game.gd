@@ -117,7 +117,11 @@ func _play_turn(p: PlayerData) -> void:
 	_highlight_score(p)
 
 	# Кубик: числа крутятся, игрок жмёт — останавливается.
-	_set_message("Ходит %s. Жми «%s», чтобы бросить кубик!" % [p.display_name, _confirm_hint(p)])
+	if p.is_bot():
+		_set_message("Ходит %s (бот)..." % p.display_name)
+		_bot_press_later(p, "confirm", randf_range(0.8, 1.4))
+	else:
+		_set_message("Ходит %s. Жми «%s», чтобы бросить кубик!" % [p.display_name, _confirm_hint(p)])
 	_dice_label.visible = true
 	var roll := 1
 	var spin := 0.0
@@ -162,6 +166,11 @@ func _choose_path(p: PlayerData, from: BoardSpace) -> BoardSpace:
 	var selected := 0
 	_set_message("Развилка! Выбери путь: влево/вправо, «%s» — идти" % _confirm_hint(p))
 	options[selected].set_highlight(true)
+	if p.is_bot():
+		# Бот иногда рискует и идёт срезкой.
+		if randf() < 0.5:
+			_bot_press_later(p, "move_right", 0.6)
+		_bot_press_later(p, "confirm", 1.3)
 	await get_tree().process_frame
 	while not p.input.is_just_pressed("confirm"):
 		var dir := 0
@@ -187,6 +196,7 @@ func _offer_deficit(p: PlayerData) -> void:
 
 	_set_message("Купить ДЕФИЦИТ за %d ₽?  «%s» — да,  «%s» — нет" % [
 		MatchState.DEFICIT_PRICE, _confirm_hint(p), _cancel_hint(p)])
+	_bot_press_later(p, "confirm", 0.9) # бот всегда покупает
 	await get_tree().process_frame
 	while true:
 		if p.input.is_just_pressed("confirm"):
@@ -236,6 +246,15 @@ func _hop(pawn: Node3D, to: Vector3) -> void:
 	await tween.finished
 
 
+## Бот «нажимает» кнопку через delay секунд — так же, как живой игрок.
+## Для людей ничего не делает.
+func _bot_press_later(p: PlayerData, action: String, delay: float) -> void:
+	if not p.is_bot():
+		return
+	await get_tree().create_timer(delay).timeout
+	p.bot_input().press(action)
+
+
 func _random_kiosk_space(exclude: int) -> int:
 	var candidates: Array[int] = []
 	for s in _spaces:
@@ -248,6 +267,8 @@ func _random_kiosk_space(exclude: int) -> int:
 
 func _confirm_hint(p: PlayerData) -> String:
 	match p.device_kind:
+		PlayerData.DeviceKind.BOT:
+			return "—"
 		PlayerData.DeviceKind.KEYBOARD_WASD:
 			return "Пробел"
 		PlayerData.DeviceKind.KEYBOARD_ARROWS:
