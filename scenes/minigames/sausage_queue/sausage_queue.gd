@@ -10,6 +10,8 @@ enum Phase { INTRO, WAIT, GO, DONE }
 
 const CHARACTER_SCENE := preload("res://scenes/characters/test_character.tscn")
 const SAUSAGE_SCENE := preload("res://assets/models/props/sausage.glb")
+## Продавщица — своя модель (как на картинке режима): румяная, каре, белый колпак и халат.
+const SELLER_SCENE := preload("res://scenes/characters/saleswoman.tscn")
 const GO_TIMEOUT := 2.5
 const PLAYER_SPACING := 1.5
 const PLAYERS_Z := 0.4
@@ -144,29 +146,15 @@ func _lower_hand_later(character: PlayerCharacter) -> void:
 func _spawn_seller() -> void:
 	var seller_data := PlayerData.new()
 	seller_data.display_name = "Тётя Валя"
-	seller_data.color = Color("f2efe6") # белый халат
+	seller_data.color = Color("f2efe6")
 	seller_data.slot = 0
-	_seller = CHARACTER_SCENE.instantiate()
+	_seller = SELLER_SCENE.instantiate()
 	_seller.setup(seller_data, Vector3(0, 0, -3.1))
 	_seller.name = "Seller"
 	_seller.rotation.y = PI # лицом к покупателям
 	_seller.scale = Vector3.ONE * 1.1
 	_characters_root.add_child(_seller)
 	_seller.set_physics_process(false)
-
-	# Белый колпак продавщицы.
-	var cap := MeshInstance3D.new()
-	var cap_mesh := CylinderMesh.new()
-	cap_mesh.top_radius = 0.3
-	cap_mesh.bottom_radius = 0.34
-	cap_mesh.height = 0.26
-	cap_mesh.radial_segments = 10
-	cap.mesh = cap_mesh
-	cap.position.y = 1.62
-	var cap_mat := StandardMaterial3D.new()
-	cap_mat.albedo_color = Color.WHITE
-	cap.material_override = cap_mat
-	_seller.visual.add_child(cap)
 
 	_sausage = SAUSAGE_SCENE.instantiate()
 	_sausage.scale = Vector3.ONE * 1.4
