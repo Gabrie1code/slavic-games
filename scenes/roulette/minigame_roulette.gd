@@ -9,6 +9,8 @@ const CARD_GAP := 30.0
 const MIN_CARDS_IN_STRIP := 36
 const SPIN_TIME := 4.5
 const PLAYED_TINT := Color(0.4, 0.4, 0.4)
+## Картинки карточек: <id мини-игры>.png. Размер — вертикальный 3:4 (например 900×1200).
+const CARD_IMAGES_DIR := "res://assets/ui/minigames/"
 
 var _strip: HBoxContainer
 var _title: Label
@@ -120,22 +122,45 @@ func _build_ui(played_before: Array[int]) -> void:
 func _make_card(info: Dictionary, played: bool) -> Control:
 	var panel := PanelContainer.new()
 	panel.custom_minimum_size = CARD_SIZE
+	panel.clip_contents = true
 	var style := StyleBoxFlat.new()
 	style.bg_color = info["color"]
 	style.set_corner_radius_all(18)
 	style.set_border_width_all(6)
 	style.border_color = Color("f6c343")
-	style.set_content_margin_all(16)
+	style.set_content_margin_all(6)
 	panel.add_theme_stylebox_override("panel", style)
 
-	var column := VBoxContainer.new()
-	column.alignment = BoxContainer.ALIGNMENT_CENTER
-	column.add_theme_constant_override("separation", 20)
-	panel.add_child(column)
-	column.add_child(_label(info["title"], 40, Color.WHITE))
-	column.add_child(_label(info["tagline"], 24, Color("f6e7a8")))
+	var image_path := "%s%s.png" % [CARD_IMAGES_DIR, info.get("id", "")]
+	if ResourceLoader.exists(image_path):
+		# Карточка-картинка: изображение на всю карточку, название внизу на тёмной плашке.
+		var stack := Control.new()
+		panel.add_child(stack)
+		var picture := TextureRect.new()
+		picture.texture = load(image_path)
+		picture.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		picture.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+		picture.set_anchors_preset(Control.PRESET_FULL_RECT)
+		stack.add_child(picture)
+		var plate := ColorRect.new()
+		plate.color = Color(0, 0, 0, 0.6)
+		plate.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+		plate.offset_top = -86
+		stack.add_child(plate)
+		var title := _label(String(info["title"]).replace("\n", " "), 28, Color.WHITE)
+		title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		title.set_anchors_preset(Control.PRESET_FULL_RECT)
+		plate.add_child(title)
+	else:
+		var column := VBoxContainer.new()
+		column.alignment = BoxContainer.ALIGNMENT_CENTER
+		column.add_theme_constant_override("separation", 20)
+		panel.add_child(column)
+		column.add_child(_label(info["title"], 40, Color.WHITE))
+		column.add_child(_label(info["tagline"], 24, Color("f6e7a8")))
 	if played:
-		column.add_child(_label("СЫГРАНО", 30, Color("ff6b5a")))
+		var stamp := _label("СЫГРАНО", 34, Color("ff6b5a"))
+		panel.add_child(stamp)
 		panel.modulate = PLAYED_TINT
 	return panel
 

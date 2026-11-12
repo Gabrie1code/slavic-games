@@ -42,6 +42,12 @@ var _dice: Node3D
 var _dice_spinning := false
 var _bottle: Node3D
 var _timer_bar: ProgressBar
+## Крупный кубик в углу экрана — главное отображение выпавшего числа.
+var _hud_panel: PanelContainer
+var _hud_dice: Node3D
+var _hud_spinning := false
+var _hud_number: Label
+var _hud_steps: Label
 
 var _round_label: Label
 var _message_label: Label
@@ -84,6 +90,7 @@ func _ready() -> void:
 	add_child(_bottle)
 
 	_build_ui()
+	_build_hud_dice()
 	_update_ui()
 	_camera.look_at_from_position(CAMERA_OFFSET * 1.8, Vector3.ZERO)
 	_run_round.call_deferred()
@@ -95,6 +102,8 @@ func _process(delta: float) -> void:
 		_dice_pivot.look_at(_dice_pivot.global_position * 2.0 - _camera.global_position)
 		if _dice_spinning:
 			_dice.rotate(Vector3(1.0, 0.8, 0.3).normalized(), delta * 9.0)
+	if _hud_spinning:
+		_hud_dice.rotate(Vector3(0.7, 1.0, 0.2).normalized(), delta * 7.0)
 	if _camera_target:
 		var target_pos := _camera_target.global_position + CAMERA_OFFSET
 		_camera.global_position = _camera.global_position.lerp(target_pos, minf(1.0, 4.0 * delta))
@@ -145,6 +154,7 @@ func _play_turn(p: PlayerData) -> void:
 	_dice_pivot.global_position = pawn.global_position + Vector3.UP * DICE_HEIGHT
 	_dice_pivot.visible = true
 	_dice_spinning = true
+	_hud_start_spin(p)
 	_timer_bar.visible = not p.is_bot()
 	var waited := 0.0
 	await get_tree().process_frame
@@ -159,6 +169,7 @@ func _play_turn(p: PlayerData) -> void:
 	await get_tree().create_timer(0.6).timeout
 
 	var steps := roll
+	_hud_steps.text = "Осталось шагов: %d" % steps
 	while steps > 0:
 		var current := _spaces[stats.space_index]
 		var target := current.next[0]
@@ -169,6 +180,7 @@ func _play_turn(p: PlayerData) -> void:
 		steps -= 1
 		# Кубик летит над фишкой и показывает, сколько шагов осталось.
 		_dice_pivot.global_position = pawn.global_position + Vector3.UP * DICE_HEIGHT
+		_hud_steps.text = "Осталось шагов: %d" % steps if steps > 0 else "Пришли!"
 		if steps > 0:
 			_show_dice_face(steps, 0.15)
 		# Проходя мимо ларька, можно купить дефицит.
@@ -216,8 +228,97 @@ func _throw_dice(value: int) -> void:
 	var down := create_tween()
 	down.tween_property(_dice_pivot, "position:y", start_y, 0.3) \
 		.set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
+	_hud_show_value(value)
 	await _show_dice_face(value, 0.35)
-	await down.finished
+	# Ждём падения, только если оно ещё идёт: ожидание уже завершившегося
+	# твина никогда не закончится — из-за этого фишки раньше «зависали».
+	if down.is_running():
+		await down.finished
+
+
+# ---------------- Крупный кубик в углу ----------------
+
+func _hud_start_spin(p: PlayerData) -> void:
+	_hud_panel.visible = true
+	var style := _hud_panel.get_theme_stylebox("panel") as StyleBoxFlat
+	style.border_color = p.color
+	_hud_spinning = true
+	_hud_number.text = "?"
+	_hud_steps.text = p.display_name
+
+
+func _hud_show_value(value: int) -> void:
+	_hud_spinning = false
+	var from := _hud_dice.quaternion
+	var to := Quaternion.from_euler((DICE_FACES[value] as Vector3) * (PI / 180.0))
+	var tween := create_tween()
+	var turn := func(t: float) -> void: _hud_dice.quaternion = from.slerp(to, t)
+	tween.tween_method(turn, 0.0, 1.0, 0.5).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	_hud_number.text = str(value)
+	_hud_number.pivot_offset = _hud_number.size / 2.0
+	_hud_number.scale = Vector2.ONE * 1.8
+	create_tween().tween_property(_hud_number, "scale", Vector2.ONE, 0.35) \
+		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+
+func _build_hud_dice() -> void:
+	_hud_panel = PanelContainer.new()
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.12, 0.08, 0.06, 0.88)
+	style.border_color = Color("f6c343")
+	style.set_border_width_all(4)
+	style.set_corner_radius_all(16)
+	style.set_content_margin_all(14)
+	_hud_panel.add_theme_stylebox_override("panel", style)
+	_hud_panel.set_anchors_preset(Control.PRESET_CENTER_LEFT)
+	_hud_panel.position = Vector2(28, -190)
+	_hud_panel.visible = false
+	_ui.add_child(_hud_panel)
+	var column := VBoxContainer.new()
+	column.add_theme_constant_override("separation", 6)
+	_hud_panel.add_child(column)
+	var caption := _make_label(20)
+	caption.text = "КУБИК"
+	caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	caption.modulate = Color("c9b98f")
+	column.add_child(caption)
+
+	# Кубик крупным планом: свой маленький 3D-мир.
+	var view := SubViewportContainer.new()
+	view.custom_minimum_size = Vector2(200, 200)
+	view.stretch = true
+	column.add_child(view)
+	var viewport := SubViewport.new()
+	viewport.own_world_3d = true
+	viewport.transparent_bg = true
+	viewport.msaa_3d = Viewport.MSAA_4X
+	view.add_child(viewport)
+	var light := DirectionalLight3D.new()
+	light.rotation_degrees = Vector3(-35, 30, 0)
+	viewport.add_child(light)
+	var env := Environment.new()
+	env.background_mode = Environment.BG_CLEAR_COLOR
+	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+	env.ambient_light_color = Color(1, 0.95, 0.88)
+	env.ambient_light_energy = 0.8
+	var world_env := WorldEnvironment.new()
+	world_env.environment = env
+	viewport.add_child(world_env)
+	_hud_dice = DICE_SCENE.instantiate()
+	viewport.add_child(_hud_dice)
+	var cam := Camera3D.new()
+	cam.position = Vector3(0, 0, 1.25)
+	cam.fov = 40.0
+	viewport.add_child(cam)
+
+	_hud_number = _make_label(72)
+	_hud_number.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_hud_number.add_theme_color_override("font_color", Color("f6c343"))
+	_hud_number.add_theme_constant_override("outline_size", 16)
+	column.add_child(_hud_number)
+	_hud_steps = _make_label(20)
+	_hud_steps.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	column.add_child(_hud_steps)
 
 
 ## Плавно повернуть кубик гранью value к камере.

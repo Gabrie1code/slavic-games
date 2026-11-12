@@ -14,21 +14,25 @@ const SCENE_BOARD := "res://scenes/board/board_game.tscn"
 const SCENE_RESULTS := "res://scenes/results/results.tscn"
 const SCENE_ROULETTE := "res://scenes/roulette/minigame_roulette.tscn"
 
-## Все мини-игры: сцена, название, подпись и цвет карточки в рулетке.
+## Все мини-игры: id, сцена, название, подпись и цвет карточки в рулетке.
+## Картинка карточки: res://assets/ui/minigames/<id>.png (если её нет — карточка с текстом).
 const MINIGAMES: Array[Dictionary] = [
 	{
+		"id": "sausage_queue",
 		"scene": "res://scenes/minigames/sausage_queue/sausage_queue.tscn",
 		"title": "Очередь\nза колбасой",
 		"tagline": "Реакция",
 		"color": Color("8c1c13"),
 	},
 	{
+		"id": "bat_battle",
 		"scene": "res://scenes/minigames/bat_battle/bat_battle.tscn",
 		"title": "Битва\nна битах",
 		"tagline": "Все против всех",
 		"color": Color("2f5f8a"),
 	},
 	{
+		"id": "freeze_tag",
 		"scene": "res://scenes/minigames/freeze_tag/freeze_tag.tscn",
 		"title": "Морожка",
 		"tagline": "Догонялки\n1 водящий против всех",

@@ -3,8 +3,8 @@ extends Node3D
 ##
 ## Вход:  Пробел/E — левая клавиатура, Enter — правая клавиатура, A — геймпад.
 ## Выход: Q, Backspace/Shift или B на геймпаде.
-## Начать партию: Tab или Start на геймпаде.
-## Если есть свободные места — сначала спросим, сколько добавить ботов.
+## Начать партию: все живые игроки подходят к телевизору и жмут кнопку действия («Готов»).
+## Когда готовы все — спросим про ботов (если есть места), потом отсчёт 5 сек и старт.
 ## Рынок (справа): подойти и нажать кнопку подтверждения — откроется гардероб.
 
 const CHARACTER_SCENE := preload("res://scenes/characters/test_character.tscn")
@@ -12,6 +12,9 @@ const SPAWN_RADIUS := 3.0
 const ROUNDS := 5
 const MARKET_POS := Vector3(7.0, 0.0, -1.6)
 const MARKET_RADIUS := 2.0
+const TV_ZONE_POS := Vector3(0.0, 0.0, -4.0)
+const TV_ZONE_RADIUS := 1.8
+const COUNTDOWN := 5.0
 
 var _characters: Dictionary = {} # PlayerData.id -> персонаж
 var _slot_panels: Array[PanelContainer] = []
@@ -20,6 +23,12 @@ var _slot_panels: Array[PanelContainer] = []
 var _bot_dialog: PanelContainer
 var _bot_count_label: Label
 var _bot_count := 0
+
+## Готовые к старту игроки: PlayerData.id -> надпись «ГОТОВ» над головой.
+var _ready_marks: Dictionary = {}
+## Отсчёт до старта (сек). Меньше нуля — отсчёта нет.
+var _countdown := -1.0
+var _countdown_label: Label
 
 ## Открытые примерочные: PlayerData.id -> DressingRoom
 var _rooms: Dictionary = {}
@@ -36,6 +45,7 @@ func _ready() -> void:
 	_sun.rotation_degrees = Vector3(-55, -35, 0)
 	_build_ui()
 	_build_market()
+	_build_tv_zone()
 
 	# Боты прошлой партии в лобби не нужны: при старте спросим заново.
 	PlayerManager.remove_bots()
@@ -59,9 +69,6 @@ func _unhandled_input(event: InputEvent) -> void:
 			else:
 				get_tree().quit()
 			return
-		if key.physical_keycode == KEY_TAB:
-			_start_match()
-			return
 		if key.physical_keycode == KEY_F9:
 			_test_add_money()
 			return
@@ -72,25 +79,32 @@ func _unhandled_input(event: InputEvent) -> void:
 			PlayerManager.add_local_player(scheme as PlayerData.DeviceKind)
 	elif event is InputEventJoypadButton:
 		var button := event as InputEventJoypadButton
-		if _bot_dialog.visible and button.button_index != JOY_BUTTON_START:
+		if _bot_dialog.visible:
 			return
 		if button.button_index == JOY_BUTTON_A:
 			PlayerManager.add_local_player(PlayerData.DeviceKind.JOYPAD, button.device)
-		elif button.button_index == JOY_BUTTON_START:
-			_start_match()
 
 
-## Tab / Start: если есть свободные места — спросить про ботов, иначе сразу старт.
-func _start_match() -> void:
-	if PlayerManager.players.is_empty():
-		return
+## Все живые игроки готовы: спросить про ботов (если есть места), иначе — сразу отсчёт.
+func _all_ready() -> void:
 	_close_all_wardrobes()
-	if _bot_dialog.visible:
-		_confirm_bots()
-	elif PlayerManager.free_slots() > 0:
+	if PlayerManager.free_slots() > 0:
 		_open_bot_dialog()
 	else:
-		_launch()
+		_start_countdown()
+
+
+func _start_countdown() -> void:
+	_countdown = COUNTDOWN
+	_countdown_label.visible = true
+
+
+func _cancel_countdown() -> void:
+	if _countdown < 0.0:
+		return
+	_countdown = -1.0
+	_countdown_label.visible = false
+	PlayerManager.remove_bots() # ботов спросим заново, когда все снова будут готовы
 
 
 func _launch() -> void:
@@ -98,7 +112,7 @@ func _launch() -> void:
 	SceneManager.change_scene(MatchState.SCENE_BOARD)
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	if _bot_dialog.visible:
 		_process_bot_dialog()
 		return
@@ -107,10 +121,58 @@ func _process(_delta: float) -> void:
 			continue
 		if _rooms.has(p.id):
 			continue # примерочная сама обрабатывает кнопки игрока
+		var at_tv := _is_near(p, TV_ZONE_POS, TV_ZONE_RADIUS)
 		if p.input.is_just_pressed("confirm") and _is_at_market(p):
 			_open_wardrobe(p)
+		elif p.input.is_just_pressed("confirm") and at_tv:
+			_set_ready(p, not _ready_marks.has(p.id))
 		elif p.input.is_just_pressed("cancel"):
 			PlayerManager.remove_player(p)
+			continue
+		if not at_tv and _ready_marks.has(p.id):
+			_set_ready(p, false) # отошёл от телевизора — уже не готов
+
+	if _countdown >= 0.0:
+		_countdown -= delta
+		_countdown_label.text = "Начинаем через %d..." % ceili(_countdown)
+		if _countdown <= 0.0:
+			_countdown = -1.0
+			_launch()
+		return
+	var humans := PlayerManager.players.filter(func(p: PlayerData) -> bool: return not p.is_bot())
+	var all_ready := humans.all(func(p: PlayerData) -> bool: return _ready_marks.has(p.id))
+	if not humans.is_empty() and all_ready:
+		_all_ready()
+
+
+## Отметить игрока готовым (надпись «ГОТОВ» над головой) или снять отметку.
+func _set_ready(p: PlayerData, on: bool) -> void:
+	if on == _ready_marks.has(p.id):
+		return
+	if on:
+		var mark := Label3D.new()
+		mark.text = "ГОТОВ!"
+		mark.font_size = 56
+		mark.outline_size = 14
+		mark.modulate = Color("8fd694")
+		mark.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		mark.no_depth_test = true
+		mark.position.y = 2.5
+		(_characters[p.id] as Node3D).add_child(mark)
+		_ready_marks[p.id] = mark
+	else:
+		var mark: Node = _ready_marks[p.id]
+		if is_instance_valid(mark):
+			mark.queue_free()
+		_ready_marks.erase(p.id)
+		_cancel_countdown()
+
+
+func _is_near(p: PlayerData, point: Vector3, radius: float) -> bool:
+	if not _characters.has(p.id):
+		return false
+	var pos: Vector3 = (_characters[p.id] as Node3D).global_position
+	return Vector2(pos.x - point.x, pos.z - point.z).length() < radius
 
 
 # ---------------- Рынок и гардероб ----------------
@@ -175,6 +237,31 @@ func _layout_rooms() -> void:
 			rect = Rect2(Vector2(half.x * (i % 2), half.y * (i / 2)), half)
 		rooms[i].position = rect.position
 		rooms[i].size = rect.size
+
+
+## Круг перед телевизором: встань и нажми кнопку — «Готов».
+func _build_tv_zone() -> void:
+	var zone := MeshInstance3D.new()
+	var zone_mesh := CylinderMesh.new()
+	zone_mesh.top_radius = TV_ZONE_RADIUS
+	zone_mesh.bottom_radius = TV_ZONE_RADIUS
+	zone_mesh.height = 0.02
+	zone_mesh.radial_segments = 24
+	zone.mesh = zone_mesh
+	var zone_mat := StandardMaterial3D.new()
+	zone_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	zone_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	zone_mat.albedo_color = Color(0.56, 0.84, 0.58, 0.3)
+	zone.material_override = zone_mat
+	zone.position = TV_ZONE_POS + Vector3.UP * 0.05
+	add_child(zone)
+	var hint := Label3D.new()
+	hint.text = "ИГРАТЬ: встань в круг\nи нажми Пробел / Enter / A"
+	hint.font_size = 34
+	hint.outline_size = 10
+	hint.rotation_degrees.x = -90
+	hint.position = TV_ZONE_POS + Vector3(0, 0.07, 0.9)
+	add_child(hint)
 
 
 func _build_market() -> void:
@@ -270,13 +357,17 @@ func _open_bot_dialog() -> void:
 func _close_bot_dialog() -> void:
 	_bot_dialog.visible = false
 	_set_characters_input(true)
+	# «Назад» — снимаем готовность со всех, иначе окно тут же откроется снова.
+	for p in PlayerManager.players:
+		_set_ready(p, false)
 
 
 func _confirm_bots() -> void:
 	_bot_dialog.visible = false
+	_set_characters_input(true)
 	for i in _bot_count:
 		PlayerManager.add_bot()
-	_launch()
+	_start_countdown()
 
 
 ## Управлять окном может любой живой игрок своими кнопками.
@@ -318,10 +409,15 @@ func _on_player_joined(p: PlayerData) -> void:
 	character.setup(p, spawn)
 	_players_root.add_child(character)
 	_characters[p.id] = character
+	if not p.is_bot():
+		_cancel_countdown() # новый игрок пришёл — пусть тоже подтвердит готовность
 	_refresh_slots()
 
 
 func _on_player_left(p: PlayerData) -> void:
+	_ready_marks.erase(p.id)
+	if not p.is_bot():
+		_cancel_countdown()
 	if _rooms.has(p.id):
 		(_rooms[p.id] as Node).queue_free()
 		_rooms.erase(p.id)
@@ -357,7 +453,7 @@ func _build_ui() -> void:
 	var hint := Label.new()
 	hint.text = ("Вход: Пробел (WASD) · Enter (стрелки) · A (геймпад)\n"
 		+ "Прыжок: та же кнопка · Выйти: Q / Backspace / B · Закрыть игру: Esc\n"
-		+ "Переодеться и купить одежду: РЫНОК справа · НАЧАТЬ ПАРТИЮ: Tab или Start на геймпаде")
+		+ "Переодеться: РЫНОК справа · НАЧАТЬ: все подходят к ТЕЛЕВИЗОРУ и жмут кнопку")
 	hint.add_theme_font_size_override("font_size", 22)
 	hint.add_theme_color_override("font_outline_color", Color.BLACK)
 	hint.add_theme_constant_override("outline_size", 8)
@@ -369,6 +465,18 @@ func _build_ui() -> void:
 	column.add_child(spacer)
 
 	_build_bot_dialog()
+
+	_countdown_label = Label.new()
+	_countdown_label.set_anchors_preset(Control.PRESET_CENTER)
+	_countdown_label.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	_countdown_label.grow_vertical = Control.GROW_DIRECTION_BOTH
+	_countdown_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_countdown_label.add_theme_font_size_override("font_size", 72)
+	_countdown_label.add_theme_color_override("font_color", Color("f6c343"))
+	_countdown_label.add_theme_color_override("font_outline_color", Color("7a1410"))
+	_countdown_label.add_theme_constant_override("outline_size", 18)
+	_countdown_label.visible = false
+	_ui.add_child(_countdown_label)
 
 	var rooms_layer := CanvasLayer.new()
 	rooms_layer.layer = 10
