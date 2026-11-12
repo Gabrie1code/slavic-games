@@ -278,10 +278,15 @@ func _build_bedroom() -> void:
 
 func _process(delta: float) -> void:
 	_time += delta
-	if not lamp_on and _time >= _lamp_back_at:
+	# Задели торшер (даже чуть сдвинули) — он гаснет, как от кнопки, и загорается только через
+	# LAMP_BACK сек после того, как встал на место. Раньше от толчка свет мигал и вспыхивал.
+	if not floor_lamp.is_at_home():
+		lamp_on = false
+		_lamp_back_at = _time + LAMP_BACK
+	elif not lamp_on and _time >= _lamp_back_at:
 		lamp_on = true
 	# Гаснет сразу, разгорается плавно.
-	var target := 1.0 if lamp_on and floor_lamp.is_at_home() else 0.0
+	var target := 1.0 if lamp_on else 0.0
 	if target < _lamp_level:
 		_lamp_level = target
 	else:
@@ -347,7 +352,9 @@ func _build_lamp_light() -> void:
 	_lamp_light.light_color = Color(1.0, 0.82, 0.55)
 	_lamp_light.light_energy = LAMP_ENERGY
 	_lamp_light.omni_range = 4.0
-	_lamp_light.shadow_enabled = true
+	# Без теней: абажур отбрасывал резкий восьмиугольник света на пол («кривое свечение»).
+	_lamp_light.shadow_enabled = false
+	_lamp_light.omni_attenuation = 1.5 # мягче к краю
 	_lamp_light.position = Vector3(0, 1.4, 0)
 	floor_lamp.add_child(_lamp_light)
 	_lamp_glow = MeshInstance3D.new()

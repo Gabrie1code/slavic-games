@@ -792,7 +792,21 @@ func _on_player_joined(p: PlayerData) -> void:
 		_create_view(p)
 	if not p.is_bot():
 		_cancel_countdown() # новый игрок пришёл — пусть тоже подтвердит готовность
+	else:
+		_place_bot(p, character as PlayerCharacter)
 	_refresh_slots()
+
+
+## Бот перед игрой садится на свободное место дивана (каждый на своё — не застревают друг
+## в друге). Мест нет — стоит за диваном лицом к телевизору (у каждого слота своя точка).
+func _place_bot(p: PlayerData, character: PlayerCharacter) -> void:
+	for i in _apartment.seats.size():
+		if not _seated.values().has(i):
+			_sit(p, i)
+			return
+	var behind_x: Array[float] = [-0.8, 0.0, 0.8]
+	character.global_position = Apartment.SOFA_POS + Vector3(behind_x[p.slot % 3], 0.05, 0.85)
+	character.rotation.y = 0.0
 
 
 func _on_player_left(p: PlayerData) -> void:
@@ -906,86 +920,10 @@ func _refresh_slots() -> void:
 
 
 func _build_bot_dialog() -> void:
-	_bot_dialog = PanelContainer.new()
-	_bot_dialog.visible = false
-	_bot_dialog.set_anchors_preset(Control.PRESET_CENTER)
-	_bot_dialog.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	_bot_dialog.grow_vertical = Control.GROW_DIRECTION_BOTH
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.12, 0.08, 0.07, 0.95)
-	style.border_color = Color("f6c343")
-	style.set_border_width_all(4)
-	style.set_corner_radius_all(16)
-	style.set_content_margin_all(32)
-	_bot_dialog.add_theme_stylebox_override("panel", style)
-	_ui.add_child(_bot_dialog)
-
-	var column := VBoxContainer.new()
-	column.add_theme_constant_override("separation", 16)
-	_bot_dialog.add_child(column)
-	for line in [
-		["Добавить ботов на свободные места?", 34, Color("f6c343")],
-		["Сколько ботов:", 24, Color.WHITE],
-	]:
-		var label := Label.new()
-		label.text = line[0]
-		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		label.add_theme_font_size_override("font_size", line[1])
-		label.add_theme_color_override("font_color", line[2])
-		column.add_child(label)
-
-	# Число ботов со стрелками (стрелки можно нажимать мышью).
-	var picker := HBoxContainer.new()
-	picker.alignment = BoxContainer.ALIGNMENT_CENTER
-	picker.add_theme_constant_override("separation", 24)
-	column.add_child(picker)
-	var left := _dialog_button("◀", 48)
-	left.pressed.connect(_change_bot_count.bind(-1))
-	picker.add_child(left)
-	_bot_count_label = Label.new()
-	_bot_count_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_bot_count_label.custom_minimum_size.x = 260
-	_bot_count_label.add_theme_font_size_override("font_size", 64)
-	picker.add_child(_bot_count_label)
-	var right := _dialog_button("▶", 48)
-	right.pressed.connect(_change_bot_count.bind(1))
-	picker.add_child(right)
-
-	var buttons := HBoxContainer.new()
-	buttons.alignment = BoxContainer.ALIGNMENT_CENTER
-	buttons.add_theme_constant_override("separation", 20)
-	column.add_child(buttons)
-	# Слева «Назад», справа «Начать» (как привычно: «вперёд» — справа).
-	var back := _dialog_button("Назад", 30)
-	back.pressed.connect(_close_bot_dialog)
-	buttons.add_child(back)
-	var start := _dialog_button("Начать", 30)
-	start.pressed.connect(_confirm_bots)
-	buttons.add_child(start)
-
-	var hint := Label.new()
-	hint.text = ("Влево/вправо — меньше/больше (по кругу)\n"
-		+ "Пробел / Enter / A или Tab — начать · Q / Backspace / B или Esc — назад")
-	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	hint.add_theme_font_size_override("font_size", 20)
-	hint.modulate.a = 0.75
-	column.add_child(hint)
-
-
-func _dialog_button(text: String, font_size: int) -> Button:
-	var button := Button.new()
-	button.text = text
-	button.focus_mode = Control.FOCUS_NONE
-	button.custom_minimum_size = Vector2(90, 64)
-	button.add_theme_font_size_override("font_size", font_size)
-	for state in ["normal", "hover", "pressed"]:
-		var style := StyleBoxFlat.new()
-		style.bg_color = Color("6a4318") if state == "hover" else Color("4a3020")
-		style.border_color = Color("f6c343")
-		style.set_border_width_all(2 if state == "normal" else 3)
-		style.set_corner_radius_all(12)
-		style.set_content_margin_all(12)
-		button.add_theme_stylebox_override(state, style)
-	button.add_theme_color_override("font_color", Color("f6c343"))
-	button.add_theme_color_override("font_hover_color", Color.WHITE)
-	return button
+	var dialog := BotDialog.new()
+	dialog.step_pressed.connect(_change_bot_count)
+	dialog.back_pressed.connect(_close_bot_dialog)
+	dialog.start_pressed.connect(_confirm_bots)
+	_ui.add_child(dialog)
+	_bot_dialog = dialog
+	_bot_count_label = dialog.count_label
