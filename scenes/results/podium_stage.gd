@@ -111,8 +111,9 @@ func _build_step(world: Node3D, place: int) -> void:
 	world.add_child(rim)
 	var number := Label3D.new()
 	number.text = str(place + 1)
-	number.font_size = 220
-	number.outline_size = 24
+	# Цифра помещается на передней стенке своей ступени (раньше 1,1 м — залезала на соседние).
+	number.font_size = int(height * 130.0)
+	number.outline_size = maxi(6, number.font_size / 9)
 	number.modulate = PLACE_COLORS[place]
 	number.position = Vector3(STEP_X[place], height / 2.0, STEP_SIZE.y / 2.0 + 0.01)
 	world.add_child(number)

@@ -26,6 +26,12 @@ const CROUCH_LEAN := 0.45
 ## Максимальная скорость взлёта (прыжок 7, отбрасывание битой до ~7 — хватает с запасом).
 const MAX_RISE_SPEED := 9.0
 ## Поворот правой руки: опущена / поднята вверх / вытянута в сторону.
+## Во сколько раз шире по X/Z (и выше по Y) вещь этого слота — чтобы внешний слой был снаружи.
+const LAYER_SCALE := {
+	Cosmetics.Slot.HAT: Vector3(1.07, 1.04, 1.07),
+	Cosmetics.Slot.JACKET: Vector3(1.035, 1.0, 1.035),
+	Cosmetics.Slot.SHOES: Vector3(1.06, 1.0, 1.06),
+}
 const ARM_DOWN := 0.12
 const ARM_UP := 2.75
 const ARM_SIDE := 1.45
@@ -336,6 +342,9 @@ func wear(slot: int, item_id: String) -> void:
 		item.remove_child(piece_3d)
 		_part(String(piece.name)).add_child(piece_3d)
 		piece_3d.transform = Transform3D.IDENTITY
+		# Слои одежды: шапка шире головы (голова не торчит на бегу), верх поверх штанов,
+		# обувь поверх штанин — внешний слой чуть шире по X/Z вокруг оси части тела.
+		piece_3d.scale = LAYER_SCALE.get(slot, Vector3.ONE)
 		_recolor(piece_3d)
 		_apply_layer(piece_3d)
 		pieces.append(piece_3d)
