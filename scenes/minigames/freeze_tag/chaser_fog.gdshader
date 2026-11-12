@@ -5,8 +5,8 @@ render_mode unshaded, cull_disabled, depth_draw_never, shadows_disabled;
 
 uniform vec3 center = vec3(0.0);
 uniform float radius = 4.5;
-uniform float softness = 1.3;
-uniform vec4 fog_color : source_color = vec4(0.04, 0.05, 0.09, 0.94);
+uniform float softness = 1.0;
+uniform vec4 fog_color : source_color = vec4(0.01, 0.012, 0.025, 0.99);
 
 varying vec3 world_pos;
 

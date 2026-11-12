@@ -90,6 +90,7 @@ var _ice_material: StandardMaterial3D
 var _ice_core_material: StandardMaterial3D
 var _ice_edge_material: StandardMaterial3D
 var _run_fx: RunEffects
+var _flake_material: StandardMaterial3D
 var _shard_material: StandardMaterial3D
 ## Крупные полоски разморозки внизу экрана: PlayerData.id -> {"box", "bar"}.
 var _hud_bars: Dictionary = {}
@@ -126,6 +127,7 @@ func _ready() -> void:
 	_yard.swing.sit_finished.connect(_on_playground_done)
 	_spawn_racers()
 	_setup_views()
+	_prewarm_effects()
 	_build_ui()
 	_run_intro.call_deferred()
 
@@ -410,40 +412,31 @@ func _ice_edge(a: Vector3, b: Vector3) -> MeshInstance3D:
 	return edge
 
 
-## Снежинки, медленно кружащие вокруг глыбы.
-func _snowflakes() -> GPUParticles3D:
-	var flakes := GPUParticles3D.new()
+## Снежинки, медленно кружащие вокруг глыбы. CPU-частицы: в отличие от GPU-частиц им не нужно
+## собирать шейдер в момент заморозки (из-за этого раньше игра на миг подвисала).
+func _snowflakes() -> CPUParticles3D:
+	var flakes := CPUParticles3D.new()
 	flakes.amount = 10
 	flakes.lifetime = 2.2
-	var process := ParticleProcessMaterial.new()
-	process.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_BOX
-	process.emission_box_extents = Vector3(ICE_RADIUS + 0.15, ICE_HEIGHT / 2.0, ICE_RADIUS + 0.15)
-	process.gravity = Vector3(0, 0.12, 0)
-	process.initial_velocity_min = 0.05
-	process.initial_velocity_max = 0.2
-	process.angle_min = -180.0
-	process.angle_max = 180.0
-	process.scale_min = 0.6
-	process.scale_max = 1.3
+	flakes.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
+	flakes.emission_box_extents = Vector3(ICE_RADIUS + 0.15, ICE_HEIGHT / 2.0, ICE_RADIUS + 0.15)
+	flakes.gravity = Vector3(0, 0.12, 0)
+	flakes.initial_velocity_min = 0.05
+	flakes.initial_velocity_max = 0.2
+	flakes.angle_min = -180.0
+	flakes.angle_max = 180.0
+	flakes.scale_amount_min = 0.6
+	flakes.scale_amount_max = 1.3
 	var fade := Gradient.new()
 	fade.set_color(0, Color(1, 1, 1, 0))
 	fade.set_color(1, Color(1, 1, 1, 0))
 	fade.add_point(0.25, Color(1, 1, 1, 1))
 	fade.add_point(0.75, Color(1, 1, 1, 1))
-	var ramp := GradientTexture1D.new()
-	ramp.gradient = fade
-	process.color_ramp = ramp
-	flakes.process_material = process
+	flakes.color_ramp = fade
 	var quad := QuadMesh.new()
 	quad.size = Vector2(0.2, 0.2)
-	var flake_mat := StandardMaterial3D.new()
-	flake_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	flake_mat.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
-	flake_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	flake_mat.albedo_texture = SNOWFLAKE
-	flake_mat.vertex_color_use_as_albedo = true
-	quad.material = flake_mat
-	flakes.draw_pass_1 = quad
+	quad.material = _flake_material
+	flakes.mesh = quad
 	flakes.position.y = ICE_HEIGHT / 2.0
 	return flakes
 
@@ -683,6 +676,34 @@ func _show_alerts(helpers: Array[Racer]) -> void:
 				r.alert.scale = Vector3.ONE * (1.0 + absf(sin(Time.get_ticks_msec() / 120.0)) * 0.2)
 
 
+## «Прогрев»: лёд, зона и полоска один раз рисуются под землёй в начале раунда, чтобы Godot
+## заранее собрал их шейдеры — тогда в момент заморозки игра не подвисает.
+func _prewarm_effects() -> void:
+	var warm := Node3D.new()
+	warm.position = Vector3(0, -3.0, 0) # под землёй: не видно, но рисуется
+	add_child(warm)
+	warm.add_child(_build_ice())
+	var zone := MeshInstance3D.new()
+	var zone_mesh := CylinderMesh.new()
+	zone_mesh.top_radius = ZONE_RADIUS
+	zone_mesh.bottom_radius = ZONE_RADIUS
+	zone_mesh.height = 0.02
+	zone.mesh = zone_mesh
+	zone.material_override = _zone_material
+	warm.add_child(zone)
+	# Синяя «плёнка» на замороженном и полоска разморозки — те же настройки материалов.
+	var tinted := MeshInstance3D.new()
+	tinted.mesh = BoxMesh.new()
+	var overlay := StandardMaterial3D.new()
+	overlay.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	overlay.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	overlay.albedo_color = Color(0.45, 0.75, 1.0, 0.45)
+	tinted.material_overlay = overlay
+	warm.add_child(tinted)
+	await get_tree().create_timer(1.0).timeout
+	warm.queue_free()
+
+
 # ---------------- Площадка ----------------
 
 ## Качели и карусель толкают все; «подтвердить» у лесенки — горка, у качелей — сесть.
@@ -867,6 +888,13 @@ func _make_materials() -> void:
 	_shard_material.emission_enabled = true
 	_shard_material.emission = Color(0.45, 0.75, 1.0)
 	_shard_material.emission_energy_multiplier = 0.5
+
+	_flake_material = StandardMaterial3D.new()
+	_flake_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_flake_material.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+	_flake_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	_flake_material.albedo_texture = SNOWFLAKE
+	_flake_material.vertex_color_use_as_albedo = true
 
 	_zone_material = StandardMaterial3D.new()
 	_zone_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
