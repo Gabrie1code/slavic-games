@@ -47,9 +47,12 @@ class Racer:
 	var unfreeze_progress := 0.0
 	var stun_left := 0.0
 	var zone_time := 0.0
-	var ice: MeshInstance3D
+	var ice: Node3D
 	var zone: MeshInstance3D
 	var status: Label3D
+	## Полоска разморозки над головой (фон + заполнение).
+	var bar: Node3D
+	var bar_fill: MeshInstance3D
 
 
 var _racers: Array[Racer] = []
@@ -63,6 +66,11 @@ var _message_label: Label
 var _score_labels: Dictionary = {} # PlayerData.id -> Label
 
 var _ice_material: StandardMaterial3D
+var _ice_core_material: StandardMaterial3D
+var _shard_material: StandardMaterial3D
+## Крупные полоски разморозки внизу экрана: PlayerData.id -> {"box", "bar"}.
+var _hud_bars: Dictionary = {}
+var _hud_bars_box: VBoxContainer
 var _zone_material: StandardMaterial3D
 
 @onready var _camera: Camera3D = $Camera3D
@@ -168,6 +176,7 @@ func _physics_process(delta: float) -> void:
 
 	_update_chaser(delta)
 	_update_unfreezing(delta)
+	_face_bars()
 	_update_scores()
 
 	var runners := _runners()
@@ -252,10 +261,8 @@ func _update_unfreezing(delta: float) -> void:
 			f.unfreeze_progress = maxf(0.0, f.unfreeze_progress - delta * 0.5)
 		if f.unfreeze_progress >= UNFREEZE_TIME:
 			_unfreeze(f, helper)
-		elif f.unfreeze_progress > 0.0:
-			f.status.text = "РАЗМОРОЗКА %d%%" % int(f.unfreeze_progress / UNFREEZE_TIME * 100.0)
 		else:
-			f.status.text = "ЗАМОРОЖЕН"
+			_set_unfreeze_bar(f, f.unfreeze_progress / UNFREEZE_TIME, helper)
 
 
 func _freeze(r: Racer) -> void:
@@ -267,17 +274,12 @@ func _freeze(r: Racer) -> void:
 		r.player.bot_input().move = Vector2.ZERO
 		r.player.bot_input().hold("confirm", false)
 
-	r.ice = MeshInstance3D.new()
-	var ice_mesh := CylinderMesh.new()
-	ice_mesh.top_radius = 0.62
-	ice_mesh.bottom_radius = 0.7
-	ice_mesh.height = 2.05
-	ice_mesh.radial_segments = 6
-	ice_mesh.rings = 1
-	r.ice.mesh = ice_mesh
-	r.ice.material_override = _ice_material
-	r.ice.position.y = 1.0
+	r.ice = _build_ice()
 	r.character.add_child(r.ice)
+	r.ice.scale = Vector3.ONE * 0.2
+	create_tween().tween_property(r.ice, "scale", Vector3.ONE, 0.25) \
+		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	_build_bar(r)
 
 	r.zone = MeshInstance3D.new()
 	var zone_mesh := CylinderMesh.new()
@@ -290,9 +292,149 @@ func _freeze(r: Racer) -> void:
 	add_child(r.zone)
 	r.zone.global_position = r.character.global_position * Vector3(1, 0, 1) + Vector3.UP * 0.03
 
-	r.status.modulate = Color("9fe3ff")
-	r.status.text = "ЗАМОРОЖЕН"
+	r.status.text = ""
 	_show_message("%s заморожен!" % r.player.display_name)
+
+
+## Ледяная глыба: шестигранник, светлая сердцевина, кристаллы у основания и искры.
+func _build_ice() -> Node3D:
+	var root := Node3D.new()
+	var block := MeshInstance3D.new()
+	var block_mesh := CylinderMesh.new()
+	block_mesh.top_radius = 0.6
+	block_mesh.bottom_radius = 0.72
+	block_mesh.height = 2.0
+	block_mesh.radial_segments = 6
+	block_mesh.rings = 1
+	block.mesh = block_mesh
+	block.material_override = _ice_material
+	block.position.y = 1.0
+	root.add_child(block)
+	var core := MeshInstance3D.new()
+	var core_mesh := CylinderMesh.new()
+	core_mesh.top_radius = 0.35
+	core_mesh.bottom_radius = 0.45
+	core_mesh.height = 1.7
+	core_mesh.radial_segments = 6
+	core.mesh = core_mesh
+	core.material_override = _ice_core_material
+	core.position.y = 0.9
+	core.rotation.y = PI / 6.0
+	root.add_child(core)
+	for i in 9:
+		var shard := MeshInstance3D.new()
+		var shard_mesh := CylinderMesh.new()
+		shard_mesh.top_radius = 0.0
+		shard_mesh.bottom_radius = randf_range(0.08, 0.16)
+		shard_mesh.height = randf_range(0.35, 0.8)
+		shard_mesh.radial_segments = 4
+		shard.mesh = shard_mesh
+		shard.material_override = _shard_material
+		var a := TAU * i / 9.0 + randf_range(-0.2, 0.2)
+		shard.position = Vector3(cos(a) * 0.72, shard_mesh.height * 0.35, sin(a) * 0.72)
+		shard.rotation = Vector3(sin(a) * 0.5, randf() * TAU, -cos(a) * 0.5)
+		root.add_child(shard)
+	var sparkles := GPUParticles3D.new()
+	sparkles.amount = 14
+	sparkles.lifetime = 1.4
+	var process := ParticleProcessMaterial.new()
+	process.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_SPHERE
+	process.emission_sphere_radius = 0.8
+	process.gravity = Vector3(0, 0.4, 0)
+	process.scale_min = 0.6
+	process.scale_max = 1.2
+	sparkles.process_material = process
+	var spark := QuadMesh.new()
+	spark.size = Vector2(0.07, 0.07)
+	var spark_mat := StandardMaterial3D.new()
+	spark_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	spark_mat.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+	spark_mat.albedo_color = Color(0.9, 0.97, 1.0)
+	spark.material = spark_mat
+	sparkles.draw_pass_1 = spark
+	sparkles.position.y = 1.0
+	root.add_child(sparkles)
+	return root
+
+
+## Полоска разморозки над головой (поворачивается к камере в _face_bars).
+func _build_bar(r: Racer) -> void:
+	r.bar = Node3D.new()
+	r.bar.position.y = 2.55
+	r.character.add_child(r.bar)
+	var bg := MeshInstance3D.new()
+	var bg_mesh := QuadMesh.new()
+	bg_mesh.size = Vector2(1.3, 0.2)
+	bg.mesh = bg_mesh
+	var bg_mat := StandardMaterial3D.new()
+	bg_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	bg_mat.albedo_color = Color(0.05, 0.08, 0.12)
+	bg_mat.no_depth_test = true
+	bg.material_override = bg_mat
+	r.bar.add_child(bg)
+	r.bar_fill = MeshInstance3D.new()
+	var fill_mesh := QuadMesh.new()
+	fill_mesh.size = Vector2(1.22, 0.13)
+	r.bar_fill.mesh = fill_mesh
+	var fill_mat := StandardMaterial3D.new()
+	fill_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	fill_mat.albedo_color = Color("6fd3ff")
+	fill_mat.no_depth_test = true
+	fill_mat.render_priority = 1
+	r.bar_fill.material_override = fill_mat
+	r.bar_fill.position.z = 0.01
+	r.bar.add_child(r.bar_fill)
+	_set_unfreeze_bar(r, 0.0, null)
+
+
+func _set_unfreeze_bar(r: Racer, progress: float, helper: Racer) -> void:
+	if r.bar_fill:
+		# Заполнение растёт слева направо.
+		var p := clampf(progress, 0.0, 1.0)
+		r.bar_fill.scale.x = maxf(p, 0.001)
+		r.bar_fill.position.x = -1.22 * (1.0 - p) / 2.0
+	_set_hud_bar(r, progress, helper)
+
+
+## Крупная полоска внизу экрана: «Серёга размораживает Колю».
+func _set_hud_bar(r: Racer, progress: float, helper: Racer) -> void:
+	var id := r.player.id
+	if progress <= 0.0:
+		if _hud_bars.has(id):
+			(_hud_bars[id]["box"] as Node).queue_free()
+			_hud_bars.erase(id)
+		return
+	if not _hud_bars.has(id):
+		var box := VBoxContainer.new()
+		var caption := _label("", 26, Color("9fe3ff"))
+		box.add_child(caption)
+		var bar := ProgressBar.new()
+		bar.max_value = 1.0
+		bar.show_percentage = false
+		bar.custom_minimum_size = Vector2(620, 30)
+		var fill := StyleBoxFlat.new()
+		fill.bg_color = Color("6fd3ff")
+		fill.set_corner_radius_all(8)
+		bar.add_theme_stylebox_override("fill", fill)
+		var back := StyleBoxFlat.new()
+		back.bg_color = Color(0.05, 0.08, 0.12, 0.85)
+		back.set_corner_radius_all(8)
+		bar.add_theme_stylebox_override("background", back)
+		box.add_child(bar)
+		_hud_bars_box.add_child(box)
+		_hud_bars[id] = {"box": box, "bar": bar, "caption": caption}
+	var entry: Dictionary = _hud_bars[id]
+	(entry["bar"] as ProgressBar).value = progress
+	var who := helper.player.display_name if helper else "Никто"
+	(entry["caption"] as Label).text = "%s размораживает %s" % [who, r.player.display_name] \
+		if helper else "%s оттаивает обратно в лёд..." % r.player.display_name
+
+
+## Полоски над головами смотрят на камеру.
+func _face_bars() -> void:
+	for r in _runners():
+		if r.bar:
+			r.bar.look_at(r.bar.global_position * 2.0 - _camera.global_position)
 
 
 func _unfreeze(r: Racer, helper: Racer) -> void:
@@ -301,8 +443,14 @@ func _unfreeze(r: Racer, helper: Racer) -> void:
 	r.immune_left = IMMUNE_TIME
 	r.character.input_enabled = true
 	if r.ice:
-		r.ice.queue_free()
+		var melt := create_tween()
+		melt.tween_property(r.ice, "scale", Vector3(1.3, 0.05, 1.3), 0.2)
+		melt.tween_callback(r.ice.queue_free)
 		r.ice = null
+	if r.bar:
+		r.bar.queue_free()
+		r.bar = null
+	_set_hud_bar(r, 0.0, null)
 	if r.zone:
 		r.zone.queue_free()
 		r.zone = null
@@ -445,12 +593,28 @@ func _add_chaser_hat(character: PlayerCharacter) -> void:
 func _make_materials() -> void:
 	_ice_material = StandardMaterial3D.new()
 	_ice_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	_ice_material.albedo_color = Color(0.65, 0.88, 1.0, 0.55)
-	_ice_material.roughness = 0.08
-	_ice_material.metallic = 0.2
+	_ice_material.albedo_color = Color(0.6, 0.86, 1.0, 0.42)
+	_ice_material.roughness = 0.05
+	_ice_material.metallic_specular = 1.0
+	_ice_material.rim_enabled = true
+	_ice_material.rim = 1.0
+	_ice_material.rim_tint = 0.2
 	_ice_material.emission_enabled = true
-	_ice_material.emission = Color(0.3, 0.55, 0.8)
-	_ice_material.emission_energy_multiplier = 0.3
+	_ice_material.emission = Color(0.35, 0.65, 0.95)
+	_ice_material.emission_energy_multiplier = 0.35
+	_ice_core_material = StandardMaterial3D.new()
+	_ice_core_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	_ice_core_material.albedo_color = Color(0.92, 0.97, 1.0, 0.25)
+	_ice_core_material.emission_enabled = true
+	_ice_core_material.emission = Color(0.7, 0.85, 1.0)
+	_ice_core_material.emission_energy_multiplier = 0.4
+	_shard_material = StandardMaterial3D.new()
+	_shard_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	_shard_material.albedo_color = Color(0.75, 0.93, 1.0, 0.75)
+	_shard_material.roughness = 0.05
+	_shard_material.emission_enabled = true
+	_shard_material.emission = Color(0.45, 0.75, 1.0)
+	_shard_material.emission_energy_multiplier = 0.5
 
 	_zone_material = StandardMaterial3D.new()
 	_zone_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
@@ -500,12 +664,19 @@ func _build_ui() -> void:
 	top.add_child(_timer_label)
 
 	var rules := ("Водящий морозит касанием. Разморозить друга: стой рядом и держи "
-		+ "Пробел / Enter / A.\nНе карауль замороженных: в красной зоне можно быть только 3 сек.")
+		+ "Пробел / Enter / A (полоска внизу).\n"
+		+ "Не карауль замороженных: в красной зоне можно быть только 3 сек.")
 	column.add_child(_label(rules, 20, Color.WHITE))
 
 	_message_label = _label("", 48, Color.WHITE)
 	_message_label.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	column.add_child(_message_label)
+
+	_hud_bars_box = VBoxContainer.new()
+	_hud_bars_box.alignment = BoxContainer.ALIGNMENT_CENTER
+	_hud_bars_box.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	_hud_bars_box.add_theme_constant_override("separation", 6)
+	column.add_child(_hud_bars_box)
 
 	var row := HBoxContainer.new()
 	row.alignment = BoxContainer.ALIGNMENT_CENTER

@@ -165,7 +165,8 @@ func _physics_process(delta: float) -> void:
 
 		if f.player.is_bot():
 			_bot_think(f)
-		if f.player.input and f.player.input.is_just_pressed("confirm") and f.cooldown == 0.0:
+		# Кнопку можно не только нажимать, но и держать: удары идут сами по перезарядке.
+		if f.player.input and f.player.input.is_pressed("confirm") and f.cooldown == 0.0:
 			_spin(f)
 
 		if f.character.global_position.y < OUT_Y:
@@ -200,6 +201,7 @@ func _spin(f: Fighter) -> void:
 	f.character.set_arm_pose(PlayerCharacter.ARM_SIDE, 0.0, 0.06)
 	if f.bat:
 		create_tween().tween_property(f.bat, "rotation:x", 0.0, 0.06)
+	_spawn_swoosh(f, SUPER_RADIUS if is_super else HIT_RADIUS)
 	var tween := create_tween()
 	f.character.visual.rotation.y = 0.0
 	tween.tween_interval(0.05)
@@ -224,9 +226,11 @@ func _spin(f: Fighter) -> void:
 			continue
 		var dir := offset.normalized() if offset.length() > 0.01 else Vector3.FORWARD
 		other.character.apply_knockback(dir * force + Vector3.UP * 4.0)
-		other.hp = maxi(0, other.hp - damage)
+		var dealt := mini(other.hp, damage)
+		other.hp -= dealt
 		_update_hp(other)
 		_flash(other.character)
+		_damage_number(other.character, dealt, is_super)
 		if other.hp == 0:
 			_eliminate(other, "выбит")
 
@@ -273,6 +277,8 @@ func _bot_think(f: Fighter) -> void:
 func _eliminate(f: Fighter, reason: String) -> void:
 	if not f.alive:
 		return
+	if f.hp > 0:
+		_damage_number(f.character, f.hp, true) # слетел с крыши — минус все оставшиеся HP
 	f.alive = false
 	f.hp = 0
 	_update_hp(f)
@@ -412,6 +418,63 @@ func _update_hp(f: Fighter) -> void:
 	f.hp_label.modulate = Color("a8f0a0").lerp(Color("ff6b5a"), 1.0 - float(f.hp) / MAX_HP)
 	if _hp_bars.has(f.player.id):
 		(_hp_bars[f.player.id] as ProgressBar).value = f.hp
+
+
+## Всплывающая цифра урона над головой: «-20», летит вверх и тает.
+func _damage_number(character: PlayerCharacter, amount: int, big: bool) -> void:
+	var label := Label3D.new()
+	label.text = "-%d" % amount
+	label.font_size = 96 if big else 72
+	label.outline_size = 18
+	label.modulate = Color("ffd23f") if big else Color("ff5a4a")
+	label.outline_modulate = Color(0.25, 0.02, 0.02)
+	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	label.no_depth_test = true
+	add_child(label)
+	label.global_position = character.global_position + Vector3(randf_range(-0.3, 0.3), 2.3, 0)
+	label.scale = Vector3.ONE * 0.4
+	var tween := create_tween().set_parallel(true)
+	tween.tween_property(label, "scale", Vector3.ONE, 0.15) \
+		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tween.tween_property(label, "position:y", label.position.y + 1.3, 0.9).set_ease(Tween.EASE_OUT)
+	tween.tween_property(label, "modulate:a", 0.0, 0.4).set_delay(0.5)
+	tween.chain().tween_callback(label.queue_free)
+
+
+## След биты в воздухе: полупрозрачная дуга, крутится вместе с персонажем и тает.
+func _spawn_swoosh(f: Fighter, radius: float) -> void:
+	var mesh := ArrayMesh.new()
+	var arrays := []
+	arrays.resize(Mesh.ARRAY_MAX)
+	var verts := PackedVector3Array()
+	var colors := PackedColorArray()
+	var steps := 24
+	for i in steps + 1:
+		var t := float(i) / steps
+		var a := t * TAU * 0.8 # дуга на 290°
+		var dir := Vector3(cos(a), 0.0, -sin(a))
+		var alpha := t * t * 0.7 # хвост прозрачный, голова — плотнее
+		verts.append(dir * 0.45)
+		verts.append(dir * radius)
+		colors.append(Color(1, 1, 1, 0.0))
+		colors.append(Color(1, 1, 1, alpha))
+	arrays[Mesh.ARRAY_VERTEX] = verts
+	arrays[Mesh.ARRAY_COLOR] = colors
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLE_STRIP, arrays)
+	var swoosh := MeshInstance3D.new()
+	swoosh.mesh = mesh
+	var material := StandardMaterial3D.new()
+	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	material.vertex_color_use_as_albedo = true
+	material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	swoosh.material_override = material
+	swoosh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	swoosh.position.y = 1.0
+	f.character.visual.add_child(swoosh)
+	var tween := create_tween()
+	tween.tween_property(swoosh, "transparency", 1.0, SPIN_TIME + 0.15).set_ease(Tween.EASE_IN)
+	tween.tween_callback(swoosh.queue_free)
 
 
 ## Краткая вспышка при получении удара.
