@@ -78,6 +78,8 @@ var lamp_on := true
 var night_lamp_on := true
 ## Дисковый телефон (гостиная, у двери в игровую) и кот.
 var phone: RotaryPhone
+## Туалет (унитаз — toilet_room.toilet).
+var toilet_room: ToiletRoom
 ## Экраны игровых автоматов (кнопкой действия их можно «сломать» на 8 сек).
 var arcade_screens: Array[ArcadeScreen] = []
 var cat: LobbyCat
@@ -100,6 +102,8 @@ func _ready() -> void:
 	_build_bedroom()
 	_build_rubgame()
 	_build_living_extras()
+	toilet_room = ToiletRoom.new()
+	add_child(toilet_room)
 
 
 # ---------------- Стены и пол ----------------
@@ -145,8 +149,6 @@ func _build_rooms() -> void:
 		Vector3((LEFT_X + PARTITION_X) / 2, 1.5, LIVING_FRONT_Z + 0.2))
 	_invisible_wall(Vector3(bed_w, 3, 0.4),
 		Vector3((PARTITION_X + RIGHT_X) / 2, 1.5, BEDROOM_FRONT_Z + 0.2))
-	_invisible_wall(Vector3(0.4, 3, LIVING_FRONT_Z - BEDROOM_FRONT_Z),
-		Vector3(PARTITION_X + 0.2, 1.5, (BEDROOM_FRONT_Z + LIVING_FRONT_Z) / 2))
 	# Потолок и передние стены — только для вида от первого лица.
 	var ceiling := _mat(Color("e8e2d2"), 0.9)
 	_fp_only(_box(Vector3(RIGHT_X - RUBGAME_LEFT_X, 0.1, LIVING_FRONT_Z - BACK_Z),
@@ -156,8 +158,7 @@ func _build_rooms() -> void:
 		Vector3((LEFT_X + PARTITION_X) / 2, WALL_HEIGHT / 2, LIVING_FRONT_Z + 0.1), wallpaper))
 	_fp_only(_box(Vector3(bed_w, WALL_HEIGHT, 0.2),
 		Vector3((PARTITION_X + RIGHT_X) / 2, WALL_HEIGHT / 2, BEDROOM_FRONT_Z + 0.1), wallpaper_bed))
-	_fp_only(_box(Vector3(0.2, WALL_HEIGHT, LIVING_FRONT_Z - BEDROOM_FRONT_Z),
-		Vector3(PARTITION_X, WALL_HEIGHT / 2, (BEDROOM_FRONT_Z + LIVING_FRONT_Z) / 2), wallpaper))
+	# Правее гостиной перед спальней — туалет (ToiletRoom), стена с дверью строится там.
 	# Перегородка между комнатами низкая (2.4 м — сверху видно обе комнаты). От первого лица
 	# верх перегородки до потолка закрыт по всей длине (раньше закрыт был только проём — дыры).
 	_fp_only(_box(Vector3(0.16, WALL_HEIGHT - 2.4, BEDROOM_FRONT_Z - BACK_Z),

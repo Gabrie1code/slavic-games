@@ -90,7 +90,8 @@ func _ready() -> void:
 	# Сверху видно всю квартиру: игровую комнату, гостиную и спальню.
 	_camera.look_at_from_position(Vector3(-1.2, 16.0, 15.0), Vector3(-1.2, 0, -0.5))
 	# Сверху не показываем потолок и передние стены.
-	_camera.cull_mask &= ~Apartment.FP_ONLY_LAYER & ~VIEWMODEL_LAYERS & ~Apartment.RUBGAME_LAMP_LAYER
+	_camera.cull_mask &= ~Apartment.FP_ONLY_LAYER & ~VIEWMODEL_LAYERS & ~Apartment.RUBGAME_LAMP_LAYER \
+		& ~ToiletRoom.WALL_HIGH_LAYER
 	var views_layer := CanvasLayer.new()
 	views_layer.layer = 0
 	add_child(views_layer)
@@ -238,6 +239,9 @@ func _process(delta: float) -> void:
 			character.can_jump = _prompt_for(p, character).is_empty()
 		if p.input.is_just_pressed("attack"):
 			_punch(p)
+		if p.input.is_just_pressed("confirm") and _gadgets.can_use_toilet(p):
+			_open_room(p, ToiletScreen.new().setup_for(p, character, _apartment.toilet_room.toilet))
+			continue
 		if p.input.is_just_pressed("confirm") and _gadgets.try_interact(p):
 			continue
 		var at_tv := _is_near(p, Apartment.TV_ZONE, TV_ZONE_RADIUS)
@@ -430,14 +434,19 @@ func _open_wardrobe(p: PlayerData) -> void:
 
 
 func _open_rubgame(p: PlayerData) -> void:
+	var screen := RubgameScreen.new()
+	screen.setup(p, _characters[p.id], _apartment.rubgame_table)
+	_open_room(p, screen)
+
+
+## Окно игрока поверх лобби (стол, туалет): персонаж замирает, лобби делит экран.
+func _open_room(p: PlayerData, room: LobbyRoom) -> void:
 	var character: PlayerCharacter = _characters[p.id]
 	character.input_enabled = false
 	character.velocity = Vector3.ZERO
-	var screen := RubgameScreen.new()
-	screen.setup(p, character, _apartment.rubgame_table)
-	screen.closed.connect(_on_room_closed)
-	_rooms_root.add_child(screen)
-	_rooms[p.id] = screen
+	room.closed.connect(_on_room_closed)
+	_rooms_root.add_child(room)
+	_rooms[p.id] = room
 	_layout_rooms()
 
 

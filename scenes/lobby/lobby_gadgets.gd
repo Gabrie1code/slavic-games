@@ -14,6 +14,7 @@ const LOOK_ANGLE := 50.0
 const GRAMOPHONE_RADIUS := 1.4
 const LAMP_RADIUS := 1.2
 const ARCADE_RADIUS := 1.1
+const TOILET_RADIUS := 1.2
 ## Через сколько граммофон можно завести снова (секунды).
 const TUNE_TIME := 3.0
 const NOTE := preload("res://assets/textures/fx/note_pixel.png")
@@ -106,8 +107,13 @@ func try_interact(p: PlayerData) -> bool:
 ## Торшер, ночник, игровые автоматы — «щёлкнуть выключателем». true — нажатие использовано.
 func _use_switch(p: PlayerData) -> bool:
 	var arcade := _near_arcade(p)
+	var toilet := _near_toilet(p)
 	if _near_tippable(p, apartment.floor_lamp, LAMP_RADIUS) and apartment.lamp_lit():
 		apartment.turn_off_lamp()
+	elif toilet and toilet.can_flush():
+		toilet.flush()
+	elif toilet and toilet.can_open():
+		toilet.open_lid()
 	elif _near_night_lamp(p):
 		apartment.toggle_night_lamp()
 	elif arcade and arcade.is_working():
@@ -135,7 +141,7 @@ func hint(p: PlayerData) -> Array[Dictionary]:
 	return _furniture_hint(p)
 
 
-## Граммофон, торшер и ночник: кнопка есть, только пока вещь стоит на месте.
+## Граммофон, торшер, ночник, туалет и автоматы: кнопка есть, только пока вещь стоит на месте.
 func _furniture_hint(p: PlayerData) -> Array[Dictionary]:
 	if _near_tippable(p, apartment.gramophone, GRAMOPHONE_RADIUS):
 		return [entry(confirm_key(p), "Завести граммофон", not _gramophone_ready())]
@@ -145,12 +151,49 @@ func _furniture_hint(p: PlayerData) -> Array[Dictionary]:
 	if _near_night_lamp(p):
 		var action := "Выключить ночник" if apartment.night_lamp_on else "Включить ночник"
 		return [entry(confirm_key(p), action)]
+	if _near_toilet(p):
+		return _toilet_hint(p)
+	return _arcade_hint(p)
+
+
+func _arcade_hint(p: PlayerData) -> Array[Dictionary]:
 	var arcade := _near_arcade(p)
-	if arcade:
-		if arcade.is_working():
-			return [entry(confirm_key(p), "Сломать автомат")]
-		return [entry(confirm_key(p), "Автомат чинится…", true)]
-	return []
+	if arcade == null:
+		return []
+	if arcade.is_working():
+		return [entry(confirm_key(p), "Сломать автомат")]
+	return [entry(confirm_key(p), "Автомат чинится…", true)]
+
+
+## Унитаз: поднять крышку → сходить → (перезарядка 60 сек) смыть.
+func _toilet_hint(p: PlayerData) -> Array[Dictionary]:
+	var toilet := apartment.toilet_room.toilet
+	var key := confirm_key(p)
+	var text := "Поднять крышку"
+	var disabled := false
+	if toilet.in_use:
+		text = "Занято"
+		disabled = true
+	elif toilet.is_flushing():
+		text = "Смывается…"
+		disabled = true
+	elif toilet.can_flush():
+		text = "Смыть (снова — через %d с)" % ceili(toilet.cooldown_left())
+	elif toilet.can_use():
+		text = "Сходить в туалет"
+	return [entry(key, text, disabled)]
+
+
+## Можно сходить в туалет (лобби открывает вид сбоку — ToiletScreen).
+func can_use_toilet(p: PlayerData) -> bool:
+	var toilet := _near_toilet(p)
+	return toilet != null and toilet.can_use()
+
+
+## Унитаз, к которому игрок подошёл лицом (null — далеко).
+func _near_toilet(p: PlayerData) -> Toilet:
+	var toilet := apartment.toilet_room.toilet
+	return toilet if _near(p, toilet.bowl_position(), TOILET_RADIUS) else null
 
 
 ## Игровой автомат, к экрану которого игрок стоит лицом (null — рядом нет).
