@@ -75,7 +75,32 @@ def pixel_heart():
     img.save(os.path.join(OUT, "heart_pixel.png"))
 
 
+def pixel_note():
+    """Пиксельная нота ♪ 8×11 (над граммофоном): тёмная обводка, золотистая заливка."""
+    rows = [
+        "....##..",
+        "....#y#.",
+        "....#.y#",
+        "....#..#",
+        "....#...",
+        "....#...",
+        ".####...",
+        "#yyyy#..",
+        "#ywyy#..",
+        "#yyyy#..",
+        ".####...",
+    ]
+    colors = {"#": (40, 25, 10, 255), "y": (255, 205, 60, 255), "w": (255, 245, 200, 255)}
+    img = Image.new("RGBA", (8, 11), (0, 0, 0, 0))
+    for y, row in enumerate(rows):
+        for x, ch in enumerate(row):
+            if ch in colors:
+                img.putpixel((x, y), colors[ch])
+    img.save(os.path.join(OUT, "note_pixel.png"))
+
+
 snowflake()
 alert()
 pixel_heart()
+pixel_note()
 print("DONE")

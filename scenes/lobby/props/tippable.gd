@@ -31,6 +31,12 @@ func _ready() -> void:
 	_home = global_transform
 
 
+## Стоит на своём месте (не повалена и не «возвращается»): с ней можно что-то делать.
+func is_at_home() -> bool:
+	return not freeze and _away_time == 0.0 \
+		and global_position.distance_to(_home.origin) < 0.25 and global_basis.y.dot(Vector3.UP) > 0.95
+
+
 func _physics_process(delta: float) -> void:
 	var moved := global_position.distance_to(_home.origin) > 0.25 \
 		or global_basis.y.dot(Vector3.UP) < 0.95

@@ -62,9 +62,17 @@ const GLASS := Color(0.8, 0.95, 0.9, 0.6)
 var seats: Array[Dictionary] = []
 ## Стол рулетки (крутится сам каждые 20 секунд).
 var rubgame_table: RubgameTable
+## Граммофон (играет три ноты) и торшер (включается; повалили — гаснет).
+var gramophone: Tippable
+var floor_lamp: Tippable
+## Торшер включён (горит, только пока стоит на месте).
+var lamp_on := true
 ## Дисковый телефон (гостиная, у двери в игровую) и кот.
 var phone: RotaryPhone
 var cat: LobbyCat
+
+var _lamp_light: OmniLight3D
+var _lamp_glow: MeshInstance3D
 
 
 func _ready() -> void:
@@ -195,7 +203,8 @@ func _build_living_room() -> void:
 	_breakable("book_stack", table_pos + Vector3(0.25, 0.47, 0.0), books_a, 0.4)
 	_solid(_model("armchair"), Vector3(0.9, 0.6, 0.9), 0.3, Vector3(-5.2, 0, -0.3), PI / 2)
 	_place(_model("wall_carpet"), Vector3(LEFT_X + 0.08, 0.85, -0.3)).rotation_degrees.y = 90.0
-	_tippable("floor_lamp", Vector3(0.5, 1.75, 0.5), 0.88, Vector3(-1.0, 0, 1.45), 6.0)
+	floor_lamp = _tippable("floor_lamp", Vector3(0.5, 1.75, 0.5), 0.88, Vector3(-1.0, 0, 1.45), 6.0)
+	_build_lamp_light()
 	_place(_model("chandelier"), Vector3(-2.4, 0, -0.6))
 
 	# Обеденный стол у перегородки: варенье, ваза, книги; стулья и табурет падают.
@@ -205,7 +214,9 @@ func _build_living_room() -> void:
 	_tippable("chair", Vector3(0.45, 0.95, 0.45), 0.47, dining + Vector3(0, 0, -0.75), 3.0, 0.0)
 	_tippable("stool", Vector3(0.36, 0.47, 0.36), 0.24, dining + Vector3(0.95, 0, 0), 2.0)
 	_breakable("jar_jam", dining + Vector3(-0.35, 0.78, 0.1), [Color("801010"), GLASS], 0.4)
-	_place(_model("gramophone"), dining + Vector3(0.05, 0.78, -0.05)).rotation.y = 0.3
+	# Граммофон: от удара падает со стола и через время сам возвращается (как стулья).
+	gramophone = _tippable("gramophone", Vector3(0.36, 0.14, 0.36), 0.07,
+		dining + Vector3(0.05, 0.8, -0.05), 2.0, 17.0)
 	var books_b := [Color("cc9918"), Color("6a2a6a"), Color("1a4080")]
 	_breakable("book_stack", dining + Vector3(0.45, 0.78, 0.15), books_b, 0.4)
 
@@ -231,6 +242,34 @@ func _build_bedroom() -> void:
 	_tippable("stool", Vector3(0.36, 0.47, 0.36), 0.24, Vector3(8.4, 0, -0.4), 2.0)
 	_breakable("book_stack", Vector3(8.6, 0.47, -0.4), [Color("992018"), Color("cc9918")], 0.4)
 	_place(_model("chandelier"), Vector3(6.2, 0, -1.4))
+
+
+func _process(_delta: float) -> void:
+	var lit := lamp_on and floor_lamp.is_at_home()
+	_lamp_light.visible = lit
+	_lamp_glow.visible = lit
+
+
+## Лампочка под абажуром торшера: тёплый свет и светящийся шарик.
+func _build_lamp_light() -> void:
+	_lamp_light = OmniLight3D.new()
+	_lamp_light.light_color = Color(1.0, 0.82, 0.55)
+	_lamp_light.light_energy = 1.3
+	_lamp_light.omni_range = 4.0
+	_lamp_light.shadow_enabled = true
+	_lamp_light.position = Vector3(0, 1.4, 0)
+	floor_lamp.add_child(_lamp_light)
+	_lamp_glow = MeshInstance3D.new()
+	var bulb := SphereMesh.new()
+	bulb.radius = 0.07
+	bulb.height = 0.14
+	_lamp_glow.mesh = bulb
+	var glow_mat := StandardMaterial3D.new()
+	glow_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	glow_mat.albedo_color = Color(1.0, 0.92, 0.7)
+	_lamp_glow.material_override = glow_mat
+	_lamp_glow.position = Vector3(0, 1.45, 0)
+	floor_lamp.add_child(_lamp_glow)
 
 
 # ---------------- Телефон, часы, кот ----------------

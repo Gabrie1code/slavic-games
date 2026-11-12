@@ -1,6 +1,7 @@
 class_name LobbyGadgets
 extends RefCounted
-## «Живые» вещи лобби, с которыми можно что-то сделать кнопками: дисковый телефон и кот Баггет.
+## «Живые» вещи лобби, с которыми можно что-то сделать кнопками: дисковый телефон, кот Баггет,
+## граммофон (три ноты) и торшер (включить/выключить). Повален — кнопки нет, пока не вернётся.
 ## Лобби каждый кадр спрашивает подсказку (hint), отдаёт нажатия (try_interact) и ведёт
 ## игрока с трубкой (process_holder).
 
@@ -8,10 +9,17 @@ const PHONE_RADIUS := 1.2
 ## С трубкой в руке диск можно крутить, только стоя у телефона.
 const DIAL_RADIUS := 1.7
 const CAT_RADIUS := 1.3
+const GRAMOPHONE_RADIUS := 1.4
+const LAMP_RADIUS := 1.2
+## Сколько играет граммофон (три ноты) — пока играет, второй раз не заведёшь.
+const TUNE_TIME := 1.2
+const NOTE := preload("res://assets/textures/fx/note_pixel.png")
 
 var apartment: Apartment
 ## PlayerData.id -> PlayerCharacter (тот же словарь, что в лобби).
 var characters: Dictionary
+var _tune_until := 0.0
+var _player: AudioStreamPlayer3D
 
 
 func _init(apt: Apartment, chars: Dictionary) -> void:
@@ -65,6 +73,12 @@ func try_interact(p: PlayerData) -> bool:
 	if _near(p, Apartment.PHONE_TABLE_POS, PHONE_RADIUS) and apartment.phone.can_use(p):
 		apartment.phone.pick_up(p, character)
 		return true
+	if _near_tippable(p, apartment.gramophone, GRAMOPHONE_RADIUS) and _gramophone_ready():
+		_play_gramophone()
+		return true
+	if _near_tippable(p, apartment.floor_lamp, LAMP_RADIUS):
+		apartment.lamp_on = not apartment.lamp_on
+		return true
 	if _near_cat(p) and apartment.cat.pet():
 		# Персонаж тянет руку к коту.
 		character.set_arm_pose(0.25, 0.9, 0.15)
@@ -90,7 +104,60 @@ func hint(p: PlayerData) -> Array[Dictionary]:
 		return [entry(confirm_key(p), "Телефон занят: %s" % phone.user.display_name, true)]
 	if _near_cat(p):
 		return _cat_hint(p)
+	return _furniture_hint(p)
+
+
+## Граммофон и торшер: кнопка есть, только пока вещь стоит на месте.
+func _furniture_hint(p: PlayerData) -> Array[Dictionary]:
+	if _near_tippable(p, apartment.gramophone, GRAMOPHONE_RADIUS):
+		return [entry(confirm_key(p), "Завести граммофон", not _gramophone_ready())]
+	if _near_tippable(p, apartment.floor_lamp, LAMP_RADIUS):
+		var action := "Выключить торшер" if apartment.lamp_on else "Включить торшер"
+		return [entry(confirm_key(p), action)]
 	return []
+
+
+## Рядом с вещью, которая стоит на месте (поваленную трогать нельзя — кнопки нет).
+func _near_tippable(p: PlayerData, item: Tippable, radius: float) -> bool:
+	return item.is_at_home() and _near(p, item.global_position, radius)
+
+
+func _gramophone_ready() -> bool:
+	return Time.get_ticks_msec() / 1000.0 > _tune_until
+
+
+## Три ноты: звук (мелодия собирается в Tune) и три пиксельные нотки над раструбом.
+func _play_gramophone() -> void:
+	var gramophone := apartment.gramophone
+	_tune_until = Time.get_ticks_msec() / 1000.0 + TUNE_TIME
+	if _player == null or not is_instance_valid(_player):
+		_player = AudioStreamPlayer3D.new()
+		_player.unit_size = 4.0
+		_player.position = Vector3(0, 0.6, 0)
+		gramophone.add_child(_player)
+	_player.stream = Tune.random_melody()
+	_player.play()
+	for i in 3:
+		_spawn_note(gramophone, i * 0.32)
+
+
+func _spawn_note(gramophone: Node3D, delay: float) -> void:
+	var note := Sprite3D.new()
+	note.texture = NOTE
+	note.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST # пиксели чёткие
+	note.pixel_size = 0.016
+	note.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	note.shaded = false
+	note.modulate.a = 0.0
+	note.position = Vector3(randf_range(-0.12, 0.12), 0.75, randf_range(-0.12, 0.12))
+	gramophone.add_child(note)
+	var tween := note.create_tween().set_parallel(true)
+	tween.tween_property(note, "modulate:a", 1.0, 0.1).set_delay(delay)
+	tween.tween_property(note, "position:y", 1.35, 1.1).set_delay(delay)
+	tween.tween_property(note, "position:x", note.position.x + randf_range(-0.15, 0.15), 1.1) \
+		.set_delay(delay).set_trans(Tween.TRANS_SINE)
+	tween.tween_property(note, "modulate:a", 0.0, 0.3).set_delay(delay + 0.8)
+	tween.chain().tween_callback(note.queue_free)
 
 
 func _cat_hint(p: PlayerData) -> Array[Dictionary]:
