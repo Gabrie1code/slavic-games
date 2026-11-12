@@ -161,7 +161,13 @@ func _build_living_room() -> void:
 	_solid(tv, Vector3(1.3, 1.5, 1.0), 0.75, TV_POS)
 	var shelf_pos := Vector3(-0.7, 0, -3.75)
 	_solid(_model("bookshelf"), Vector3(1.3, 2.3, 0.45), 1.15, shelf_pos)
-	_place(_model("radio"), shelf_pos + Vector3(-0.3, 0.935, 0.02))
+	# Радио и ряды книг бьются, как хрусталь, и через время появляются снова.
+	_breakable("radio", shelf_pos + Vector3(-0.3, 0.935, 0.02),
+		[Color("2e1a0f"), Color("bfb8a6"), Color("d9b44a")], 0.55)
+	var book_colors := [Color("992018"), Color("1a4080"), Color("2a6a2a"), Color("cc9918"),
+		Color("6a2a6a")]
+	_breakable("book_row_a", shelf_pos + Vector3(0, 1.43, 0), book_colors, 0.6, 0.06)
+	_breakable("book_row_b", shelf_pos + Vector3(0, 1.91, 0), book_colors, 0.6, 0.06)
 	_breakable("crystal_vase", shelf_pos + Vector3(0.3, 0.935, 0.0), [CRYSTAL], 0.55, 0.05)
 
 	# Окно со шторами, на подоконнике горшки, под окном гантели.

@@ -309,14 +309,17 @@ P.append(box((1.3, 0.45, 0.06), (0, 0, 2.27), WOOD, bevel=0.01))
 P.append(box((1.3, 0.03, 1.4), (0, 0.21, 1.6), WOOD_L))
 for x in (-0.635, 0.635):
     P.append(box((0.03, 0.45, 1.4), (x, 0, 1.6), WOOD))
-for shelf_z in (1.415, 1.895):                                                   # ряды корешков
+made.append(export("bookshelf", P))
+# Ряды книг — отдельно от шкафа, чтобы их можно было разбить (в игре: на полки 1.415 и 1.895).
+for row_name in ("book_row_a", "book_row_b"):
+    P = []
     x = -0.6
     while x < 0.58:
         w = random.uniform(0.035, 0.07)
         h = random.uniform(0.24, 0.34)
-        P.append(box((w, 0.2, h), (x + w / 2, 0.05, shelf_z + h / 2), random.choice(BOOKS)))
+        P.append(box((w, 0.2, h), (x + w / 2, 0.05, h / 2), random.choice(BOOKS)))
         x += w + 0.004
-made.append(export("bookshelf", P))
+    made.append(export(row_name, P))
 
 # ---------------- Радиоприёмник ----------------
 CASE = mat("RadioCase", (0.18, 0.1, 0.06), 0.4)
@@ -327,8 +330,16 @@ P.append(box((0.22, 0.01, 0.17), (-0.08, -0.07, 0.12), GRILLE))
 P.append(box((0.12, 0.012, 0.06), (0.12, -0.07, 0.16), DIAL))
 for z in (0.07, 0.1):
     P.append(cyl(0.018, 0.02, (0.12 + (z - 0.07) * 1.5, -0.075, z), METAL, verts=8, rot=(math.radians(90), 0, 0)))
-P.append(box((0.3, 0.03, 0.02), (0, 0, 0.27), METAL))                                   # ручка
-P.append(cyl(0.006, 0.5, (0.17, 0.03, 0.48), METAL, verts=4, rot=(0, math.radians(-20), 0)))  # антенна
+# Ручка — дужка на двух стойках, стоит на корпусе (раньше висела в воздухе).
+for x in (-0.14, 0.14):
+    P.append(box((0.02, 0.03, 0.05), (x, 0, 0.26), METAL))
+P.append(box((0.3, 0.03, 0.02), (0, 0, 0.29), METAL))
+# Антенна: основание на крыше корпуса, телескоп наклонён влево (центр = основание + 0.25 по оси).
+P.append(sphere(0.014, (0.15, 0.03, 0.245), METAL))
+# Короткая (0.3 м), чтобы не упираться в полку над радио.
+P.append(cyl(0.006, 0.3, (0.15 - 0.15 * math.sin(math.radians(25)), 0.03,
+                          0.245 + 0.15 * math.cos(math.radians(25))), METAL, verts=4,
+             rot=(0, math.radians(-25), 0)))
 made.append(export("radio", P))
 
 # ---------------- Гантели ----------------

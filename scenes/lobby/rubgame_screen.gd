@@ -43,6 +43,11 @@ var _message_color := GREEN
 var _message_time := 0.0
 ## Что подтверждаем в окне: номинал фишки или -1 — обмен всех фишек на рубли.
 var _pending := 0
+## Вид сверху на сукно (ЛКМ по столу или кнопка удара — переключить).
+var _top_view := false
+## Где персонаж стоял до стола — туда же он вернётся, когда отойдёт.
+var _return_pos := Vector3.ZERO
+var _return_yaw := 0.0
 
 var _camera: Camera3D
 var _wallet: MoneyLabel
@@ -70,8 +75,10 @@ func _ready() -> void:
 	resized.connect(_apply_font_sizes)
 	_apply_font_sizes()
 	table.round_finished.connect(_on_round_finished)
-	# Персонаж встаёт за стол, лицом к нему.
+	# Персонаж встаёт за стол, лицом к нему (на своё место по слоту — четверо не толкаются).
 	if lobby_character:
+		_return_pos = lobby_character.global_position
+		_return_yaw = lobby_character.rotation.y
 		lobby_character.global_position = table.stand_point(player.slot)
 		lobby_character.rotation.y = table.stand_yaw()
 		lobby_character.velocity = Vector3.ZERO
@@ -87,6 +94,10 @@ func _process(delta: float) -> void:
 	var target := table.camera_transform()
 	if table.phase != RubgameTable.Phase.BETTING:
 		target = table.wheel_camera_transform()
+	elif _top_view:
+		target = table.felt_camera_transform()
+	# Рамка цвета игрока вокруг выбранной ставки на сукне.
+	table.set_selection(player, _bet(), _number)
 	_camera.global_transform = _camera.global_transform.interpolate_with(target,
 		minf(1.0, delta * CAMERA_SPEED))
 	if _message_time > 0.0:
@@ -95,6 +106,20 @@ func _process(delta: float) -> void:
 			_message = ""
 	_update_status()
 	_handle_input()
+
+
+## Отойти от стола: персонаж возвращается туда, откуда подошёл (а не остаётся за столом).
+func close() -> void:
+	if lobby_character:
+		lobby_character.global_position = _return_pos
+		lobby_character.rotation.y = _return_yaw
+		lobby_character.velocity = Vector3.ZERO
+	table.clear_selection(player)
+	super.close()
+
+
+func _exit_tree() -> void:
+	table.clear_selection(player) # игрок вышел из игры прямо у стола — рамку убрать
 
 
 func refresh() -> void:
@@ -111,6 +136,10 @@ func _handle_input() -> void:
 		return
 	if _confirm.handle_input(input):
 		return
+	# Кнопка удара (F, «/», X) — вид сверху. Клик мышью обрабатывает сам стол (_on_view_input),
+	# чтобы нажатия по кнопкам магазина не переключали вид.
+	if input.is_just_pressed("attack") and not Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
+		_toggle_top_view()
 	if input.is_just_pressed("cancel"):
 		close()
 	elif input.menu_just_pressed("confirm"):
@@ -158,6 +187,16 @@ func _cycle(row: int, step: int) -> void:
 		ROW_CHIP:
 			_chip_index = posmod(_chip_index + step, PlayerManager.CHIP_VALUES.size())
 	_refresh()
+
+
+func _on_view_input(event: InputEvent) -> void:
+	var click := event as InputEventMouseButton
+	if click and click.pressed and click.button_index == MOUSE_BUTTON_LEFT:
+		_toggle_top_view()
+
+
+func _toggle_top_view() -> void:
+	_top_view = not _top_view
 
 
 func _ask_buy(value: int) -> void:
@@ -302,7 +341,8 @@ func _build() -> void:
 	var view := SubViewportContainer.new()
 	view.stretch = true
 	view.set_anchors_preset(Control.PRESET_FULL_RECT)
-	view.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	view.mouse_filter = Control.MOUSE_FILTER_STOP # клик по столу — вид сверху
+	view.gui_input.connect(_on_view_input)
 	add_child(view)
 	var viewport := SubViewport.new() # мир общий с лобби — своя только камера
 	viewport.msaa_3d = Viewport.MSAA_2X
@@ -449,7 +489,8 @@ func _build_bottom() -> void:
 	_bets_label = _label("", GOLD, 0.55)
 	column.add_child(_bets_label)
 	_hint = _label("Вверх/вниз — выбор   Влево/вправо — листать   Подтвердить — купить / "
-		+ "поставить   Отмена — отойти", Color(1, 1, 1, 0.6), 0.4)
+		+ "поставить   ЛКМ по столу / удар — вид сверху   Отмена — отойти",
+		Color(1, 1, 1, 0.6), 0.4)
 	column.add_child(_hint)
 
 

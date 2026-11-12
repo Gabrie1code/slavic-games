@@ -38,9 +38,12 @@ const WHEEL_SPIN_SPEED := 3.0
 const BALL_TURNS := 6
 const CHIP_SCALE := 0.4
 const CHIP_HEIGHT := 0.025 * CHIP_SCALE
-## Где встают игроки (за дальним краем стола) — по слоту игрока.
-const STAND_Z := -1.0
-const STAND_X: Array[float] = [-0.1, 0.5, 1.1, 1.7]
+## Где встают игроки (за дальним краем стола) — по слоту игрока. Шаг 0.8 м: персонажи
+## (радиус 0.4) стоят плечом к плечу и не залезают друг в друга.
+const STAND_Z := -1.05
+const STAND_X: Array[float] = [-1.2, -0.4, 0.4, 1.2]
+## Толщина рамки «выбранная ставка» на сукне.
+const FRAME_WIDTH := 0.018
 
 var phase := Phase.BETTING
 ## Сколько секунд осталось до конца фазы.
@@ -59,6 +62,8 @@ var _ball_offset := 0.0 # «лишние» обороты шарика в нач
 var _chips_root: Node3D
 var _board: Label3D
 var _chip_scenes: Dictionary = {}
+## Рамки выбранных ставок: PlayerData.id -> Node3D (4 планки цвета игрока).
+var _selections: Dictionary = {}
 
 
 func _ready() -> void:
@@ -128,6 +133,39 @@ func stand_point(slot: int) -> Vector3:
 
 func stand_yaw() -> float:
 	return global_rotation.y + PI # лицом к столу (к +Z стола)
+
+
+## Обвести на сукне клетку, которую игрок сейчас выбрал (во время приёма ставок).
+func set_selection(p: PlayerData, bet: int, number: int) -> void:
+	var frame: Node3D = _selections.get(p.id)
+	if frame == null:
+		frame = _make_frame(p.color)
+		_selections[p.id] = frame
+	var rect := Roulette.layout_rect(bet, number)
+	# Каждый игрок — чуть внутрь клетки, чтобы рамки нескольких игроков не сливались.
+	var inset := 0.004 * (p.slot % 4)
+	var x0 := FELT_CENTER.x + (rect.position.x - 0.5) * FELT_SIZE.x + inset
+	var x1 := FELT_CENTER.x + (rect.end.x - 0.5) * FELT_SIZE.x - inset
+	var z0 := FELT_CENTER.z + (rect.position.y - 0.5) * FELT_SIZE.y + inset
+	var z1 := FELT_CENTER.z + (rect.end.y - 0.5) * FELT_SIZE.y - inset
+	var bars := frame.get_children()
+	_place_bar(bars[0] as Node3D, Vector3((x0 + x1) / 2, 0, z0), Vector3(x1 - x0, 0, 0))
+	_place_bar(bars[1] as Node3D, Vector3((x0 + x1) / 2, 0, z1), Vector3(x1 - x0, 0, 0))
+	_place_bar(bars[2] as Node3D, Vector3(x0, 0, (z0 + z1) / 2), Vector3(0, 0, z1 - z0))
+	_place_bar(bars[3] as Node3D, Vector3(x1, 0, (z0 + z1) / 2), Vector3(0, 0, z1 - z0))
+	frame.visible = phase == Phase.BETTING
+
+
+func clear_selection(p: PlayerData) -> void:
+	if _selections.has(p.id):
+		(_selections[p.id] as Node3D).queue_free()
+		_selections.erase(p.id)
+
+
+## Камера над сукном: смотрит сверху на поле ставок (по клику на стол).
+func felt_camera_transform() -> Transform3D:
+	var eye := to_global(FELT_CENTER + Vector3(0, 1.9, 0.25))
+	return Transform3D.IDENTITY.translated(eye).looking_at(to_global(FELT_CENTER), Vector3.UP)
 
 
 ## Камера крупного плана: стоит перед столом, видно колесо, сукно и игроков за столом.
@@ -227,6 +265,33 @@ func _chip_position(p: PlayerData, bet: int, number: int) -> Vector3:
 		if b["player"] == p and b["bet"] == bet and b["number"] == number:
 			stacked += 1
 	return pos + corner + Vector3.UP * (0.002 + stacked * CHIP_HEIGHT)
+
+
+func _make_frame(color: Color) -> Node3D:
+	var frame := Node3D.new()
+	frame.position.y = FELT_CENTER.y + 0.004
+	var frame_mat := StandardMaterial3D.new()
+	frame_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	frame_mat.albedo_color = color.lightened(0.25)
+	for i in 4:
+		var bar := MeshInstance3D.new()
+		bar.mesh = BoxMesh.new()
+		bar.material_override = frame_mat
+		bar.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		frame.add_child(bar)
+	add_child(frame)
+	# Рамка «дышит», чтобы её было видно на пёстром сукне.
+	var pulse := frame.create_tween().set_loops()
+	pulse.tween_property(frame_mat, "albedo_color:a", 0.45, 0.5)
+	pulse.tween_property(frame_mat, "albedo_color:a", 1.0, 0.5)
+	frame_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	return frame
+
+
+func _place_bar(bar: Node3D, center: Vector3, length: Vector3) -> void:
+	bar.position = center
+	var box := (bar as MeshInstance3D).mesh as BoxMesh
+	box.size = Vector3(maxf(absf(length.x), FRAME_WIDTH), 0.006, maxf(absf(length.z), FRAME_WIDTH))
 
 
 func _update_board() -> void:

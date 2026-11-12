@@ -79,6 +79,27 @@ static func pocket_angle(n: int) -> float:
 	return WHEEL.find(n) * TAU / WHEEL.size()
 
 
+## Клетка ставки на сукне целиком (доли текстуры): для рамки «выбрано».
+static func layout_rect(bet: int, number: int) -> Rect2:
+	var out_w := (GRID_U.y - GRID_U.x) / 4.0
+	var out_h := OUT_V.y - OUT_V.x
+	match bet:
+		Bet.ZERO:
+			return Rect2(ZERO_U.x, GRID_V.x, ZERO_U.y - ZERO_U.x, GRID_V.y - GRID_V.x)
+		Bet.EVEN:
+			return Rect2(GRID_U.x, OUT_V.x, out_w, out_h)
+		Bet.RED:
+			return Rect2(GRID_U.x + out_w, OUT_V.x, out_w, out_h)
+		Bet.BLACK:
+			return Rect2(GRID_U.x + out_w * 2.0, OUT_V.x, out_w, out_h)
+		Bet.ODD:
+			return Rect2(GRID_U.x + out_w * 3.0, OUT_V.x, out_w, out_h)
+	var cell_w := (GRID_U.y - GRID_U.x) / 12.0
+	var cell_h := (GRID_V.y - GRID_V.x) / 3.0
+	var center := layout_uv(bet, number)
+	return Rect2(center.x - cell_w / 2.0, center.y - cell_h / 2.0, cell_w, cell_h)
+
+
 ## Где на сукне лежат фишки этой ставки (доли текстуры: x — u, y — v).
 static func layout_uv(bet: int, number: int) -> Vector2:
 	var out_w := (GRID_U.y - GRID_U.x) / 4.0
