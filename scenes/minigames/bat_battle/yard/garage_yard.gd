@@ -17,9 +17,10 @@ const DOOR_X: Array[float] = [-6.375, -2.125, 2.125, 6.375]
 const DOOR_Z := 4.58
 const GELIK_POS := Vector3(4.6, GROUND_Y, 6.35)
 const PIGEON_COUNT := 6
-const GRAFFITI: Array[String] = ["ЦОЙ ЖИВ", "СПАРТАК —\nЧЕМПИОН", "Здесь был\nВася", "КИНО"]
-const GRAFFITI_COLORS: Array[Color] = [
-	Color(0.95, 0.95, 0.9), Color(0.9, 0.2, 0.2), Color(0.3, 0.6, 1.0), Color(0.95, 0.8, 0.2),
+const GARAGE_NUMBERS: Array[int] = [17, 18, 21, 23]
+## Граффити на воротах (имена картинок в assets/textures/garage/).
+const GRAFFITI: Array[String] = [
+	"graffiti_tsoi", "graffiti_spartak", "graffiti_vasya", "graffiti_kino",
 ]
 
 ## Бойцы: голуби улетают, если кто-то из них рядом.
@@ -193,29 +194,33 @@ func _build_front() -> void:
 	ladder.rotation = Vector3(-0.335, PI / 2, 0)
 
 
-## Номера, замки и надписи на воротах гаражей.
+## Номера-таблички, замки и граффити на воротах гаражей (картинки из
+## tools/textures/garage_decals.py — чёткие, с прозрачностью; раньше были мыльные Label3D).
 func _build_garage_details() -> void:
 	for i in DOOR_X.size():
 		var x := DOOR_X[i]
-		var number := Label3D.new()
-		number.text = "№ %d" % [17, 18, 21, 23][i]
-		number.font_size = 64
-		number.outline_size = 0
-		number.modulate = Color(0.95, 0.92, 0.85)
-		number.pixel_size = 0.006
-		number.position = Vector3(x + 1.2, -0.9, DOOR_Z)
-		add_child(number)
+		var plate_pos := Vector3(x + 1.2, -1.42, DOOR_Z + 0.012)
+		_decal("plate_%d" % GARAGE_NUMBERS[i], Vector2(0.56, 0.28), plate_pos)
 		var lock := _place("padlock", Vector3(x + 0.12, -2.65, DOOR_Z + 0.03))
 		lock.scale = Vector3.ONE * 1.4
-		var graffiti := Label3D.new()
-		graffiti.text = GRAFFITI[i]
-		graffiti.font_size = 96
-		graffiti.outline_size = 0
-		graffiti.modulate = GRAFFITI_COLORS[i]
-		graffiti.pixel_size = 0.006
-		graffiti.position = Vector3(x - 0.5, -1.9, DOOR_Z + 0.01)
-		graffiti.rotation.z = randf_range(-0.12, 0.12)
-		add_child(graffiti)
+		_decal(GRAFFITI[i], Vector2(2.3, 1.15), Vector3(x - 0.15, -1.95, DOOR_Z + 0.01))
+
+
+## Картинка-наклейка на стене (смотрит вперёд, +Z): освещается как стена, края мягкие.
+func _decal(texture_name: String, size: Vector2, pos: Vector3) -> void:
+	var quad := MeshInstance3D.new()
+	var mesh := QuadMesh.new()
+	mesh.size = size
+	quad.mesh = mesh
+	var decal_mat := StandardMaterial3D.new()
+	decal_mat.albedo_texture = load("res://assets/textures/garage/%s.png" % texture_name)
+	decal_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	decal_mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
+	decal_mat.roughness = 0.9
+	quad.material_override = decal_mat
+	quad.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	quad.position = pos
+	add_child(quad)
 
 
 func _set_gelik_lights(on: bool) -> void:
