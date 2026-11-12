@@ -107,7 +107,7 @@ METAL = mat("Brass", (0.75, 0.6, 0.3), 0.3, 1.0)
 WHITE = mat("WhitePaint", (0.92, 0.92, 0.9), 0.6)
 SHADE = mat("LampShade", (0.95, 0.55, 0.15), 0.8)
 LACE = mat("Lace", (0.96, 0.95, 0.9), 0.9)
-MIRROR = mat("Mirror", (0.8, 0.85, 0.88), 0.03, 1.0)
+MIRROR = mat("Mirror", (0.72, 0.8, 0.86), 0.12, 0.15)  # не чистый металл: без отражений был бы чёрным
 
 made = []
 
@@ -278,6 +278,108 @@ for i in range(8):
     P.append(box((0.08, 0.12, 0.5), (-0.42 + i * 0.12, -0.06, 0.45), mat("Radiator", (0.85, 0.85, 0.82), 0.5)))
 made.append(export("window", P))
 
+
+# ---------------- Кресло ----------------
+P = [box((0.85, 0.85, 0.3), (0, 0, 0.3), FABRIC, bevel=0.05)]
+P.append(box((0.85, 0.25, 0.65), (0, 0.32, 0.7), FABRIC, bevel=0.06))
+for x in (-0.38, 0.38):
+    P.append(box((0.14, 0.85, 0.52), (x, 0, 0.48), FABRIC2, bevel=0.05))
+P.append(box((0.58, 0.6, 0.12), (0, -0.06, 0.5), FABRIC2, bevel=0.04))
+for x in (-0.36, 0.36):
+    for y in (-0.36, 0.36):
+        P.append(cyl(0.03, 0.15, (x, y, 0.075), WOOD, verts=6))
+made.append(export("armchair", P))
+
+# ---------------- Журнальный столик ----------------
+P = [box((1.0, 0.55, 0.04), (0, 0, 0.45), WOOD, bevel=0.012)]
+P.append(box((0.9, 0.45, 0.02), (0, 0, 0.18), WOOD_L))
+for x in (-0.44, 0.44):
+    for y in (-0.22, 0.22):
+        P.append(cyl(0.022, 0.45, (x, y, 0.22), WOOD, verts=6, r2=0.015))
+P.append(box((0.5, 0.3, 0.005), (0, 0, 0.472), LACE))
+made.append(export("coffee_table", P))
+
+# ---------------- Книжная секция стенки (полки с книгами, место под радио) ----------------
+P = [box((1.3, 0.45, 0.85), (0, 0, 0.475), WOOD, bevel=0.015)]
+for x in (-0.32, 0.32):
+    P.append(box((0.62, 0.02, 0.75), (x, -0.23, 0.48), WOOD_L, bevel=0.008))
+for z in (0.92, 1.4, 1.88):
+    P.append(box((1.3, 0.42, 0.03), (0, 0.02, z), WOOD))
+P.append(box((1.3, 0.45, 0.06), (0, 0, 2.27), WOOD, bevel=0.01))
+P.append(box((1.3, 0.03, 1.4), (0, 0.21, 1.6), WOOD_L))
+for x in (-0.635, 0.635):
+    P.append(box((0.03, 0.45, 1.4), (x, 0, 1.6), WOOD))
+for shelf_z in (1.415, 1.895):                                                   # ряды корешков
+    x = -0.6
+    while x < 0.58:
+        w = random.uniform(0.035, 0.07)
+        h = random.uniform(0.24, 0.34)
+        P.append(box((w, 0.2, h), (x + w / 2, 0.05, shelf_z + h / 2), random.choice(BOOKS)))
+        x += w + 0.004
+made.append(export("bookshelf", P))
+
+# ---------------- Радиоприёмник ----------------
+CASE = mat("RadioCase", (0.18, 0.1, 0.06), 0.4)
+GRILLE = mat("RadioGrille", (0.75, 0.72, 0.65), 0.6, 0.5)
+DIAL = mat("RadioDial", (0.95, 0.85, 0.55), 0.3)
+P = [box((0.42, 0.14, 0.24), (0, 0, 0.12), CASE, bevel=0.02)]
+P.append(box((0.22, 0.01, 0.17), (-0.08, -0.07, 0.12), GRILLE))
+P.append(box((0.12, 0.012, 0.06), (0.12, -0.07, 0.16), DIAL))
+for z in (0.07, 0.1):
+    P.append(cyl(0.018, 0.02, (0.12 + (z - 0.07) * 1.5, -0.075, z), METAL, verts=8, rot=(math.radians(90), 0, 0)))
+P.append(box((0.3, 0.03, 0.02), (0, 0, 0.27), METAL))                                   # ручка
+P.append(cyl(0.006, 0.5, (0.17, 0.03, 0.48), METAL, verts=4, rot=(0, math.radians(-20), 0)))  # антенна
+made.append(export("radio", P))
+
+# ---------------- Гантели ----------------
+IRON = mat("Iron", (0.12, 0.12, 0.13), 0.5, 0.7)
+P = [cyl(0.018, 0.34, (0, 0, 0.06), METAL, verts=8, rot=(0, math.radians(90), 0))]
+for x in (-0.13, -0.09, 0.09, 0.13):
+    P.append(cyl(0.06, 0.035, (x, 0, 0.06), IRON, verts=6, rot=(0, math.radians(90), 0)))
+made.append(export("dumbbell", P))
+
+# ---------------- Табурет ----------------
+P = [box((0.36, 0.36, 0.04), (0, 0, 0.45), WOOD_L, bevel=0.01)]
+for x in (-0.14, 0.14):
+    for y in (-0.14, 0.14):
+        P.append(box((0.04, 0.04, 0.43), (x, y, 0.215), WOOD_L))
+P.append(box((0.3, 0.03, 0.03), (0, -0.14, 0.12), WOOD_L))
+P.append(box((0.3, 0.03, 0.03), (0, 0.14, 0.12), WOOD_L))
+made.append(export("stool", P))
+
+# ---------------- Люстра (крепится к потолку на высоте 3 м: верх в z = 3) ----------------
+SHADE_GLASS = mat("ChandelierGlass", (0.98, 0.92, 0.75), 0.3, 0.0, 0.85)
+P = [cyl(0.012, 0.5, (0, 0, 2.75), METAL, verts=6), cyl(0.07, 0.04, (0, 0, 2.98), METAL, verts=8),
+     sphere(0.06, (0, 0, 2.5), METAL, segs=8, rings=5)]
+for i in range(5):
+    a = i * 2 * math.pi / 5
+    x, y = math.cos(a) * 0.32, math.sin(a) * 0.32
+    P.append(box((0.32, 0.02, 0.02), (x / 2, y / 2, 2.5), METAL, rot=(0, 0, a)))
+    P.append(cyl(0.09, 0.14, (x, y, 2.54), SHADE_GLASS, verts=8, r2=0.05))
+made.append(export("chandelier", P))
+
+# ---------------- Шторы с тюлем (к окну шириной 1.5 м) ----------------
+DRAPE = mat("Drape", (0.45, 0.12, 0.08), 0.9)
+TULLE = mat("Tulle", (0.97, 0.97, 0.95), 0.9, 0.0, 0.55)
+P = [box((2.3, 0.04, 0.04), (0, 0, 2.62), METAL)]                                        # карниз
+P.append(box((1.5, 0.01, 1.7), (0, -0.04, 1.75), TULLE))                                 # тюль
+for x in (-0.95, 0.95):
+    for k in range(4):                                                                     # складки штор
+        P.append(cyl(0.05, 1.95, (x + (k - 1.5) * 0.09, -0.06, 1.62), DRAPE, verts=6))
+made.append(export("curtains", P))
+
+# ---------------- Ковёр на пол (лежит, узором вверх) ----------------
+W, D = 3.0, 2.1
+P = [box((W, D, 0.02), (0, 0, 0.01), RED)]
+P.append(box((W - 0.14, D - 0.14, 0.024), (0, 0, 0.012), GOLDC))
+P.append(box((W - 0.28, D - 0.28, 0.028), (0, 0, 0.014), RED))
+for sz, c in ((0.8, BLUEC), (0.6, GOLDC), (0.4, RED), (0.2, CREAM)):
+    P.append(box((sz, sz, 0.03 + (0.8 - sz) * 0.005), (0, 0, 0.016), c, rot=(0, 0, math.radians(45))))
+for x in (-1.1, 1.1):
+    for y in (-0.65, 0.65):
+        P.append(box((0.2, 0.2, 0.034), (x, y, 0.017), BLUEC, rot=(0, 0, math.radians(45))))
+made.append(export("floor_rug", P))
+
 if not RENDER:
     print("DONE")
     sys.exit(0)
@@ -290,6 +392,9 @@ layout = {
     "jar_pickles": (-2.6, -0.9, 0), "jar_jam": (-2.25, -0.9, 0), "cactus_pot": (2.8, -0.4, 0),
     "aloe_pot": (3.2, -0.4, 0), "book_stack": (2.6, -1.3, 0), "wardrobe": (4.6, 0.8, 0), "bed": (6.7, 0.3, 0),
     "nightstand": (5.8, 1.0, 0), "table_lamp": (5.8, 1.0, 0.55), "window": (2.8, 1.25, 0),
+    "armchair": (-1.6, -2.6, 0), "coffee_table": (0.2, -2.6, 0), "bookshelf": (8.6, 1.1, 0),
+    "radio": (8.6, 1.1, 0.95), "dumbbell": (3.6, -1.2, 0), "stool": (4.2, -1.2, 0),
+    "chandelier": (0, -1.0, -0.5), "curtains": (2.8, 1.2, 0), "floor_rug": (0.5, -3.6, 0),
 }
 for o in made:
     if o.name in layout:

@@ -7,6 +7,12 @@ extends Node3D
 ## Когда готовы все — спросим про ботов (если есть места), потом отсчёт 5 сек и старт.
 ## Лобби — советская квартира (см. Apartment): в гостиной всё можно ломать, на диване — сидеть.
 ## Шкаф в спальне: подойти и нажать кнопку подтверждения — откроется примерочная.
+##
+## Вид от первого лица (по умолчанию) или от третьего — F2 (пока идёт разработка).
+## От первого лица у каждого живого игрока своя камера (экран делится):
+## WASD + мышь, стрелки (влево/вправо — поворот), геймпад — левый стик + правый стик.
+
+enum View { FIRST_PERSON, THIRD_PERSON }
 
 const CHARACTER_SCENE := preload("res://scenes/characters/test_character.tscn")
 const ROUNDS := 5
@@ -15,6 +21,11 @@ const WARDROBE_RADIUS := 1.2
 const TV_ZONE_RADIUS := 1.3
 const SEAT_RADIUS := 0.9
 const COUNTDOWN := 5.0
+## Вид от первого лица: чувствительность мыши и скорость обзора правым стиком.
+const MOUSE_SENSITIVITY := 0.0025
+const STICK_LOOK_SPEED := 2.8
+const EYE_HEIGHT := 1.42
+const PITCH_LIMIT := 1.2
 
 var _characters: Dictionary = {} # PlayerData.id -> персонаж
 var _slot_panels: Array[PanelContainer] = []
@@ -33,6 +44,15 @@ var _countdown_label: Label
 ## Кто где сидит на диване: PlayerData.id -> номер места.
 var _seated: Dictionary = {}
 
+## Когда игрок сел (чтобы зажатая клавиша движения не подняла его сразу же).
+var _sit_time: Dictionary = {}
+
+## Вид от первого лица: PlayerData.id -> {"container", "camera", "prompt"}.
+var _view := View.FIRST_PERSON
+var _views: Dictionary = {}
+var _views_root: Control
+var _mouse_delta := Vector2.ZERO
+
 ## Открытые примерочные: PlayerData.id -> DressingRoom
 var _rooms: Dictionary = {}
 var _rooms_root: Control
@@ -41,10 +61,20 @@ var _rooms_root: Control
 @onready var _camera: Camera3D = $Camera3D
 @onready var _sun: DirectionalLight3D = $Sun
 @onready var _ui: CanvasLayer = $UI
+@onready var _apartment: Apartment = $Apartment
 
 
 func _ready() -> void:
 	_camera.look_at_from_position(Vector3(1.5, 12.0, 11.5), Vector3(1.5, 0, -0.6))
+	# Сверху не показываем потолок и передние стены.
+	_camera.cull_mask &= ~Apartment.FP_ONLY_LAYER
+	var views_layer := CanvasLayer.new()
+	views_layer.layer = 0
+	add_child(views_layer)
+	_views_root = Control.new()
+	_views_root.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_views_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	views_layer.add_child(_views_root)
 	_sun.rotation_degrees = Vector3(-55, -35, 0)
 	_build_ui()
 	_build_zone(Apartment.TV_ZONE, TV_ZONE_RADIUS, Color(0.56, 0.84, 0.58),
@@ -60,6 +90,12 @@ func _ready() -> void:
 	for p in PlayerManager.players:
 		_on_player_joined(p)
 	_refresh_slots()
+	_apply_view()
+
+
+func _input(event: InputEvent) -> void:
+	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
+		_mouse_delta += (event as InputEventMouseMotion).relative
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -74,10 +110,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			else:
 				get_tree().quit()
 			return
-		if key.physical_keycode == KEY_F9:
-			_test_add_money()
-			return
-		if _bot_dialog.visible:
+		if _handle_dev_key(key.physical_keycode) or _bot_dialog.visible:
 			return
 		var scheme := InputSetup.keyboard_join_scheme(key.physical_keycode)
 		# Пока открыта примерочная, Enter — это «подтвердить» в меню, а не вход игрока.
@@ -91,6 +124,19 @@ func _unhandled_input(event: InputEvent) -> void:
 			return
 		if button.button_index == JOY_BUTTON_A:
 			PlayerManager.add_local_player(PlayerData.DeviceKind.JOYPAD, button.device)
+
+
+## Клавиши для разработки: F2 — вид от 1-го/3-го лица, F9 — +500 ₽. true — клавиша обработана.
+func _handle_dev_key(keycode: Key) -> bool:
+	match keycode:
+		KEY_F2:
+			_view = View.THIRD_PERSON if _view == View.FIRST_PERSON else View.FIRST_PERSON
+			_apply_view()
+		KEY_F9:
+			_test_add_money()
+		_:
+			return false
+	return true
 
 
 ## Все живые игроки готовы: спросить про ботов (если есть места), иначе — сразу отсчёт.
@@ -121,6 +167,8 @@ func _launch() -> void:
 
 
 func _process(delta: float) -> void:
+	if _view == View.FIRST_PERSON:
+		_update_first_person(delta)
 	if _bot_dialog.visible:
 		_process_bot_dialog()
 		return
@@ -131,8 +179,13 @@ func _process(delta: float) -> void:
 			continue # примерочная сама обрабатывает кнопки игрока
 		var character: PlayerCharacter = _characters.get(p.id)
 		if character and character.sitting:
-			# Сидит на диване: встать — кнопкой или движением.
-			if p.input.is_just_pressed("confirm") or p.input.get_move().length() > 0.5:
+			# Сидит на диване: встать — новым нажатием кнопки или движения.
+			# (Раньше зажатая клавиша движения поднимала персонажа в тот же миг.)
+			var since: float = Time.get_ticks_msec() / 1000.0 - float(_sit_time.get(p.id, 0.0))
+			var pressed := p.input.is_just_pressed("confirm") or p.input.is_just_pressed("cancel")
+			for move in ["move_up", "move_down", "move_left", "move_right"]:
+				pressed = pressed or p.input.is_just_pressed(move)
+			if since > 0.35 and pressed:
 				_stand(p)
 			continue
 		var at_tv := _is_near(p, Apartment.TV_ZONE, TV_ZONE_RADIUS)
@@ -175,6 +228,7 @@ func _set_ready(p: PlayerData, on: bool) -> void:
 		mark.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 		mark.no_depth_test = true
 		mark.position.y = 2.5
+		mark.layers = _player_layer(p) # над своей головой от первого лица не видно
 		(_characters[p.id] as Node3D).add_child(mark)
 		_ready_marks[p.id] = mark
 	else:
@@ -221,18 +275,21 @@ func _build_zone(pos: Vector3, radius: float, color: Color, text: String) -> voi
 
 ## Свободное место на диване рядом с игроком (-1 — нет).
 func _free_seat_near(p: PlayerData) -> int:
-	for i in Apartment.SEATS.size():
+	for i in _apartment.seats.size():
 		if _seated.values().has(i):
 			continue
-		var seat := Apartment.SEATS[i]
-		if _is_near(p, seat + Vector3(0, 0, 0.9), SEAT_RADIUS):
+		if _is_near(p, _apartment.seats[i]["approach"], SEAT_RADIUS):
 			return i
 	return -1
 
 
 func _sit(p: PlayerData, seat: int) -> void:
 	_seated[p.id] = seat
-	(_characters[p.id] as PlayerCharacter).sit_at(Apartment.SEATS[seat], PI)
+	_sit_time[p.id] = Time.get_ticks_msec() / 1000.0
+	var info: Dictionary = _apartment.seats[seat]
+	var character: PlayerCharacter = _characters[p.id]
+	character.sit_at(info["pos"], info["yaw"])
+	character.fp_pitch = 0.0
 
 
 func _stand(p: PlayerData) -> void:
@@ -294,6 +351,176 @@ func _layout_rooms() -> void:
 			rect = Rect2(Vector2(half.x * (i % 2), half.y * (i / 2)), half)
 		rooms[i].position = rect.position
 		rooms[i].size = rect.size
+
+
+# ---------------- Вид от первого лица ----------------
+
+## Слой модели игрока: его собственная камера от первого лица этот слой не рисует.
+func _player_layer(p: PlayerData) -> int:
+	return 1 << (p.slot + 1)
+
+
+func _apply_view() -> void:
+	var first := _view == View.FIRST_PERSON
+	for p in PlayerManager.players:
+		if p.is_bot() or not _characters.has(p.id):
+			continue
+		var character: PlayerCharacter = _characters[p.id]
+		character.first_person = first
+		if first:
+			_create_view(p)
+		else:
+			_remove_view(p)
+	if not first:
+		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	_layout_views()
+
+
+func _create_view(p: PlayerData) -> void:
+	if _views.has(p.id):
+		return
+	var container := SubViewportContainer.new()
+	container.stretch = true
+	container.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var viewport := SubViewport.new()
+	viewport.msaa_3d = Viewport.MSAA_2X
+	container.add_child(viewport) # мир общий с лобби — своя только камера
+	var camera := Camera3D.new()
+	camera.fov = 75.0
+	camera.cull_mask = 0xFFFFF & ~_player_layer(p)
+	viewport.add_child(camera)
+	camera.current = true
+
+	var frame := ReferenceRect.new()
+	frame.border_color = p.color
+	frame.border_width = 3
+	frame.editor_only = false
+	frame.set_anchors_preset(Control.PRESET_FULL_RECT)
+	frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	container.add_child(frame)
+	var dot := _overlay_label("•", 28)
+	dot.set_anchors_preset(Control.PRESET_CENTER)
+	container.add_child(dot)
+	var prompt := _overlay_label("", 24)
+	prompt.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+	prompt.offset_top = -120
+	prompt.offset_bottom = -80
+	prompt.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	container.add_child(prompt)
+	_views_root.add_child(container)
+	_views[p.id] = {"container": container, "camera": camera, "prompt": prompt}
+	_layout_views()
+
+
+func _remove_view(p: PlayerData) -> void:
+	if not _views.has(p.id):
+		return
+	(_views[p.id]["container"] as Node).queue_free()
+	_views.erase(p.id)
+	_layout_views()
+
+
+## Одна камера — весь экран, две — пополам, три-четыре — по четвертям.
+func _layout_views() -> void:
+	var screen := get_viewport().get_visible_rect().size
+	var ids: Array = _views.keys()
+	ids.sort_custom(func(a: int, b: int) -> bool:
+		return _player_by_id(a).slot < _player_by_id(b).slot)
+	var n := ids.size()
+	for i in n:
+		var rect := Rect2(Vector2.ZERO, screen)
+		if n == 2:
+			rect = Rect2(Vector2(screen.x / 2.0 * i, 0), Vector2(screen.x / 2.0, screen.y))
+		elif n > 2:
+			var half := screen / 2.0
+			rect = Rect2(Vector2(half.x * (i % 2), half.y * (i / 2)), half)
+		var container: SubViewportContainer = _views[ids[i]]["container"]
+		container.position = rect.position
+		container.size = rect.size
+
+
+func _player_by_id(id: int) -> PlayerData:
+	for p in PlayerManager.players:
+		if p.id == id:
+			return p
+	return null
+
+
+## Каждый кадр: обзор мышью/стиком, камеры на уровне глаз, подсказки.
+func _update_first_person(delta: float) -> void:
+	var mouse := _mouse_delta
+	_mouse_delta = Vector2.ZERO
+	for id: int in _views:
+		var p := _player_by_id(id)
+		if p == null or not _characters.has(id):
+			continue
+		var character: PlayerCharacter = _characters[id]
+		var look := Vector2.ZERO
+		match p.device_kind:
+			PlayerData.DeviceKind.KEYBOARD_WASD:
+				look = mouse * MOUSE_SENSITIVITY
+				character.fp_strafe = Input.mouse_mode == Input.MOUSE_MODE_CAPTURED
+			PlayerData.DeviceKind.JOYPAD:
+				var stick := Vector2(Input.get_joy_axis(p.joypad_id, JOY_AXIS_RIGHT_X),
+					Input.get_joy_axis(p.joypad_id, JOY_AXIS_RIGHT_Y))
+				if stick.length() > 0.2:
+					look = stick * STICK_LOOK_SPEED * delta
+				character.fp_strafe = true
+			_:
+				character.fp_strafe = false # стрелки: влево/вправо — поворот
+		if not _rooms.has(id):
+			character.rotation.y -= look.x
+			character.fp_pitch = clampf(character.fp_pitch - look.y, -PITCH_LIMIT, PITCH_LIMIT)
+		var camera: Camera3D = _views[id]["camera"]
+		var eye_height := EYE_HEIGHT - (0.1 if character.sitting else 0.0)
+		var eye := character.global_position + Vector3.UP * eye_height
+		camera.global_transform = Transform3D(
+			Basis.from_euler(Vector3(character.fp_pitch, character.rotation.y, 0.0)), eye)
+		(_views[id]["prompt"] as Label).text = _prompt_for(p, character)
+	# Мышь ловим, только если есть игрок на WASD и не открыто окно/примерочная.
+	var want_capture := _view == View.FIRST_PERSON and _rooms.is_empty() and not _bot_dialog.visible \
+		and PlayerManager.is_device_taken(PlayerData.DeviceKind.KEYBOARD_WASD)
+	var mode := Input.MOUSE_MODE_CAPTURED if want_capture else Input.MOUSE_MODE_VISIBLE
+	if Input.mouse_mode != mode:
+		Input.mouse_mode = mode
+
+
+## Подсказка внизу экрана игрока: что можно сделать здесь.
+func _prompt_for(p: PlayerData, character: PlayerCharacter) -> String:
+	var key := _confirm_key(p)
+	if character.sitting:
+		return "%s — встать" % key
+	if _is_near(p, Apartment.WARDROBE_ZONE, WARDROBE_RADIUS):
+		return "%s — открыть шкаф (переодеться)" % key
+	if _is_near(p, Apartment.TV_ZONE, TV_ZONE_RADIUS):
+		if _ready_marks.has(p.id):
+			return "Ты ГОТОВ! Ждём остальных  (%s — отменить)" % key
+		return "%s — ГОТОВ к игре" % key
+	if _free_seat_near(p) >= 0:
+		return "%s — сесть на диван" % key
+	return ""
+
+
+func _confirm_key(p: PlayerData) -> String:
+	match p.device_kind:
+		PlayerData.DeviceKind.KEYBOARD_WASD:
+			return "Пробел"
+		PlayerData.DeviceKind.KEYBOARD_ARROWS:
+			return "Enter"
+		_:
+			return "A"
+
+
+func _overlay_label(text: String, font_size: int) -> Label:
+	var label := Label.new()
+	label.text = text
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	label.add_theme_font_size_override("font_size", font_size)
+	label.add_theme_color_override("font_outline_color", Color.BLACK)
+	label.add_theme_constant_override("outline_size", 8)
+	return label
 
 
 # ---------------- Окно ботов ----------------
@@ -360,6 +587,11 @@ func _on_player_joined(p: PlayerData) -> void:
 	character.setup(p, spawn)
 	_players_root.add_child(character)
 	_characters[p.id] = character
+	character.set_render_layer(_player_layer(p))
+	if _view == View.FIRST_PERSON and not p.is_bot():
+		character.first_person = true
+		character.rotation.y = 0.0 # лицом к телевизору
+		_create_view(p)
 	if not p.is_bot():
 		_cancel_countdown() # новый игрок пришёл — пусть тоже подтвердит готовность
 	_refresh_slots()
@@ -367,6 +599,7 @@ func _on_player_joined(p: PlayerData) -> void:
 
 func _on_player_left(p: PlayerData) -> void:
 	_seated.erase(p.id)
+	_remove_view(p)
 	_ready_marks.erase(p.id)
 	if not p.is_bot():
 		_cancel_countdown()
@@ -405,7 +638,7 @@ func _build_ui() -> void:
 	var hint := Label.new()
 	hint.text = ("Вход: Пробел (WASD) · Enter (стрелки) · A (геймпад)\n"
 		+ "Прыжок: та же кнопка · Выйти: Q / Backspace / B · Закрыть игру: Esc\n"
-		+ "Переодеться: ШКАФ в спальне · Сесть: диван · НАЧАТЬ: все к ТЕЛЕВИЗОРУ и жмут кнопку")
+		+ "Переодеться: ШКАФ в спальне · Сесть: диван · НАЧАТЬ: все к ТЕЛЕВИЗОРУ · F2 — вид")
 	hint.add_theme_font_size_override("font_size", 22)
 	hint.add_theme_color_override("font_outline_color", Color.BLACK)
 	hint.add_theme_constant_override("outline_size", 8)

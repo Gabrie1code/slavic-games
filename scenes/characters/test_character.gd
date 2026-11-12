@@ -15,6 +15,8 @@ const PUSH_FORCE := 0.5
 ## Поза сидя: насколько опустить модель и поднять ноги вперёд.
 const SIT_DROP := -0.1
 const SIT_LEGS := 1.45
+## Вид от первого лица: скорость поворота стрелками/клавишами (рад/сек).
+const FP_TURN_SPEED := 2.6
 const TURN_SPEED := 12.0
 const KNOCKBACK_DECAY := 18.0
 ## Поворот правой руки: опущена / поднята вверх / вытянута в сторону.
@@ -38,6 +40,12 @@ var fall_limit := -10.0
 var arm_pose_x := 0.0
 ## Сидит ли персонаж (на диване в лобби).
 var sitting := false
+## Вид от первого лица: движение относительно взгляда.
+var first_person := false
+## От первого лица: true — A/D шагают вбок (поворот мышью/стиком), false — A/D поворачивают.
+var fp_strafe := false
+## Наклон взгляда вверх/вниз (для камеры от первого лица).
+var fp_pitch := 0.0
 
 var _knockback := Vector3.ZERO
 var _gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity")
@@ -48,6 +56,8 @@ var _idle_time := 0.0
 var _primary_material: StandardMaterial3D
 ## Слот одежды -> надетые куски (чтобы снять при смене).
 var _worn: Dictionary = {}
+## Слой видимости модели (свою модель камера от первого лица не показывает).
+var _render_layer := 1
 
 @onready var visual: Node3D = $Visual
 @onready var right_hand: Node3D = Node3D.new()
@@ -101,12 +111,19 @@ func _physics_process(delta: float) -> void:
 
 	# Камера смотрит спереди, поэтому «вверх» на экране — это -Z в мире.
 	var dir := Vector3(move.x, 0.0, move.y)
+	if first_person:
+		# От первого лица — относительно взгляда: basis.z смотрит назад, basis.x — вправо.
+		if fp_strafe:
+			dir = transform.basis.x * move.x + transform.basis.z * move.y
+		else:
+			rotation.y -= move.x * FP_TURN_SPEED * delta
+			dir = transform.basis.z * move.y
 	var target := dir * speed
 	velocity.x = move_toward(velocity.x - _knockback.x, target.x, ACCELERATION * delta) + _knockback.x
 	velocity.z = move_toward(velocity.z - _knockback.z, target.z, ACCELERATION * delta) + _knockback.z
 	_knockback = _knockback.move_toward(Vector3.ZERO, KNOCKBACK_DECAY * delta)
 
-	if dir.length() > 0.1:
+	if dir.length() > 0.1 and not first_person:
 		var yaw := atan2(-dir.x, -dir.z)
 		rotation.y = lerp_angle(rotation.y, yaw, TURN_SPEED * delta)
 
@@ -256,9 +273,23 @@ func wear(slot: int, item_id: String) -> void:
 		_part(String(piece.name)).add_child(piece_3d)
 		piece_3d.transform = Transform3D.IDENTITY
 		_recolor(piece_3d)
+		_apply_layer(piece_3d)
 		pieces.append(piece_3d)
 	item.queue_free()
 	_worn[slot] = pieces
+
+
+## Слой видимости всей модели персонажа (и надетой одежды).
+func set_render_layer(layer: int) -> void:
+	_render_layer = layer
+	_apply_layer(self)
+
+
+func _apply_layer(node: Node) -> void:
+	if node is VisualInstance3D:
+		(node as VisualInstance3D).layers = _render_layer
+	for child in node.get_children():
+		_apply_layer(child)
 
 
 func _part(part_name: String) -> Node3D:
