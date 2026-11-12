@@ -10,6 +10,11 @@ const ACCELERATION := 40.0
 ## Прыжок: короткий и «тяжёлый» — гравитация персонажа сильнее стандартной.
 const JUMP_VELOCITY := 7.0
 const GRAVITY_SCALE := 2.2
+## Сила, с которой персонаж толкает незакреплённые вещи (стулья, торшер).
+const PUSH_FORCE := 0.5
+## Поза сидя: насколько опустить модель и поднять ноги вперёд.
+const SIT_DROP := -0.1
+const SIT_LEGS := 1.45
 const TURN_SPEED := 12.0
 const KNOCKBACK_DECAY := 18.0
 ## Поворот правой руки: опущена / поднята вверх / вытянута в сторону.
@@ -31,6 +36,8 @@ var respawn_on_fall := true
 var fall_limit := -10.0
 ## Наклон правой руки вперёд (>0) / назад (<0), когда рука занята (держит предмет).
 var arm_pose_x := 0.0
+## Сидит ли персонаж (на диване в лобби).
+var sitting := false
 
 var _knockback := Vector3.ZERO
 var _gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity")
@@ -104,6 +111,7 @@ func _physics_process(delta: float) -> void:
 		rotation.y = lerp_angle(rotation.y, yaw, TURN_SPEED * delta)
 
 	move_and_slide()
+	_push_bodies()
 
 	if respawn_on_fall and global_position.y < fall_limit:
 		global_position = spawn_position
@@ -120,16 +128,49 @@ func _process(delta: float) -> void:
 	var swing := sin(_walk_phase) * SWING * amount
 	# Ноги и руки качаются навстречу друг другу; в стойке — плавно возвращаются.
 	var legs_back := 1.0 - minf(1.0, delta * 10.0)
-	_part("LegL").rotation.x = swing if amount > 0.05 else _part("LegL").rotation.x * legs_back
-	_part("LegR").rotation.x = -swing if amount > 0.05 else _part("LegR").rotation.x * legs_back
+	if sitting:
+		_part("LegL").rotation.x = SIT_LEGS
+		_part("LegR").rotation.x = SIT_LEGS
+	else:
+		_part("LegL").rotation.x = swing if amount > 0.05 else _part("LegL").rotation.x * legs_back
+		_part("LegR").rotation.x = -swing if amount > 0.05 else _part("LegR").rotation.x * legs_back
 	_part("ArmL").rotation.x = -swing * 0.8
 	if not _right_arm_busy:
 		_part("ArmR").rotation.x = swing * 0.8
 	else:
 		_part("ArmR").rotation.x = arm_pose_x
 	# Подпрыгивание при шаге и лёгкое «дыхание» в стойке.
-	_model.position.y = absf(sin(_walk_phase)) * 0.06 * amount
+	_model.position.y = SIT_DROP if sitting else absf(sin(_walk_phase)) * 0.06 * amount
 	_part("Head").rotation.x = sin(_idle_time * 2.0) * 0.04
+
+
+## Сесть: персонаж ставится в точку (под сиденьем) и поворачивается на yaw.
+func sit_at(point: Vector3, yaw: float) -> void:
+	sitting = true
+	set_physics_process(false)
+	velocity = Vector3.ZERO
+	global_position = point
+	rotation.y = yaw
+
+
+## Встать с дивана: шаг вперёд и снова обычная физика.
+func stand_up() -> void:
+	if not sitting:
+		return
+	sitting = false
+	global_position += -global_basis.z * 0.7 + Vector3.UP * 0.1
+	set_physics_process(true)
+
+
+## Толкнуть незакреплённые вещи, в которые упёрся персонаж.
+func _push_bodies() -> void:
+	for i in get_slide_collision_count():
+		var hit := get_slide_collision(i)
+		var body := hit.get_collider() as RigidBody3D
+		if body and not body.freeze:
+			var push := -hit.get_normal()
+			push.y = 0.0
+			body.apply_impulse(push * PUSH_FORCE, hit.get_position() - body.global_position)
 
 
 ## Отбросить персонажа (например, от удара битой).

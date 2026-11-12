@@ -5,15 +5,15 @@ extends Node3D
 ## Выход: Q, Backspace/Shift или B на геймпаде.
 ## Начать партию: все живые игроки подходят к телевизору и жмут кнопку действия («Готов»).
 ## Когда готовы все — спросим про ботов (если есть места), потом отсчёт 5 сек и старт.
-## Рынок (справа): подойти и нажать кнопку подтверждения — откроется гардероб.
+## Лобби — советская квартира (см. Apartment): в гостиной всё можно ломать, на диване — сидеть.
+## Шкаф в спальне: подойти и нажать кнопку подтверждения — откроется примерочная.
 
 const CHARACTER_SCENE := preload("res://scenes/characters/test_character.tscn")
-const SPAWN_RADIUS := 3.0
 const ROUNDS := 5
-const MARKET_POS := Vector3(7.0, 0.0, -1.6)
-const MARKET_RADIUS := 2.0
-const TV_ZONE_POS := Vector3(0.0, 0.0, -4.0)
-const TV_ZONE_RADIUS := 1.8
+## Зоны в квартире (координаты — в Apartment).
+const WARDROBE_RADIUS := 1.2
+const TV_ZONE_RADIUS := 1.3
+const SEAT_RADIUS := 0.9
 const COUNTDOWN := 5.0
 
 var _characters: Dictionary = {} # PlayerData.id -> персонаж
@@ -30,6 +30,9 @@ var _ready_marks: Dictionary = {}
 var _countdown := -1.0
 var _countdown_label: Label
 
+## Кто где сидит на диване: PlayerData.id -> номер места.
+var _seated: Dictionary = {}
+
 ## Открытые примерочные: PlayerData.id -> DressingRoom
 var _rooms: Dictionary = {}
 var _rooms_root: Control
@@ -41,11 +44,13 @@ var _rooms_root: Control
 
 
 func _ready() -> void:
-	_camera.look_at_from_position(Vector3(0, 9.5, 10.5), Vector3(0, 0, 0.5))
+	_camera.look_at_from_position(Vector3(1.5, 12.0, 11.5), Vector3(1.5, 0, -0.6))
 	_sun.rotation_degrees = Vector3(-55, -35, 0)
 	_build_ui()
-	_build_market()
-	_build_tv_zone()
+	_build_zone(Apartment.TV_ZONE, TV_ZONE_RADIUS, Color(0.56, 0.84, 0.58),
+		"ИГРАТЬ: встань в круг\nи нажми Пробел / Enter / A")
+	_build_zone(Apartment.WARDROBE_ZONE, WARDROBE_RADIUS, Color(0.96, 0.76, 0.26),
+		"ШКАФ: переодеться\nи купить одежду")
 
 	# Боты прошлой партии в лобби не нужны: при старте спросим заново.
 	PlayerManager.remove_bots()
@@ -124,11 +129,20 @@ func _process(delta: float) -> void:
 			continue
 		if _rooms.has(p.id):
 			continue # примерочная сама обрабатывает кнопки игрока
-		var at_tv := _is_near(p, TV_ZONE_POS, TV_ZONE_RADIUS)
-		if p.input.is_just_pressed("confirm") and _is_at_market(p):
+		var character: PlayerCharacter = _characters.get(p.id)
+		if character and character.sitting:
+			# Сидит на диване: встать — кнопкой или движением.
+			if p.input.is_just_pressed("confirm") or p.input.get_move().length() > 0.5:
+				_stand(p)
+			continue
+		var at_tv := _is_near(p, Apartment.TV_ZONE, TV_ZONE_RADIUS)
+		var seat := _free_seat_near(p)
+		if p.input.is_just_pressed("confirm") and _is_near(p, Apartment.WARDROBE_ZONE, WARDROBE_RADIUS):
 			_open_wardrobe(p)
 		elif p.input.is_just_pressed("confirm") and at_tv:
 			_set_ready(p, not _ready_marks.has(p.id))
+		elif p.input.is_just_pressed("confirm") and seat >= 0:
+			_sit(p, seat)
 		elif p.input.is_just_pressed("cancel"):
 			PlayerManager.remove_player(p)
 			continue
@@ -178,7 +192,53 @@ func _is_near(p: PlayerData, point: Vector3, radius: float) -> bool:
 	return Vector2(pos.x - point.x, pos.z - point.z).length() < radius
 
 
-# ---------------- Рынок и гардероб ----------------
+# ---------------- Зоны, диван, примерочная ----------------
+
+## Круг на полу с подписью: встань и нажми кнопку.
+func _build_zone(pos: Vector3, radius: float, color: Color, text: String) -> void:
+	var zone := MeshInstance3D.new()
+	var zone_mesh := CylinderMesh.new()
+	zone_mesh.top_radius = radius
+	zone_mesh.bottom_radius = radius
+	zone_mesh.height = 0.02
+	zone_mesh.radial_segments = 24
+	zone.mesh = zone_mesh
+	var zone_mat := StandardMaterial3D.new()
+	zone_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	zone_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	zone_mat.albedo_color = Color(color, 0.3)
+	zone.material_override = zone_mat
+	zone.position = pos + Vector3.UP * 0.04
+	add_child(zone)
+	var hint := Label3D.new()
+	hint.text = text
+	hint.font_size = 30
+	hint.outline_size = 10
+	hint.rotation_degrees.x = -90
+	hint.position = pos + Vector3(0, 0.06, radius * 0.5)
+	add_child(hint)
+
+
+## Свободное место на диване рядом с игроком (-1 — нет).
+func _free_seat_near(p: PlayerData) -> int:
+	for i in Apartment.SEATS.size():
+		if _seated.values().has(i):
+			continue
+		var seat := Apartment.SEATS[i]
+		if _is_near(p, seat + Vector3(0, 0, 0.9), SEAT_RADIUS):
+			return i
+	return -1
+
+
+func _sit(p: PlayerData, seat: int) -> void:
+	_seated[p.id] = seat
+	(_characters[p.id] as PlayerCharacter).sit_at(Apartment.SEATS[seat], PI)
+
+
+func _stand(p: PlayerData) -> void:
+	_seated.erase(p.id)
+	if _characters.has(p.id):
+		(_characters[p.id] as PlayerCharacter).stand_up()
 
 ## ДЛЯ ТЕСТОВ (убрать перед релизом): F9 — всем живым игрокам +500 ₽.
 func _test_add_money() -> void:
@@ -186,13 +246,6 @@ func _test_add_money() -> void:
 		PlayerManager.add_to_wallet(p, 500)
 		if _rooms.has(p.id):
 			(_rooms[p.id] as DressingRoom).refresh()
-
-
-func _is_at_market(p: PlayerData) -> bool:
-	if not _characters.has(p.id):
-		return false
-	var pos: Vector3 = (_characters[p.id] as Node3D).global_position
-	return Vector2(pos.x - MARKET_POS.x, pos.z - MARKET_POS.z).length() < MARKET_RADIUS
 
 
 func _open_wardrobe(p: PlayerData) -> void:
@@ -241,111 +294,6 @@ func _layout_rooms() -> void:
 			rect = Rect2(Vector2(half.x * (i % 2), half.y * (i / 2)), half)
 		rooms[i].position = rect.position
 		rooms[i].size = rect.size
-
-
-## Круг перед телевизором: встань и нажми кнопку — «Готов».
-func _build_tv_zone() -> void:
-	var zone := MeshInstance3D.new()
-	var zone_mesh := CylinderMesh.new()
-	zone_mesh.top_radius = TV_ZONE_RADIUS
-	zone_mesh.bottom_radius = TV_ZONE_RADIUS
-	zone_mesh.height = 0.02
-	zone_mesh.radial_segments = 24
-	zone.mesh = zone_mesh
-	var zone_mat := StandardMaterial3D.new()
-	zone_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	zone_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	zone_mat.albedo_color = Color(0.56, 0.84, 0.58, 0.3)
-	zone.material_override = zone_mat
-	zone.position = TV_ZONE_POS + Vector3.UP * 0.05
-	add_child(zone)
-	var hint := Label3D.new()
-	hint.text = "ИГРАТЬ: встань в круг\nи нажми Пробел / Enter / A"
-	hint.font_size = 34
-	hint.outline_size = 10
-	hint.rotation_degrees.x = -90
-	hint.position = TV_ZONE_POS + Vector3(0, 0.07, 0.9)
-	add_child(hint)
-
-
-func _build_market() -> void:
-	var market := Node3D.new()
-	market.name = "Market"
-	market.position = MARKET_POS
-	add_child(market)
-
-	var wood := StandardMaterial3D.new()
-	wood.albedo_color = Color("7a4a2a")
-	var red := StandardMaterial3D.new()
-	red.albedo_color = Color("c0392b")
-	var white := StandardMaterial3D.new()
-	white.albedo_color = Color("eeeeee")
-	# Прилавок, стойки и полосатый навес.
-	_add_box(market, Vector3(3.2, 0.9, 0.9), Vector3(0, 0.45, -1.9), wood, true)
-	for x in [-1.5, 1.5]:
-		_add_box(market, Vector3(0.12, 2.6, 0.12), Vector3(x, 1.3, -2.3), wood, true)
-	for i in 6:
-		_add_box(market, Vector3(0.55, 0.08, 1.4), Vector3(-1.38 + i * 0.55, 2.62, -2.0),
-			red if i % 2 == 0 else white, false)
-	# На прилавке выложен товар.
-	for item_info in [["hat_kepka", -0.8], ["hat_ushanka", 0.0], ["hat_fedora", 0.8]]:
-		var item := Cosmetics.load_item(item_info[0]).instantiate() as Node3D
-		item.position = Vector3(item_info[1], -0.45, -1.9)
-		market.add_child(item)
-
-	var sign := Label3D.new()
-	sign.text = "РЫНОК"
-	sign.font_size = 96
-	sign.outline_size = 18
-	sign.modulate = Color("f6c343")
-	sign.position = Vector3(0, 3.1, -2.0)
-	market.add_child(sign)
-
-	# Круг «встань сюда».
-	var zone := MeshInstance3D.new()
-	var zone_mesh := CylinderMesh.new()
-	zone_mesh.top_radius = MARKET_RADIUS
-	zone_mesh.bottom_radius = MARKET_RADIUS
-	zone_mesh.height = 0.02
-	zone_mesh.radial_segments = 24
-	zone.mesh = zone_mesh
-	var zone_mat := StandardMaterial3D.new()
-	zone_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	zone_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	zone_mat.albedo_color = Color(0.96, 0.76, 0.26, 0.3)
-	zone.material_override = zone_mat
-	zone.position.y = 0.04
-	market.add_child(zone)
-
-	var hint := Label3D.new()
-	hint.text = "Встань в круг и нажми\nПробел / Enter / A"
-	hint.font_size = 36
-	hint.outline_size = 10
-	hint.rotation_degrees.x = -90
-	hint.position = Vector3(0, 0.06, 0.6)
-	market.add_child(hint)
-
-
-func _add_box(parent: Node3D, size: Vector3, pos: Vector3, material: Material, solid: bool) -> void:
-	var mesh_instance := MeshInstance3D.new()
-	var mesh := BoxMesh.new()
-	mesh.size = size
-	mesh_instance.mesh = mesh
-	mesh_instance.material_override = material
-	mesh_instance.position = pos
-	if not solid:
-		parent.add_child(mesh_instance)
-		return
-	var body := StaticBody3D.new()
-	body.position = pos
-	mesh_instance.position = Vector3.ZERO
-	body.add_child(mesh_instance)
-	var shape := CollisionShape3D.new()
-	var box_shape := BoxShape3D.new()
-	box_shape.size = size
-	shape.shape = box_shape
-	body.add_child(shape)
-	parent.add_child(body)
 
 
 # ---------------- Окно ботов ----------------
@@ -408,8 +356,7 @@ func _set_characters_input(enabled: bool) -> void:
 
 func _on_player_joined(p: PlayerData) -> void:
 	var character := CHARACTER_SCENE.instantiate()
-	var angle := TAU * p.slot / PlayerManager.MAX_PLAYERS
-	var spawn := Vector3(sin(angle), 0.0, cos(angle)) * SPAWN_RADIUS + Vector3.UP * 0.5
+	var spawn := Apartment.SPAWNS[p.slot % Apartment.SPAWNS.size()]
 	character.setup(p, spawn)
 	_players_root.add_child(character)
 	_characters[p.id] = character
@@ -419,6 +366,7 @@ func _on_player_joined(p: PlayerData) -> void:
 
 
 func _on_player_left(p: PlayerData) -> void:
+	_seated.erase(p.id)
 	_ready_marks.erase(p.id)
 	if not p.is_bot():
 		_cancel_countdown()
@@ -457,7 +405,7 @@ func _build_ui() -> void:
 	var hint := Label.new()
 	hint.text = ("Вход: Пробел (WASD) · Enter (стрелки) · A (геймпад)\n"
 		+ "Прыжок: та же кнопка · Выйти: Q / Backspace / B · Закрыть игру: Esc\n"
-		+ "Переодеться: РЫНОК справа · НАЧАТЬ: все подходят к ТЕЛЕВИЗОРУ и жмут кнопку")
+		+ "Переодеться: ШКАФ в спальне · Сесть: диван · НАЧАТЬ: все к ТЕЛЕВИЗОРУ и жмут кнопку")
 	hint.add_theme_font_size_override("font_size", 22)
 	hint.add_theme_color_override("font_outline_color", Color.BLACK)
 	hint.add_theme_constant_override("outline_size", 8)

@@ -35,5 +35,12 @@ Party-игра на Godot 4.7 (GDScript), стилизованный low-poly, �
 - Цвет: палитра `PlayerManager.COLORS`, у игрока `color_index`; один цвет — один игрок
   (`color_owner`, `set_color`). Любимый цвет хранится в профиле.
 
+## Лобби — советская квартира
+- `Apartment` (scenes/lobby/apartment.gd) строит гостиную и спальню кодом из моделей `assets/models/apartment/`.
+  Точки зон: `TV_ZONE` (старт), `WARDROBE_ZONE` (примерочная), `SEATS` (диван), `SPAWNS`.
+- `Breakable` — ломается от касания игрока и восстанавливается; `Tippable` — RigidBody, падает и
+  возвращается на место. Осколки на слое 2 (не мешают игрокам).
+- Персонаж толкает RigidBody (`_push_bodies`), умеет `sit_at()` / `stand_up()`.
+
 ## Модели
 Генерируются скриптами в `tools/blender/` (модуль `bpy` 4.2, Python 3.11), экспорт в `assets/models/`.
