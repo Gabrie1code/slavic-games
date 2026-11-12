@@ -2,7 +2,8 @@
 
   nightstand_body.glb   — корпус с пустой нишей под ящик (размеры как у старой nightstand.glb);
   nightstand_drawer.glb — ящик: лицевая панель с ручкой + лоток (выдвигается вперёд, по −Y);
-  spray_can.glb         — баллончик: корпус, белая полоса, колпачок, распылитель.
+  spray_can.glb         — баллончик: корпус, белая полоса, колпачок, распылитель;
+  drawer_joke.glb       — шутка на 10%: тёмно-розовый «предмет» и наручники (лежат в ящике).
 
 Запуск:
     python tools/blender/nightstand.py assets/models/apartment
@@ -103,11 +104,39 @@ can = export("spray_can", [
     cyl(0.003, 0.012, (0, -0.012, 0.19), BLACK, verts=6, rot=(math.radians(90), 0, 0)),
 ])
 
+# Шутка: продолговатый тёмно-розовый предмет (скруглённый, на «подставке») и наручники.
+PINK = mat("JokePink", (0.55, 0.08, 0.28), 0.35)
+STEEL = mat("Steel", (0.7, 0.7, 0.72), 0.25, 1.0)
+bpy.ops.mesh.primitive_cylinder_add(vertices=14, radius=0.022, depth=0.13, location=(0, 0, 0.022),
+                                    rotation=(0, math.radians(90), 0))
+joke = [bpy.context.object]
+joke[0].data.materials.append(PINK)
+bpy.ops.mesh.primitive_uv_sphere_add(segments=14, ring_count=8, radius=0.023, location=(0.065, 0, 0.022))
+joke.append(bpy.context.object)
+joke[-1].data.materials.append(PINK)
+joke.append(cyl(0.032, 0.016, (-0.07, 0, 0.022), PINK, verts=14, rot=(0, math.radians(90), 0)))
+for o in joke:
+    for p in o.data.polygons:
+        p.use_smooth = True
+for x in (-0.03, 0.05):                                                     # наручники
+    bpy.ops.mesh.primitive_torus_add(major_radius=0.03, minor_radius=0.005, major_segments=16,
+                                     minor_segments=6, location=(x, 0.07, 0.005))
+    bpy.context.object.data.materials.append(STEEL)
+    joke.append(bpy.context.object)
+for k in range(3):
+    bpy.ops.mesh.primitive_torus_add(major_radius=0.007, minor_radius=0.002, major_segments=8,
+                                     minor_segments=4, location=(0.0 + k * 0.01, 0.07, 0.006),
+                                     rotation=(math.radians(90 * (k % 2)), 0, 0))
+    bpy.context.object.data.materials.append(STEEL)
+    joke.append(bpy.context.object)
+joke_obj = export("drawer_joke", joke)
+
 if not RENDER:
     sys.exit(0)
 scene = bpy.context.scene
 drawer.location.y = -0.25                     # выдвинутый ящик
 can.location = (0.0, -0.27, 0.36)
+joke_obj.location = (0.9, -0.6, 0.0)
 can.rotation_euler = (0, math.radians(90), 0.3)
 bpy.ops.mesh.primitive_plane_add(size=4)
 bpy.context.object.data.materials.append(mat("Floor", (0.4, 0.28, 0.17), 0.8))

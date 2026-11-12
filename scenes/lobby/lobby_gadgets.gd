@@ -145,11 +145,16 @@ func _can_hint(p: PlayerData) -> Array[Dictionary]:
 	var stand := apartment.nightstand
 	if not _near(p, stand.front_point(), NIGHTSTAND_RADIUS):
 		return []
+	var text := "" # ящик «сломан» (открыт) и пуст — кнопки нет
+	var disabled := false
 	if stand.can_take():
-		return [entry(confirm_key(p), "Взять баллончик")]
-	if stand.can_open():
-		return [entry(confirm_key(p), "Открыть ящик")]
-	return [] # ящик «сломан» (открыт) — кнопки нет
+		text = "Взять баллончик"
+	elif stand.shows_joke():
+		text = "Хм… это не баллончик"
+		disabled = true
+	elif stand.can_open():
+		text = "Открыть ящик"
+	return [] if text == "" else [entry(confirm_key(p), text, disabled)]
 
 
 ## Брошенный баллончик рядом, на который игрок смотрит (null — нет).
