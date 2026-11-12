@@ -23,6 +23,7 @@ var _button: Button
 
 
 func _ready() -> void:
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE # кнопку «Вернуться в лобби» жмут мышью
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	var background := ColorRect.new()
 	background.color = Color("2b1d18")

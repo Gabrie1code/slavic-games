@@ -28,6 +28,9 @@ func change_scene(path: String, fade_time: float = 0.3) -> void:
 	var err := get_tree().change_scene_to_file(path)
 	if err != OK:
 		push_error("Не удалось загрузить сцену %s (ошибка %d)" % [path, err])
+	# Курсор снова виден (лобби прячет его для вида от первого лица) — иначе на итогах
+	# и в меню кнопки не нажать мышью. Сцены, которым он мешает, прячут его сами.
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	# Смена сцены происходит в конце кадра — ждём, пока новая сцена появится.
 	await get_tree().process_frame
 	await get_tree().process_frame

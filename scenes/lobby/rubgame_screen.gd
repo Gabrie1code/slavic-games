@@ -8,7 +8,8 @@ extends LobbyRoom
 ##
 ## Управление кнопками своего устройства или мышью:
 ##   вверх/вниз — строка; влево/вправо — листать ставку / число / фишку;
-##   подтвердить — купить фишку, поставить, обменять; отмена — отойти от стола.
+##   удар (F, «/», X) — купить фишку, поставить, обменять; присесть (Ctrl, R3) или ЛКМ по столу —
+##   вид сверху; подтвердить (та же кнопка, что подойти к столу) или отмена — отойти от стола.
 
 const VIEWMODEL_LAYERS := 0b1111 << 10
 const GOLD := Color("f6c343")
@@ -143,13 +144,14 @@ func _handle_input() -> void:
 		return
 	if _confirm.handle_input(input):
 		return
-	# Кнопка удара (F, «/», X) — вид сверху. Клик мышью обрабатывает сам стол (_on_view_input),
+	# Присесть (Ctrl, R3) — вид сверху. Клик мышью обрабатывает сам стол (_on_view_input),
 	# чтобы нажатия по кнопкам магазина не переключали вид.
-	if input.is_just_pressed("attack") and not Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
+	if input.is_just_pressed("crouch"):
 		_toggle_top_view()
-	if input.is_just_pressed("cancel"):
+	# Подошли к столу Пробелом — тем же Пробелом и отходим.
+	if input.is_just_pressed("cancel") or input.is_just_pressed("confirm"):
 		close()
-	elif input.menu_just_pressed("confirm"):
+	elif input.is_just_pressed("attack") and not Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
 		_activate(_row)
 	elif input.menu_just_pressed("move_up"):
 		_move_row(-1)
@@ -513,8 +515,8 @@ func _build_bottom() -> void:
 	_rows[ROW_EXIT] = leave
 	_bets_label = _label("", GOLD, 0.55)
 	column.add_child(_bets_label)
-	_hint = _label("Вверх/вниз — выбор   Влево/вправо — листать   Подтвердить — купить / "
-		+ "поставить   ЛКМ по столу / удар — вид сверху   Отмена — отойти",
+	_hint = _label("Вверх/вниз — выбор   Влево/вправо — листать   Удар (F, /, X) — купить / "
+		+ "поставить   ЛКМ по столу / Ctrl — вид сверху   Пробел / Enter / A — отойти",
 		Color(1, 1, 1, 0.6), 0.4)
 	column.add_child(_hint)
 

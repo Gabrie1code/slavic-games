@@ -6,9 +6,18 @@ extends Node3D
 ##   1 — звёзды летят мимо, покачивается ракета, изредка мигает «ВСТАВЬ ЖЕТОН»;
 ##   2 — змейка ползает за яблоком.
 ## Рисуется во встроенном SubViewport и показывается на прямоугольнике поверх экрана модели.
+## Автомат можно «сломать» кнопкой действия: сыплются искры, экран гаснет и через OFF_TIME сек
+## включается снова (как восстанавливается разбитая посуда).
 
 const W := 96
 const H := 72
+const OFF_TIME := 8.0
+
+var _game: PixelGame
+var _mat: StandardMaterial3D
+var _sparks: CPUParticles3D
+var _off_until := 0.0
+var _time := 0.0
 
 
 ## mode — вид демо-игры (0..2), size — размер экрана в метрах.
@@ -18,9 +27,9 @@ func setup(mode: int, size: Vector2) -> ArcadeScreen:
 	viewport.disable_3d = true
 	viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
 	add_child(viewport)
-	var game := PixelGame.new()
-	game.mode = mode
-	viewport.add_child(game)
+	_game = PixelGame.new()
+	_game.mode = mode
+	viewport.add_child(_game)
 	var quad := MeshInstance3D.new()
 	var mesh := QuadMesh.new()
 	mesh.size = size
@@ -32,7 +41,74 @@ func setup(mode: int, size: Vector2) -> ArcadeScreen:
 	quad.material_override = mat
 	quad.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(quad)
+	_mat = mat
+	_sparks = _make_sparks()
+	add_child(_sparks)
 	return self
+
+
+## Работает (экран горит) — только тогда его можно сломать.
+func is_working() -> bool:
+	return _time >= _off_until
+
+
+## Сломать: искры, экран мигает и гаснет; через OFF_TIME сек сам включается.
+func break_down() -> void:
+	if not is_working():
+		return
+	_off_until = _time + OFF_TIME
+	_sparks.restart()
+	_sparks.emitting = true
+
+
+func _process(delta: float) -> void:
+	_time += delta
+	var since_break := _time - (_off_until - OFF_TIME)
+	if not is_working():
+		# Первые полсекунды экран судорожно мигает, потом темно.
+		var flicker := since_break < 0.5 and randf() < 0.5
+		_mat.albedo_color = Color(1.4, 1.4, 1.4) if flicker else Color(0.02, 0.02, 0.03)
+		_game.process_mode = Node.PROCESS_MODE_DISABLED
+	elif _time - _off_until < 0.4 and _off_until > 0.0:
+		# Включился: короткая белая вспышка, как у кинескопа.
+		var k := (_time - _off_until) / 0.4
+		_mat.albedo_color = Color(2.0, 2.0, 2.0).lerp(Color.WHITE, k)
+		_game.process_mode = Node.PROCESS_MODE_INHERIT
+	else:
+		_mat.albedo_color = Color.WHITE
+
+
+## Искры: короткий сноп жёлто-белых точек из экрана, падают вниз.
+func _make_sparks() -> CPUParticles3D:
+	var sparks := CPUParticles3D.new()
+	sparks.emitting = false
+	sparks.one_shot = true
+	sparks.amount = 40
+	sparks.lifetime = 0.9
+	sparks.explosiveness = 0.85
+	sparks.direction = Vector3(0, 0.6, 1)
+	sparks.spread = 60.0
+	sparks.initial_velocity_min = 1.2
+	sparks.initial_velocity_max = 3.0
+	sparks.gravity = Vector3(0, -9.8, 0)
+	sparks.scale_amount_min = 0.5
+	sparks.scale_amount_max = 1.0
+	var mesh := SphereMesh.new()
+	mesh.radius = 0.012
+	mesh.height = 0.024
+	mesh.radial_segments = 4
+	mesh.rings = 2
+	var spark_mat := StandardMaterial3D.new()
+	spark_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	spark_mat.vertex_color_use_as_albedo = true
+	mesh.material = spark_mat
+	sparks.mesh = mesh
+	var colors := Gradient.new()
+	colors.set_color(0, Color(1.0, 1.0, 0.85))
+	colors.set_color(1, Color(1.0, 0.45, 0.1, 0.0))
+	sparks.color_ramp = colors
+	sparks.position = Vector3(0, 0, 0.03)
+	return sparks
 
 
 ## Сама «игра»: рисует пиксели раз в такт (TICK), без резких вспышек.

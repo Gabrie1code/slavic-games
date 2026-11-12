@@ -78,6 +78,8 @@ var lamp_on := true
 var night_lamp_on := true
 ## Дисковый телефон (гостиная, у двери в игровую) и кот.
 var phone: RotaryPhone
+## Экраны игровых автоматов (кнопкой действия их можно «сломать» на 8 сек).
+var arcade_screens: Array[ArcadeScreen] = []
 var cat: LobbyCat
 
 var _lamp_light: OmniLight3D
@@ -270,7 +272,7 @@ func _build_bedroom() -> void:
 	_place(_model("floor_rug"), Vector3(6.4, 0.005, -0.7)).rotation_degrees.y = 90.0
 	_tippable("dumbbell", Vector3(0.34, 0.12, 0.12), 0.06, Vector3(8.5, 0, 0.6), 3.0, 30.0)
 	_tippable("stool", Vector3(0.36, 0.47, 0.36), 0.24, Vector3(8.4, 0, -0.4), 2.0)
-	_breakable("book_stack", Vector3(8.6, 0.47, -0.4), [Color("992018"), Color("cc9918")], 0.4)
+	_breakable("book_stack", Vector3(8.4, 0.47, -0.4), [Color("992018"), Color("cc9918")], 0.4)
 	_no_shadow(_place(_model("chandelier"), Vector3(6.2, 0, -1.4)))
 
 
@@ -428,6 +430,7 @@ func _build_rubgame() -> void:
 		var screen := ArcadeScreen.new().setup(i, Vector2(0.48, 0.38))
 		screen.position = Vector3(0, 1.3, 0.334) # перед экраном модели
 		cabinet.add_child(screen)
+		arcade_screens.append(screen)
 
 	# Неоновые вывески: в игровой и над дверью со стороны гостиной.
 	# Внутри комнаты вместо надписи — ретро-постеры игровых автоматов 80-х.

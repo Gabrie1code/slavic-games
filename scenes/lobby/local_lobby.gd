@@ -460,7 +460,11 @@ func _on_room_closed(p: PlayerData) -> void:
 	(_rooms[p.id] as Node).queue_free()
 	_rooms.erase(p.id)
 	if _characters.has(p.id):
-		(_characters[p.id] as PlayerCharacter).input_enabled = true
+		# Чуть позже: тем же Пробелом, которым отошли от стола, персонаж не должен подпрыгнуть.
+		var character: PlayerCharacter = _characters[p.id]
+		get_tree().create_timer(0.15).timeout.connect(func() -> void:
+			if is_instance_valid(character) and not _rooms.has(p.id):
+				character.input_enabled = true)
 	_layout_rooms()
 
 

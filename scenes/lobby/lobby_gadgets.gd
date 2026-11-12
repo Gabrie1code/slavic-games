@@ -13,6 +13,7 @@ const CAT_RADIUS := 1.3
 const LOOK_ANGLE := 50.0
 const GRAMOPHONE_RADIUS := 1.4
 const LAMP_RADIUS := 1.2
+const ARCADE_RADIUS := 1.1
 ## Через сколько граммофон можно завести снова (секунды).
 const TUNE_TIME := 3.0
 const NOTE := preload("res://assets/textures/fx/note_pixel.png")
@@ -90,11 +91,7 @@ func try_interact(p: PlayerData) -> bool:
 	if _near_tippable(p, apartment.gramophone, GRAMOPHONE_RADIUS) and _gramophone_ready():
 		_play_gramophone()
 		return true
-	if _near_tippable(p, apartment.floor_lamp, LAMP_RADIUS) and apartment.lamp_lit():
-		apartment.turn_off_lamp()
-		return true
-	if _near_night_lamp(p):
-		apartment.toggle_night_lamp()
+	if _use_switch(p):
 		return true
 	if _near_cat(p) and apartment.cat.pet():
 		# Персонаж тянет руку к коту.
@@ -104,6 +101,20 @@ func try_interact(p: PlayerData) -> bool:
 				character.set_arm_angle(PlayerCharacter.ARM_DOWN, 0.2))
 		return true
 	return false
+
+
+## Торшер, ночник, игровые автоматы — «щёлкнуть выключателем». true — нажатие использовано.
+func _use_switch(p: PlayerData) -> bool:
+	var arcade := _near_arcade(p)
+	if _near_tippable(p, apartment.floor_lamp, LAMP_RADIUS) and apartment.lamp_lit():
+		apartment.turn_off_lamp()
+	elif _near_night_lamp(p):
+		apartment.toggle_night_lamp()
+	elif arcade and arcade.is_working():
+		arcade.break_down()
+	else:
+		return false
+	return true
 
 
 ## Подсказка у телефона и кота (пусто — рядом ничего нет).
@@ -134,7 +145,20 @@ func _furniture_hint(p: PlayerData) -> Array[Dictionary]:
 	if _near_night_lamp(p):
 		var action := "Выключить ночник" if apartment.night_lamp_on else "Включить ночник"
 		return [entry(confirm_key(p), action)]
+	var arcade := _near_arcade(p)
+	if arcade:
+		if arcade.is_working():
+			return [entry(confirm_key(p), "Сломать автомат")]
+		return [entry(confirm_key(p), "Автомат чинится…", true)]
 	return []
+
+
+## Игровой автомат, к экрану которого игрок стоит лицом (null — рядом нет).
+func _near_arcade(p: PlayerData) -> ArcadeScreen:
+	for screen in apartment.arcade_screens:
+		if _near(p, screen.global_position, ARCADE_RADIUS):
+			return screen
+	return null
 
 
 ## Рядом с целым ночником (разбитый ждёт восстановления — кнопки нет).
