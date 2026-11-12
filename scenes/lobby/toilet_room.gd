@@ -62,11 +62,14 @@ func _build_door_wall() -> void:
 		_solid(Vector3(0.12, 2.4, length), Vector3(X0, 1.2, mid), wallpaper)
 		_fp_only(Vector3(0.12, HEIGHT - 2.4, length), Vector3(X0, 2.4 + (HEIGHT - 2.4) / 2.0, mid),
 			wallpaper)
+		_collider(Vector3(0.12, HEIGHT - 2.4, length), Vector3(X0, 2.4 + (HEIGHT - 2.4) / 2.0, mid))
 		_inner_faces(Vector3(0.02, 0, length), Vector3(X0 + 0.07, 0, mid))
 	var door_len := DOOR_TO_Z - DOOR_FROM_Z
 	var door_mid := (DOOR_FROM_Z + DOOR_TO_Z) / 2.0
-	_box(Vector3(0.12, 2.4 - DOOR_TOP, door_len), Vector3(X0, (2.4 + DOOR_TOP) / 2.0, door_mid),
+	# Над дверью — твёрдо до потолка (не пролететь в прыжке сквозь «картинку» стены).
+	_solid(Vector3(0.12, 2.4 - DOOR_TOP, door_len), Vector3(X0, (2.4 + DOOR_TOP) / 2.0, door_mid),
 		wallpaper)
+	_collider(Vector3(0.12, HEIGHT - 2.4, door_len), Vector3(X0, 2.4 + (HEIGHT - 2.4) / 2.0, door_mid))
 	_fp_only(Vector3(0.12, HEIGHT - 2.4, door_len),
 		Vector3(X0, 2.4 + (HEIGHT - 2.4) / 2.0, door_mid), wallpaper)
 	# Табличка над дверью со стороны гостиной.

@@ -169,6 +169,13 @@ func _build_rooms() -> void:
 	_fp_only(_box(Vector3(0.16, WALL_HEIGHT - 2.4, BEDROOM_FRONT_Z - BACK_Z),
 		Vector3(PARTITION_X, 2.4 + (WALL_HEIGHT - 2.4) / 2, (BACK_Z + BEDROOM_FRONT_Z) / 2),
 		wallpaper))
+	# И твёрдый: со шкафа/серванта допрыгивали до верха перегородки и пролетали сквозь неё
+	# (камера оказывалась «внутри стены»). То же — над дверью в игровую.
+	_invisible_wall(Vector3(0.16, WALL_HEIGHT - 2.4 + 0.3, BEDROOM_FRONT_Z - BACK_Z),
+		Vector3(PARTITION_X, 2.4 + (WALL_HEIGHT - 2.4 + 0.3) / 2, (BACK_Z + BEDROOM_FRONT_Z) / 2))
+	_invisible_wall(Vector3(0.2, WALL_HEIGHT - 2.4 + 0.3, RUBGAME_DOOR_TO_Z - RUBGAME_DOOR_FROM_Z),
+		Vector3(LEFT_X - 0.1, 2.4 + (WALL_HEIGHT - 2.4 + 0.3) / 2,
+		(RUBGAME_DOOR_FROM_Z + RUBGAME_DOOR_TO_Z) / 2))
 
 
 # ---------------- Гостиная ----------------
