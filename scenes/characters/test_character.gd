@@ -451,6 +451,11 @@ func _apply_layer(node: Node) -> void:
 		_apply_layer(child)
 
 
+## Часть тела по имени (Torso/Head/ArmL/ArmR/LegL/LegR) — для поз вне игры (пьедестал итогов).
+func part(part_name: String) -> Node3D:
+	return _part(part_name)
+
+
 func _part(part_name: String) -> Node3D:
 	return _parts[part_name] as Node3D
 

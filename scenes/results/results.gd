@@ -1,18 +1,12 @@
 extends Control
-## Итоги партии: пьедестал с кубками (2-е — 1-е — 3-е место), остальные — строкой ниже,
-## рубли уходят в кошелёк. Кнопка «Вернуться в лобби» (мышью) или кнопка подтверждения игрока.
+## Итоги партии: 3D-пьедестал (PodiumStage) — персонажи игроков с кубками радуются
+## каждый по-своему; под ним — дефицит и рубли каждого, рубли уходят в кошелёк.
+## Кнопка «Вернуться в лобби» (мышью) или кнопка подтверждения игрока.
 
-const CUPS: Array[String] = [
-	"res://assets/ui/icons/cup_gold.png",
-	"res://assets/ui/icons/cup_silver.png",
-	"res://assets/ui/icons/cup_bronze.png",
-]
 ## Цвета мест: золото, серебро, бронза, остальные.
 const PLACE_COLORS: Array[Color] = [
 	Color("f6c343"), Color("d9d9d9"), Color("cd8a4b"), Color("9a8f86"),
 ]
-## Высота ступеней пьедестала для 1-го, 2-го и 3-го места.
-const STEP_HEIGHTS: Array[float] = [230.0, 160.0, 110.0]
 ## Порядок колонок на пьедестале: слева 2-е, в центре 1-е, справа 3-е.
 const PODIUM_ORDER: Array[int] = [1, 0, 2]
 ## Первые доли секунды кнопки не слушаем (нажатие из мини-игры не должно сразу закрыть итоги).
@@ -29,7 +23,6 @@ func _ready() -> void:
 	background.color = Color("2b1d18")
 	background.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(background)
-	_add_confetti()
 
 	var column := VBoxContainer.new()
 	column.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -47,13 +40,19 @@ func _ready() -> void:
 	column.add_child(_label("Победитель: %s!" % standings[0].display_name, 64,
 		standings[0].color.lightened(0.3)))
 
+	var stage := PodiumStage.new()
+	stage.custom_minimum_size = Vector2(1500, 520)
+	stage.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	stage.setup(standings)
+	column.add_child(stage)
 	var podium := HBoxContainer.new()
 	podium.alignment = BoxContainer.ALIGNMENT_CENTER
-	podium.add_theme_constant_override("separation", 18)
+	# Колонки подписей стоят под своими ступенями (шаг 168 px = 1.55 м на пьедестале).
+	podium.add_theme_constant_override("separation", 10)
 	column.add_child(podium)
 	for place in PODIUM_ORDER:
 		if place < standings.size():
-			podium.add_child(_podium_column(standings[place], place))
+			podium.add_child(_stats_column(standings[place], place))
 
 	# Четвёртое место и дальше — строкой под пьедесталом.
 	for place in range(3, standings.size()):
@@ -75,47 +74,17 @@ func _process(delta: float) -> void:
 			return
 
 
-## Колонка пьедестала: кубок, имя (цветом игрока), дефицит и рубли, ступень с номером места.
-func _podium_column(p: PlayerData, place: int) -> VBoxContainer:
+## Подпись под ступенью: место и имя (цветом игрока), дефицит и рубли, прибавка в кошелёк.
+func _stats_column(p: PlayerData, place: int) -> VBoxContainer:
 	var s := MatchState.get_stats(p)
 	var box := VBoxContainer.new()
-	box.alignment = BoxContainer.ALIGNMENT_END
-	box.add_theme_constant_override("separation", 4)
-	box.custom_minimum_size.x = 260
-	var cup := TextureRect.new()
-	cup.texture = load(CUPS[place])
-	cup.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	cup.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	var cup_size := 170.0 if place == 0 else 130.0
-	cup.custom_minimum_size = Vector2(cup_size, cup_size)
-	box.add_child(cup)
-	if place == 0: # кубок победителя покачивается
-		cup.pivot_offset = Vector2(cup_size, cup_size) / 2.0
-		var sway := create_tween().set_loops()
-		sway.tween_property(cup, "rotation", 0.08, 0.8).set_trans(Tween.TRANS_SINE)
-		sway.tween_property(cup, "rotation", -0.08, 0.8).set_trans(Tween.TRANS_SINE)
-	box.add_child(_label(p.display_name, 36, p.color.lightened(0.3)))
-	box.add_child(_label("дефицит: %d   %d ₽" % [s.deficit, s.coins], 24, Color("e8dcc8")))
+	box.add_theme_constant_override("separation", 2)
+	box.custom_minimum_size.x = 158
+	box.add_child(_label(p.display_name, 30, p.color.lightened(0.3)))
+	box.add_child(_label("дефицит: %d   %d ₽" % [s.deficit, s.coins], 22, PLACE_COLORS[place]))
 	var note := _wallet_note(p, s.coins)
 	if note != "":
-		box.add_child(_label(note.strip_edges(), 18, Color("8fd694")))
-	var step := PanelContainer.new()
-	var style := StyleBoxFlat.new()
-	style.bg_color = PLACE_COLORS[place].darkened(0.45)
-	style.border_color = PLACE_COLORS[place]
-	style.set_border_width_all(4)
-	style.corner_radius_top_left = 12
-	style.corner_radius_top_right = 12
-	step.add_theme_stylebox_override("panel", style)
-	step.custom_minimum_size = Vector2(260, STEP_HEIGHTS[place])
-	var number := _label(str(place + 1), 96, PLACE_COLORS[place])
-	number.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	step.add_child(number)
-	box.add_child(step)
-	# Колонка «вырастает» снизу.
-	box.modulate.a = 0.0
-	var appear := create_tween().set_parallel(true)
-	appear.tween_property(box, "modulate:a", 1.0, 0.4).set_delay(0.25 * (2 - place))
+		box.add_child(_label(note.strip_edges().replace(" (", "\n("), 18, Color("8fd694")))
 	return box
 
 
@@ -128,6 +97,7 @@ func _wallet_note(p: PlayerData, coins: int) -> String:
 
 
 func _add_button(column: VBoxContainer) -> void:
+	_add_confetti() # поверх пьедестала (кнопку не закрывает: частицы мышь не ловят)
 	var holder := CenterContainer.new()
 	column.add_child(holder)
 	_button = Button.new()

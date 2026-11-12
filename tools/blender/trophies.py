@@ -1,13 +1,15 @@
 """Кубки для экрана итогов: золотой, серебряный, бронзовый (значки с прозрачным фоном).
 
 Запуск:
-    python tools/blender/trophies.py assets/ui/icons
-    -> cup_gold.png, cup_silver.png, cup_bronze.png
+    python tools/blender/trophies.py assets/ui/icons assets/models/props
+    -> cup_gold.png, cup_silver.png, cup_bronze.png (значки)
+       и cup_gold.glb, cup_silver.glb, cup_bronze.glb (3D — персонажи держат их на пьедестале)
 """
 import bpy, math, os, sys
 from mathutils import Vector
 
 OUT = sys.argv[1] if len(sys.argv) > 1 else "."
+GLB_OUT = sys.argv[2] if len(sys.argv) > 2 else None
 os.makedirs(OUT, exist_ok=True)
 bpy.ops.wm.read_factory_settings(use_empty=True)
 bpy.context.scene.cursor.location = (0, 0, 0)
@@ -110,6 +112,12 @@ for name, color, star in CUPS:
     parts = cup(color, star)
     scene.render.filepath = os.path.join(OUT, "cup_%s.png" % name)
     bpy.ops.render.render(write_still=True)
+    if GLB_OUT:
+        bpy.ops.object.select_all(action="DESELECT")
+        for o in parts:
+            o.select_set(True)
+        bpy.ops.export_scene.gltf(filepath=os.path.join(GLB_OUT, "cup_%s.glb" % name),
+                                  use_selection=True, export_format="GLB")
     for o in parts:
         bpy.data.objects.remove(o)
     print("CUP", name)
