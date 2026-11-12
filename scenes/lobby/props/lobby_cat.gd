@@ -11,6 +11,7 @@ extends Node3D
 enum State { WALK, IDLE, PETTED, TO_BED, SLEEP }
 
 const CAT_NAME := "Баггет"
+const HEART := preload("res://assets/textures/fx/heart_pixel.png")
 
 const PET_COOLDOWN := 5.0
 const PET_REACH := 1.3
@@ -248,18 +249,23 @@ func _animate(delta: float) -> void:
 	tail.rotation.z = sin(_time * (8.0 if state == State.PETTED else 2.5)) * wag
 
 
+## Маленькое пиксельное сердечко (как в Minecraft): всплывает, покачиваясь, и тает.
 func _spawn_heart(delay: float) -> void:
-	var heart := Label3D.new()
-	heart.text = "♥"
-	heart.font_size = 96
-	heart.outline_size = 12
-	heart.modulate = Color(1.0, 0.3, 0.45)
+	var heart := Sprite3D.new()
+	heart.texture = HEART
+	heart.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST # пиксели чёткие
+	heart.pixel_size = 0.016 # 9 пикселей ≈ 14 см
 	heart.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	heart.position = Vector3(randf_range(-0.15, 0.15), 0.55, randf_range(-0.15, 0.15))
+	heart.shaded = false
+	heart.position = Vector3(randf_range(-0.15, 0.15), 0.5, randf_range(-0.15, 0.15))
+	heart.modulate.a = 0.0
 	add_child(heart)
 	var tween := create_tween().set_parallel(true)
-	tween.tween_property(heart, "position:y", 1.3, 1.2).set_delay(delay)
-	tween.tween_property(heart, "modulate:a", 0.0, 0.6).set_delay(delay + 0.6)
+	tween.tween_property(heart, "modulate:a", 1.0, 0.1).set_delay(delay)
+	tween.tween_property(heart, "position:y", 1.05, 1.0).set_delay(delay)
+	tween.tween_property(heart, "position:x", heart.position.x + randf_range(-0.12, 0.12), 1.0) \
+		.set_delay(delay).set_trans(Tween.TRANS_SINE)
+	tween.tween_property(heart, "modulate:a", 0.0, 0.3).set_delay(delay + 0.7)
 	tween.chain().tween_callback(heart.queue_free)
 
 

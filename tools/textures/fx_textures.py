@@ -53,6 +53,29 @@ def alert():
     img.save(os.path.join(OUT, "alert.png"))
 
 
+def pixel_heart():
+    """Пиксельное сердечко 9×8 (как в Minecraft): красное, с тёмной обводкой и бликом.
+    В игре фильтр «ближайший» — пиксели остаются чёткими."""
+    rows = [
+        ".##...##.",
+        "#rr#.#rr#",
+        "#rwr#rrr#",
+        "#rrrrrrr#",
+        ".#rrrrr#.",
+        "..#rrr#..",
+        "...#r#...",
+        "....#....",
+    ]
+    colors = {"#": (60, 8, 12, 255), "r": (230, 40, 50, 255), "w": (255, 200, 200, 255)}
+    img = Image.new("RGBA", (9, 8), (0, 0, 0, 0))
+    for y, row in enumerate(rows):
+        for x, ch in enumerate(row):
+            if ch in colors:
+                img.putpixel((x, y), colors[ch])
+    img.save(os.path.join(OUT, "heart_pixel.png"))
+
+
 snowflake()
 alert()
+pixel_heart()
 print("DONE")

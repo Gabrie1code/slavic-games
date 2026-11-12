@@ -159,6 +159,18 @@ func _build_living_room() -> void:
 	# Окно со шторами, на подоконнике горшки, под окном гантели.
 	var window_pos := Vector3(1.65, 0, BACK_Z + 0.08)
 	_place(_model("window"), window_pos)
+	# Вид из окна (хрущёвки, небо, тополя) — картинка поверх пересвеченного «неба» модели.
+	var view := MeshInstance3D.new()
+	var view_mesh := QuadMesh.new()
+	view_mesh.size = Vector2(1.4, 1.5)
+	view.mesh = view_mesh
+	var view_mat := StandardMaterial3D.new()
+	view_mat.albedo_texture = load("res://assets/textures/window_view.png")
+	view_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	view.material_override = view_mat
+	view.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	view.position = window_pos + Vector3(0, 1.65, -0.058)
+	add_child(view)
 	_place(_model("curtains"), window_pos + Vector3(0, 0, 0.12))
 	for i in 3:
 		var pot := "cactus_pot" if i != 1 else "aloe_pot"
