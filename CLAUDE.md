@@ -32,6 +32,8 @@ Party-игра на Godot 4.7 (GDScript), стилизованный low-poly, �
 - Слоты: HAT, FACE, JACKET, PANTS, SHOES, NECK. Цена вещи `price` (0 = бесплатно), каталог и цены — docs/COSMETICS.md.
 - Профиль по `device_key()` в `user://profile.cfg`: наряд, кошелёк (рубли из партий), купленные вещи.
   API: `PlayerManager.wallet / add_to_wallet / owns / buy / save_outfit / load_outfit`.
+- Цвет: палитра `PlayerManager.COLORS`, у игрока `color_index`; один цвет — один игрок
+  (`color_owner`, `set_color`). Любимый цвет хранится в профиле.
 
 ## Модели
 Генерируются скриптами в `tools/blender/` (модуль `bpy` 4.2, Python 3.11), экспорт в `assets/models/`.

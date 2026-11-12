@@ -13,6 +13,8 @@ extends Control
 ## При выходе примеренные, но не купленные вещи снимаются.
 
 signal closed(player: PlayerData)
+## Игрок сменил цвет (лобби обновит слоты игроков).
+signal color_changed(player: PlayerData)
 
 const CHARACTER_SCENE := preload("res://scenes/characters/test_character.tscn")
 const SLOTS: Array[int] = [
@@ -23,6 +25,8 @@ const SLOTS: Array[int] = [
 const CLOSEUP_SLOTS: Array[int] = [Cosmetics.Slot.HAT, Cosmetics.Slot.FACE]
 const CAM_BODY := [Vector3(0, 1.0, 3.3), Vector3(0, 0.85, 0)]
 const CAM_HEAD := [Vector3(0, 1.36, 2.4), Vector3(0, 1.22, 0)]
+## Первая строка списка — цвет персонажа, дальше — слоты одежды.
+const COLOR_ROW := 0
 const GOLD := Color("f6c343")
 const GREEN := Color("8fd694")
 const RED := Color("ff7a6b")
@@ -32,6 +36,8 @@ var player: PlayerData
 var lobby_character: PlayerCharacter
 
 var _row := 0
+## Какой цвет сейчас показан в строке «Цвет» (может быть занятый — тогда не применён).
+var _color_candidate := 0
 var _saved: Dictionary = {}
 var _message := ""
 var _message_color := GREEN
@@ -58,6 +64,7 @@ func setup(p: PlayerData, character: PlayerCharacter) -> void:
 	player = p
 	lobby_character = character
 	_saved = p.outfit.duplicate()
+	_color_candidate = p.color_index
 
 
 func _ready() -> void:
@@ -109,7 +116,10 @@ func _handle_input() -> void:
 	if input.is_just_pressed("cancel"):
 		close()
 	elif input.is_just_pressed("confirm"):
-		if PlayerManager.owns(player, _current_id()):
+		if _row == COLOR_ROW:
+			if _color_candidate == player.color_index:
+				close()
+		elif PlayerManager.owns(player, _current_id()):
 			close()
 		else:
 			_buy_current()
@@ -123,20 +133,45 @@ func _handle_input() -> void:
 		_cycle_item(1)
 
 
+func _row_count() -> int:
+	return SLOTS.size() + 1
+
+
+## Слот одежды строки (для строки «Цвет» — -1).
+func _slot_at(row: int) -> int:
+	return -1 if row == COLOR_ROW else SLOTS[row - 1]
+
+
 func _current_id() -> String:
-	return player.outfit.get(SLOTS[_row], "")
+	return "" if _row == COLOR_ROW else player.outfit.get(_slot_at(_row), "")
 
 
 func _select_row(row: int) -> void:
-	_row = posmod(row, SLOTS.size())
+	_row = posmod(row, _row_count())
+	_color_candidate = player.color_index # ушли со строки — показываем свой цвет
 	_message = ""
-	_cam_target = CAM_HEAD if CLOSEUP_SLOTS.has(SLOTS[_row]) else CAM_BODY
+	_cam_target = CAM_HEAD if CLOSEUP_SLOTS.has(_slot_at(_row)) else CAM_BODY
+	_refresh()
+
+
+## Листать цвета. Свободный цвет применяется сразу, занятый — только показывается.
+func _cycle_color(step: int) -> void:
+	_color_candidate = posmod(_color_candidate + step, PlayerManager.COLORS.size())
+	if PlayerManager.set_color(player, _color_candidate):
+		_mannequin.set_player_color(player.color)
+		if lobby_character:
+			lobby_character.set_player_color(player.color)
+		color_changed.emit(player)
+	_message = ""
 	_refresh()
 
 
 ## Листать вещи в выбранном слоте (по кругу, «Ничего» — тоже вариант). Вещь сразу примеряется.
 func _cycle_item(step: int) -> void:
-	var slot := SLOTS[_row]
+	if _row == COLOR_ROW:
+		_cycle_color(step)
+		return
+	var slot := _slot_at(_row)
 	var options: Array[String] = [""]
 	options.append_array(Cosmetics.items_for_slot(slot as Cosmetics.Slot))
 	var next_id := options[posmod(options.find(_current_id()) + step, options.size())]
@@ -153,7 +188,7 @@ func _cycle_item(step: int) -> void:
 
 func _buy_current() -> void:
 	var id := _current_id()
-	if PlayerManager.owns(player, id):
+	if _row == COLOR_ROW or PlayerManager.owns(player, id):
 		return
 	if PlayerManager.buy(player, id):
 		_message = "Куплено: %s!" % Cosmetics.item_name(id)
@@ -181,13 +216,21 @@ func _on_row_clicked(event: InputEvent, row: int) -> void:
 func _refresh() -> void:
 	var wallet := PlayerManager.wallet(player)
 	_wallet_label.text = "%d ₽" % wallet
-	for i in SLOTS.size():
-		var slot := SLOTS[i]
-		var id: String = player.outfit.get(slot, "")
-		var owned := PlayerManager.owns(player, id)
-		_row_names[i].text = Cosmetics.SLOT_NAMES[slot]
-		_row_items[i].text = Cosmetics.item_name(id)
-		_row_prices[i].text = "" if owned else "%d ₽" % Cosmetics.price(id)
+	var color_owner := PlayerManager.color_owner(_color_candidate, player)
+	for i in _row_count():
+		if i == COLOR_ROW:
+			_row_names[i].text = "Цвет"
+			_row_items[i].text = "■  " + PlayerManager.COLOR_NAMES[_color_candidate]
+			_row_items[i].add_theme_color_override("font_color",
+				PlayerManager.COLORS[_color_candidate].lightened(0.15))
+			_row_prices[i].text = "Занято" if color_owner else ""
+		else:
+			var slot := _slot_at(i)
+			var id: String = player.outfit.get(slot, "")
+			var owned := PlayerManager.owns(player, id)
+			_row_names[i].text = Cosmetics.SLOT_NAMES[slot]
+			_row_items[i].text = Cosmetics.item_name(id)
+			_row_prices[i].text = "" if owned else "%d ₽" % Cosmetics.price(id)
 		var style := StyleBoxFlat.new()
 		style.set_corner_radius_all(10)
 		style.set_content_margin_all(8)
@@ -202,7 +245,19 @@ func _refresh() -> void:
 	# Большая кнопка под списком: что будет с выбранной вещью.
 	var id := _current_id()
 	var item_title := Cosmetics.item_name(id)
-	if PlayerManager.owns(player, id):
+	if _row == COLOR_ROW:
+		if color_owner == null:
+			_buy_button.text = "Цвет выбран ✓"
+			_buy_button.disabled = true
+			_set_button_colors(_buy_button, Color("2f5a33"), GREEN)
+			_shortage_label.text = ""
+		else:
+			# Занятый цвет — как вещь, на которую не хватает денег: выбрать нельзя.
+			_buy_button.text = "Цвет занят"
+			_buy_button.disabled = true
+			_set_button_colors(_buy_button, Color("4a4a4a"), Color(1, 1, 1, 0.5))
+			_shortage_label.text = "Этот цвет у: %s" % color_owner.display_name
+	elif PlayerManager.owns(player, id):
 		_buy_button.text = "Надето ✓" if id != "" else "Ничего не надето"
 		_buy_button.disabled = true
 		_set_button_colors(_buy_button, Color("2f5a33"), GREEN)
@@ -290,7 +345,7 @@ func _build() -> void:
 
 	_title_label = _label("РЫНОК · %s" % player.display_name, GOLD)
 	column.add_child(_title_label)
-	for i in SLOTS.size():
+	for i in _row_count():
 		var panel := PanelContainer.new()
 		panel.mouse_filter = Control.MOUSE_FILTER_STOP
 		panel.gui_input.connect(_on_row_clicked.bind(i))
@@ -424,7 +479,7 @@ func _apply_font_sizes() -> void:
 	_wallet_label.add_theme_font_size_override("font_size", int(base * 1.4))
 	(_wallet_label.get_parent().get_node("WalletCaption") as Label) \
 		.add_theme_font_size_override("font_size", int(base * 0.6))
-	for i in SLOTS.size():
+	for i in _row_names.size():
 		_row_names[i].add_theme_font_size_override("font_size", int(base * 0.75))
 		_row_names[i].custom_minimum_size.x = 150 * k
 		_row_items[i].add_theme_font_size_override("font_size", base)

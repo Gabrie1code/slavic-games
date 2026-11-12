@@ -199,6 +199,7 @@ func _open_wardrobe(p: PlayerData) -> void:
 	var room := DressingRoom.new()
 	room.setup(p, character)
 	room.closed.connect(_on_room_closed)
+	room.color_changed.connect(func(_p: PlayerData) -> void: _refresh_slots())
 	_rooms_root.add_child(room)
 	_rooms[p.id] = room
 	_layout_rooms()

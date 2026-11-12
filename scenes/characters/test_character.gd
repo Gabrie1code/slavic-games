@@ -185,6 +185,12 @@ func set_body_color(color: Color) -> void:
 	_primary_material.albedo_color = color
 
 
+## Перекрасить персонажа в новый цвет игрока (тело, «фирменная» одежда, имя).
+func set_player_color(color: Color) -> void:
+	_primary_material.albedo_color = color
+	_name_label.modulate = color.lightened(0.3)
+
+
 ## Надеть наряд: словарь {Cosmetics.Slot: id вещи}. Пустые слоты — ничего.
 func apply_outfit(outfit: Dictionary) -> void:
 	for slot: int in Cosmetics.SLOT_NAMES:

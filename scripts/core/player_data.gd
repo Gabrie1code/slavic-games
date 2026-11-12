@@ -20,6 +20,8 @@ var id: int = 0
 var slot: int = 0
 var display_name: String = ""
 var color: Color = Color.WHITE
+## Номер цвета в палитре PlayerManager.COLORS (-1 — не из палитры, например продавщица).
+var color_index: int = -1
 
 var device_kind: DeviceKind = DeviceKind.KEYBOARD_WASD
 ## Номер геймпада в Godot, если device_kind == JOYPAD.

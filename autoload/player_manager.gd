@@ -12,16 +12,14 @@ const MAX_PLAYERS := 4
 ## Профиль привязан к устройству: левая/правая клавиатура, конкретный геймпад.
 const PROFILE_PATH := "user://profile.cfg"
 
-## Цвета игроков по слотам.
-const SLOT_COLORS: Array[Color] = [
-	Color("d93a2b"), # красный
-	Color("2f6fd6"), # синий
-	Color("f2c230"), # жёлтый
-	Color("3aa655"), # зелёный
-	Color("f08a24"), # оранжевый
-	Color("8e44ad"), # фиолетовый
-	Color("1fb5b5"), # бирюзовый
-	Color("e86aa8"), # розовый
+## Палитра цветов персонажа. Один цвет — у одного игрока.
+const COLORS: Array[Color] = [
+	Color("d93a2b"), Color("2f6fd6"), Color("f2c230"), Color("3aa655"), Color("f08a24"),
+	Color("8e44ad"), Color("1fb5b5"), Color("e86aa8"), Color("e8e4da"), Color("8b5a2b"),
+]
+const COLOR_NAMES: Array[String] = [
+	"Красный", "Синий", "Жёлтый", "Зелёный", "Оранжевый",
+	"Фиолетовый", "Бирюзовый", "Розовый", "Белый", "Коричневый",
 ]
 
 ## Имена ботов.
@@ -49,9 +47,11 @@ func add_local_player(kind: PlayerData.DeviceKind, joypad_id: int = -1) -> Playe
 	_next_id += 1
 	p.slot = _free_slot()
 	p.display_name = "Игрок %d" % (p.slot + 1)
-	p.color = SLOT_COLORS[p.slot]
 	p.device_kind = kind
 	p.joypad_id = joypad_id if kind == PlayerData.DeviceKind.JOYPAD else -1
+	# Любимый цвет из профиля, если он свободен; иначе — первый свободный.
+	var preferred: int = _profile_get(p.device_key(), "color", p.slot)
+	_apply_color(p, preferred if color_owner(preferred) == null else first_free_color())
 
 	InputSetup.register_player(p)
 	p.input = PlayerInput.new(p.slot)
@@ -70,7 +70,7 @@ func add_bot() -> PlayerData:
 	p.id = _next_id
 	_next_id += 1
 	p.slot = _free_slot()
-	p.color = SLOT_COLORS[p.slot]
+	_apply_color(p, p.slot if color_owner(p.slot) == null else first_free_color())
 	p.device_kind = PlayerData.DeviceKind.BOT
 	p.input = BotInput.new()
 	p.outfit = Cosmetics.random_outfit()
@@ -151,6 +151,38 @@ func _profile_set(p: PlayerData, section: String, value: Variant) -> void:
 	config.load(PROFILE_PATH) # если файла нет — начнём с пустого
 	config.set_value(section, p.device_key(), value)
 	config.save(PROFILE_PATH)
+
+
+# ---------------- Цвета ----------------
+
+## Кто из игроков носит этот цвет (null — свободен).
+func color_owner(index: int, except: PlayerData = null) -> PlayerData:
+	for p in players:
+		if p != except and p.color_index == index:
+			return p
+	return null
+
+
+func first_free_color() -> int:
+	for i in COLORS.size():
+		if color_owner(i) == null:
+			return i
+	return 0
+
+
+## Сменить цвет игрока. Возвращает false, если цвет занят другим.
+func set_color(p: PlayerData, index: int) -> bool:
+	if color_owner(index, p) != null:
+		return false
+	_apply_color(p, index)
+	if not p.is_bot():
+		_profile_set(p, "color", index)
+	return true
+
+
+func _apply_color(p: PlayerData, index: int) -> void:
+	p.color_index = clampi(index, 0, COLORS.size() - 1)
+	p.color = COLORS[p.color_index]
 
 
 func free_slots() -> int:
