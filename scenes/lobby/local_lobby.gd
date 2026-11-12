@@ -13,8 +13,8 @@ const ROUNDS := 5
 const MARKET_POS := Vector3(7.0, 0.0, -1.6)
 const MARKET_RADIUS := 2.0
 const WARDROBE_SLOTS: Array[int] = [
-	Cosmetics.Slot.HAT, Cosmetics.Slot.JACKET, Cosmetics.Slot.PANTS,
-	Cosmetics.Slot.SHOES, Cosmetics.Slot.ACCESSORY,
+	Cosmetics.Slot.HAT, Cosmetics.Slot.FACE, Cosmetics.Slot.JACKET,
+	Cosmetics.Slot.PANTS, Cosmetics.Slot.SHOES, Cosmetics.Slot.NECK,
 ]
 
 var _characters: Dictionary = {} # PlayerData.id -> персонаж
@@ -64,6 +64,9 @@ func _unhandled_input(event: InputEvent) -> void:
 			return
 		if key.physical_keycode == KEY_TAB:
 			_start_match()
+			return
+		if key.physical_keycode == KEY_F9:
+			_test_add_money()
 			return
 		if _bot_dialog.visible:
 			return
@@ -115,6 +118,14 @@ func _process(_delta: float) -> void:
 
 # ---------------- Рынок и гардероб ----------------
 
+## ДЛЯ ТЕСТОВ (убрать перед релизом): F9 — всем живым игрокам +500 ₽.
+func _test_add_money() -> void:
+	for p in PlayerManager.players:
+		PlayerManager.add_to_wallet(p, 500)
+		if _wardrobes.has(p.id):
+			_update_wardrobe(p)
+
+
 func _is_at_market(p: PlayerData) -> bool:
 	if not _characters.has(p.id):
 		return false
@@ -136,22 +147,39 @@ func _open_wardrobe(p: PlayerData) -> void:
 	style.set_corner_radius_all(12)
 	style.set_content_margin_all(14)
 	panel.add_theme_stylebox_override("panel", style)
-	panel.custom_minimum_size = Vector2(430, 0)
-	# Окна разных игроков — друг под другом у правого края.
-	panel.position = Vector2(get_viewport().get_visible_rect().size.x - 460, 150 + p.slot * 215)
+	panel.custom_minimum_size = Vector2(440, 0)
+	# Окна игроков — сеткой 2×2 у правого края.
+	var screen_width := get_viewport().get_visible_rect().size.x
+	panel.position = Vector2(screen_width - 470 - (p.slot % 2) * 455, 130 + (p.slot / 2) * 390)
 	var label := Label.new()
 	label.add_theme_font_size_override("font_size", 20)
 	panel.add_child(label)
 	_ui.add_child(panel)
-	_wardrobes[p.id] = {"panel": panel, "label": label, "row": 0}
+	# saved — наряд до примерки: при выходе некупленные вещи вернутся к нему.
+	_wardrobes[p.id] = {
+		"panel": panel, "label": label, "row": 0, "message": "", "saved": p.outfit.duplicate(),
+	}
 	_update_wardrobe(p)
 
 
 func _close_wardrobe(p: PlayerData) -> void:
 	if not _wardrobes.has(p.id):
 		return
-	(_wardrobes[p.id]["panel"] as Node).queue_free()
+	var state: Dictionary = _wardrobes[p.id]
+	(state["panel"] as Node).queue_free()
 	_wardrobes.erase(p.id)
+	# Примеренные, но не купленные вещи снимаем — возвращаем то, что было.
+	var saved: Dictionary = state["saved"]
+	for slot: int in WARDROBE_SLOTS:
+		var id: String = p.outfit.get(slot, "")
+		if not PlayerManager.owns(p, id):
+			var back: String = saved.get(slot, "")
+			if back == "":
+				p.outfit.erase(slot)
+			else:
+				p.outfit[slot] = back
+			if _characters.has(p.id):
+				(_characters[p.id] as PlayerCharacter).wear(slot, back)
 	PlayerManager.save_outfit(p)
 	if _characters.has(p.id):
 		(_characters[p.id] as PlayerCharacter).input_enabled = true
@@ -162,22 +190,33 @@ func _close_all_wardrobes() -> void:
 		_close_wardrobe(p)
 
 
-## Вверх/вниз — выбор вещи (шапка, куртка...), влево/вправо — листать, подтвердить/отмена — готово.
+## Вверх/вниз — слот, влево/вправо — листать (примерка).
+## Подтвердить: на закрытой вещи — купить, иначе — готово. Отмена — выйти.
 func _process_wardrobe(p: PlayerData) -> void:
 	var state: Dictionary = _wardrobes[p.id]
-	if p.input.is_just_pressed("confirm") or p.input.is_just_pressed("cancel"):
+	var row: int = state["row"]
+	var slot := WARDROBE_SLOTS[row]
+	var current: String = p.outfit.get(slot, "")
+	if p.input.is_just_pressed("cancel"):
 		_close_wardrobe(p)
 		return
-	var row: int = state["row"]
-	if p.input.is_just_pressed("move_up"):
+	if p.input.is_just_pressed("confirm"):
+		if PlayerManager.owns(p, current):
+			_close_wardrobe(p)
+			return
+		if PlayerManager.buy(p, current):
+			state["message"] = "Куплено: %s!" % Cosmetics.item_name(current)
+		else:
+			state["message"] = "Не хватает рублей: нужно %d ₽" % Cosmetics.price(current)
+	elif p.input.is_just_pressed("move_up"):
 		state["row"] = posmod(row - 1, WARDROBE_SLOTS.size())
+		state["message"] = ""
 	elif p.input.is_just_pressed("move_down"):
 		state["row"] = posmod(row + 1, WARDROBE_SLOTS.size())
+		state["message"] = ""
 	elif p.input.is_just_pressed("move_left") or p.input.is_just_pressed("move_right"):
-		var slot := WARDROBE_SLOTS[row]
 		var options: Array[String] = [""]
 		options.append_array(Cosmetics.items_for_slot(slot as Cosmetics.Slot))
-		var current: String = p.outfit.get(slot, "")
 		var step := -1 if p.input.is_just_pressed("move_left") else 1
 		var next_id := options[posmod(options.find(current) + step, options.size())]
 		if next_id == "":
@@ -185,6 +224,7 @@ func _process_wardrobe(p: PlayerData) -> void:
 		else:
 			p.outfit[slot] = next_id
 		(_characters[p.id] as PlayerCharacter).wear(slot, next_id)
+		state["message"] = ""
 	else:
 		return
 	_update_wardrobe(p)
@@ -192,14 +232,26 @@ func _process_wardrobe(p: PlayerData) -> void:
 
 func _update_wardrobe(p: PlayerData) -> void:
 	var state: Dictionary = _wardrobes[p.id]
-	var lines: PackedStringArray = ["%s — рынок" % p.display_name, ""]
+	var lines: PackedStringArray = [
+		"%s — рынок         Кошелёк: %d ₽" % [p.display_name, PlayerManager.wallet(p)], "",
+	]
 	for i in WARDROBE_SLOTS.size():
 		var slot := WARDROBE_SLOTS[i]
-		var item := Cosmetics.item_name(p.outfit.get(slot, ""))
+		var id: String = p.outfit.get(slot, "")
+		var label := Cosmetics.item_name(id)
+		if not PlayerManager.owns(p, id):
+			label += "  [%d ₽]" % Cosmetics.price(id)
 		var marker := "▶ " if i == state["row"] else "   "
-		lines.append("%s%s:  ◀ %s ▶" % [marker, Cosmetics.SLOT_NAMES[slot], item])
+		lines.append("%s%s:  ◀ %s ▶" % [marker, Cosmetics.SLOT_NAMES[slot], label])
 	lines.append("")
-	lines.append("вверх/вниз — вещь, влево/вправо — листать, подтвердить — готово")
+	var row_id: String = p.outfit.get(WARDROBE_SLOTS[state["row"]], "")
+	if not PlayerManager.owns(p, row_id):
+		lines.append("Примерка. Подтвердить — купить за %d ₽" % Cosmetics.price(row_id))
+	else:
+		lines.append("вверх/вниз — слот, влево/вправо — листать")
+		lines.append("подтвердить — готово")
+	if state["message"] != "":
+		lines.append(state["message"])
 	(state["label"] as Label).text = "\n".join(lines)
 
 
@@ -223,7 +275,7 @@ func _build_market() -> void:
 		_add_box(market, Vector3(0.55, 0.08, 1.4), Vector3(-1.38 + i * 0.55, 2.62, -2.0),
 			red if i % 2 == 0 else white, false)
 	# На прилавке выложен товар.
-	for item_info in [["hat_kepka", -0.8], ["hat_ushanka", 0.0], ["acc_glasses_drops", 0.8]]:
+	for item_info in [["hat_kepka", -0.8], ["hat_ushanka", 0.0], ["face_glasses_drops", 0.8]]:
 		var item := Cosmetics.load_item(item_info[0]).instantiate() as Node3D
 		item.position = Vector3(item_info[1], -0.45, -1.9)
 		market.add_child(item)
@@ -378,7 +430,7 @@ func _build_ui() -> void:
 	var hint := Label.new()
 	hint.text = ("Вход: Пробел (WASD) · Enter (стрелки) · A (геймпад)\n"
 		+ "Прыжок: та же кнопка · Выйти: Q / Backspace / B · Закрыть игру: Esc\n"
-		+ "Переодеться: зайди на РЫНОК справа · НАЧАТЬ ПАРТИЮ: Tab или Start на геймпаде")
+		+ "Переодеться и купить одежду: РЫНОК справа · НАЧАТЬ ПАРТИЮ: Tab или Start на геймпаде")
 	hint.add_theme_font_size_override("font_size", 22)
 	hint.add_theme_color_override("font_outline_color", Color.BLACK)
 	hint.add_theme_constant_override("outline_size", 8)

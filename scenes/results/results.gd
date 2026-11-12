@@ -34,6 +34,10 @@ func _ready() -> void:
 		var s := MatchState.get_stats(p)
 		var color := PLACE_COLORS[mini(i, PLACE_COLORS.size() - 1)]
 		var line := "%d.  %s  —  дефицит: %d,  %d ₽" % [i + 1, p.display_name, s.deficit, s.coins]
+		# Рубли из партии уходят в кошелёк игрока — на них покупают одежду на рынке.
+		if not p.is_bot():
+			PlayerManager.add_to_wallet(p, s.coins)
+			line += "   → в кошелёк (всего %d ₽)" % PlayerManager.wallet(p)
 		column.add_child(_label(line, 34, color))
 
 	var hint := "Нажми свою кнопку подтверждения, чтобы вернуться в лобби"

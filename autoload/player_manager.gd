@@ -8,8 +8,9 @@ signal player_left(player: PlayerData)
 
 ## Партия и мини-игры рассчитаны на 1–4 игроков (пустые места позже займут боты).
 const MAX_PLAYERS := 4
-## Файл с нарядами игроков (в папке сохранений пользователя).
-const OUTFITS_PATH := "user://outfits.cfg"
+## Профили игроков (в папке сохранений пользователя): наряд, кошелёк, купленные вещи.
+## Профиль привязан к устройству: левая/правая клавиатура, конкретный геймпад.
+const PROFILE_PATH := "user://profile.cfg"
 
 ## Цвета игроков по слотам.
 const SLOT_COLORS: Array[Color] = [
@@ -85,26 +86,71 @@ func add_bot() -> PlayerData:
 	return p
 
 
-## Сохранить наряд игрока (привязан к его устройству).
+# ---------------- Профиль: наряд, кошелёк, покупки ----------------
+
+## Сохранить наряд игрока.
 func save_outfit(p: PlayerData) -> void:
+	_profile_set(p, "outfits", p.outfit)
+
+
+## Загрузить наряд по ключу устройства. Ненайденные и некупленные вещи пропускаем.
+func load_outfit(key: String) -> Dictionary:
+	var outfit: Dictionary = _profile_get(key, "outfits", {})
+	var owned: Array = _profile_get(key, "owned", [])
+	for slot: int in outfit.keys():
+		var id: String = outfit[slot]
+		if not Cosmetics.ITEMS.has(id) or not (Cosmetics.is_free(id) or owned.has(id)):
+			outfit.erase(slot)
+	return outfit
+
+
+## Рубли в кошельке игрока (копятся между партиями).
+func wallet(p: PlayerData) -> int:
+	return _profile_get(p.device_key(), "wallet", 0)
+
+
+func add_to_wallet(p: PlayerData, amount: int) -> void:
+	if p.is_bot() or p.device_key() == "":
+		return
+	_profile_set(p, "wallet", maxi(0, wallet(p) + amount))
+
+
+## Есть ли у игрока вещь (бесплатные есть у всех, боты носят что угодно).
+func owns(p: PlayerData, id: String) -> bool:
+	if p.is_bot() or Cosmetics.is_free(id):
+		return true
+	var owned: Array = _profile_get(p.device_key(), "owned", [])
+	return owned.has(id)
+
+
+## Купить вещь. Возвращает true, если получилось.
+func buy(p: PlayerData, id: String) -> bool:
+	if owns(p, id):
+		return true
+	var cost := Cosmetics.price(id)
+	if wallet(p) < cost or p.device_key() == "":
+		return false
+	var owned: Array = _profile_get(p.device_key(), "owned", [])
+	owned.append(id)
+	_profile_set(p, "owned", owned)
+	_profile_set(p, "wallet", wallet(p) - cost)
+	return true
+
+
+func _profile_get(key: String, section: String, default: Variant) -> Variant:
+	var config := ConfigFile.new()
+	if key == "" or config.load(PROFILE_PATH) != OK:
+		return default
+	return config.get_value(section, key, default)
+
+
+func _profile_set(p: PlayerData, section: String, value: Variant) -> void:
 	if p.device_key() == "":
 		return
 	var config := ConfigFile.new()
-	config.load(OUTFITS_PATH) # если файла нет — начнём с пустого
-	config.set_value("outfits", p.device_key(), p.outfit)
-	config.save(OUTFITS_PATH)
-
-
-func load_outfit(key: String) -> Dictionary:
-	var config := ConfigFile.new()
-	if key == "" or config.load(OUTFITS_PATH) != OK:
-		return {}
-	var outfit: Dictionary = config.get_value("outfits", key, {})
-	# Вещи, которых больше нет в каталоге, пропускаем.
-	for slot: int in outfit.keys():
-		if not Cosmetics.ITEMS.has(outfit[slot]):
-			outfit.erase(slot)
-	return outfit
+	config.load(PROFILE_PATH) # если файла нет — начнём с пустого
+	config.set_value(section, p.device_key(), value)
+	config.save(PROFILE_PATH)
 
 
 func free_slots() -> int:
