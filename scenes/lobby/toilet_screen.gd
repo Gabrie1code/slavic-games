@@ -1,21 +1,22 @@
 class_name ToiletScreen
 extends LobbyRoom
-## «Сходить в туалет»: вид сбоку на унитаз (своя камера в общем мире лобби — другие игроки
-## видят, что происходит). Жёлтой струёй целятся мышкой: куда показывает курсор — туда и
-## долетает. Без мыши — влево/вправо (или вверх/вниз). Через USE_TIME сек всё заканчивается
-## само; «подтвердить» или «отмена» — закончить раньше. После — перезарядка у унитаза.
+## «Сходить в туалет»: вид от глаз персонажа на унитаз, приближенный (своя камера в общем мире
+## лобби — другие игроки видят, что происходит). Жёлтая струя летит туда, куда показывает курсор
+## мыши (в чашу — вода желтеет, мимо — лужа). Без мыши прицел двигают кнопками движения.
+## Через USE_TIME сек всё заканчивается само; «подтвердить» или «отмена» — закончить раньше.
 
 const VIEWMODEL_LAYERS := 0b1111 << 10
 const USE_TIME := 6.0
-const MIN_DISTANCE := 0.15
-const MAX_DISTANCE := 1.3
+## Дальше этого (по полу от персонажа) струя не долетает.
+const MAX_DISTANCE := 1.4
 const KEY_AIM_SPEED := 0.6
 
 var toilet: Toilet
 var lobby_character: PlayerCharacter
 
 var _time := 0.0
-var _distance := 0.55
+## Куда целимся (точка на полу/в чаше; важны x и z).
+var _aim := Vector3.ZERO
 var _camera: Camera3D
 var _view: SubViewportContainer
 var _bar: ProgressBar
@@ -36,7 +37,8 @@ func _ready() -> void:
 		lobby_character.rotation.y = toilet.stand_yaw()
 		lobby_character.velocity = Vector3.ZERO
 		lobby_character.set_arm_pose(0.15, 0.55, 0.2)
-	_camera.global_transform = toilet.side_camera_transform()
+	_aim = toilet.bowl_position()
+	_update_camera()
 
 
 func _process(delta: float) -> void:
@@ -44,11 +46,12 @@ func _process(delta: float) -> void:
 	_bar.value = 1.0 - _time / USE_TIME
 	var input := player.input
 	if input:
-		var move := input.get_move() # вправо или вверх — дальше (камера сбоку: «вперёд» — вправо)
-		var step := move.x - move.y
-		_distance = clampf(_distance + step * KEY_AIM_SPEED * delta, MIN_DISTANCE, MAX_DISTANCE)
+		# Кнопками: вправо/влево — по X, вверх/вниз — дальше/ближе (камера смотрит на унитаз).
+		var move := input.get_move()
+		_set_aim(_aim + Vector3(move.x, 0, move.y) * KEY_AIM_SPEED * delta)
 	if lobby_character:
-		toilet.pour(_stream_origin(), _forward(), _distance, delta)
+		_update_camera()
+		toilet.pour(_stream_origin(), _aim, delta)
 	var stop := input and _time > 0.3 \
 		and (input.is_just_pressed("confirm") or input.is_just_pressed("cancel"))
 	if _time >= USE_TIME or stop:
@@ -80,23 +83,44 @@ func _forward() -> Vector3:
 	return forward.normalized()
 
 
-## Курсор над видом: струя долетает до точки под курсором (по горизонтали вперёд).
+## Камера — глаза персонажа, чуть впереди, смотрит в чашу (как от первого лица, но ближе).
+func _update_camera() -> void:
+	if lobby_character == null:
+		return
+	var eye := lobby_character.global_position + Vector3.UP * 1.45 + _forward() * 0.12
+	_camera.look_at_from_position(eye, toilet.bowl_position() + Vector3(0, 0.05, 0.05))
+
+
+## Курсор над видом: струя летит в точку под курсором — в чашу (на уровне воды), иначе на пол.
 func _on_view_input(event: InputEvent) -> void:
 	var motion := event as InputEventMouseMotion
 	if motion == null or lobby_character == null:
 		return
 	var origin := _camera.project_ray_origin(motion.position)
 	var direction := _camera.project_ray_normal(motion.position)
-	# Плоскость, в которой стоит персонаж и унитаз (камера смотрит на неё сбоку).
-	var normal := _camera.global_basis.z
-	normal.y = 0.0
-	var plane := Plane(normal.normalized(), lobby_character.global_position)
-	var hit: Variant = plane.intersects_ray(origin, direction)
-	if hit == null:
+	var water: Variant = Plane(Vector3.UP, toilet.water_height()).intersects_ray(origin, direction)
+	if water != null:
+		var point: Vector3 = water
+		var bowl := toilet.bowl_position()
+		if Vector2(point.x - bowl.x, point.z - bowl.z).length() < Toilet.RIM_RADIUS:
+			_set_aim(point)
+			return
+	var ground: Variant = Plane(Vector3.UP, toilet.floor_height()).intersects_ray(origin, direction)
+	if ground != null:
+		_set_aim(ground)
+
+
+## Прицел не дальше MAX_DISTANCE от персонажа и не позади него.
+func _set_aim(point: Vector3) -> void:
+	if lobby_character == null:
 		return
-	var point: Vector3 = hit
-	var along := (point - _stream_origin()).dot(_forward())
-	_distance = clampf(along, MIN_DISTANCE, MAX_DISTANCE)
+	var from := lobby_character.global_position
+	var flat := Vector3(point.x - from.x, 0, point.z - from.z)
+	if flat.dot(_forward()) < 0.1:
+		flat += _forward() * (0.1 - flat.dot(_forward()))
+	if flat.length() > MAX_DISTANCE:
+		flat = flat.normalized() * MAX_DISTANCE
+	_aim = from + flat
 
 
 func _build() -> void:
@@ -110,10 +134,10 @@ func _build() -> void:
 	viewport.msaa_3d = Viewport.MSAA_2X
 	_view.add_child(viewport)
 	_camera = Camera3D.new()
-	_camera.fov = 55.0
-	# Без кулаков, значков над головами и правой стены туалета (смотрим сквозь неё).
+	_camera.fov = 42.0 # приближенно
+	# Без своей модели (смотрим из её глаз), кулаков и значков над головами.
 	_camera.cull_mask = 0xFFFFF & ~VIEWMODEL_LAYERS & ~ZoneBadge.OVERHEAD_LAYER \
-		& ~ToiletRoom.WALL_LAYER & ~ToiletRoom.WALL_HIGH_LAYER
+		& ~(1 << (player.slot + 1))
 	viewport.add_child(_camera)
 	_camera.current = true
 
@@ -124,7 +148,7 @@ func _build() -> void:
 	top.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(top)
 	var title := Label.new()
-	title.text = "Целься мышкой (или ← →)"
+	title.text = "Целься мышкой (или кнопками движения)"
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title.add_theme_font_size_override("font_size", 30)
 	title.add_theme_color_override("font_outline_color", Color.BLACK)

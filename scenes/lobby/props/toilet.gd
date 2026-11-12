@@ -3,8 +3,9 @@ extends StaticBody3D
 ## Унитаз в туалете квартиры.
 ##
 ## «Подтвердить» рядом — поднять крышку (сама закрывается через LID_CLOSE_AFTER сек).
-## В открытый унитаз «подтвердить» — вид сбоку (ToiletScreen) и жёлтая струя, которой целятся
-## мышкой; вода в чаше от попадания желтеет, промах — лужица на полу (высыхает).
+## В открытый унитаз «подтвердить» — вид от глаз на унитаз (ToiletScreen) и жёлтая струя: она
+## летит туда, куда показывает курсор мыши; вода в чаше от попадания желтеет,
+## промах — лужица на полу (высыхает).
 ## После этого действие недоступно COOLDOWN сек, зато работает кнопка смыва на бачке:
 ## вода крутится воронкой, уходит и возвращается снова голубой.
 ## Модель — tools/blender/toilet.py (части ToiletBody, Lid, Water, FlushButton).
@@ -144,17 +145,9 @@ func bowl_position() -> Vector3:
 	return to_global(BOWL)
 
 
-## Камера сбоку: справа от унитаза, видно и персонажа, и чашу.
-func side_camera_transform() -> Transform3D:
-	var from := to_global(Vector3(2.7, 1.15, 0.8))
-	var to := to_global(Vector3(0, 0.75, 0.7))
-	return Transform3D.IDENTITY.translated(from).looking_at(to, Vector3.UP)
-
-
-## Струя из точки origin в сторону forward; distance — куда долетает по горизонтали.
-## Попала в воду — вода желтеет; мимо — лужица на полу.
-func pour(origin: Vector3, forward: Vector3, distance: float, delta: float) -> void:
-	var land := origin + forward * distance
+## Струя из точки origin до точки land (по горизонтали — куда целятся). Попала в чашу — вода
+## желтеет; по ободку — брызги; мимо — лужица на полу.
+func pour(origin: Vector3, land: Vector3, delta: float) -> void:
 	var bowl := bowl_position()
 	var off := Vector2(land.x - bowl.x, land.z - bowl.z).length()
 	var end_y := global_position.y + 0.01
@@ -165,17 +158,28 @@ func pour(origin: Vector3, forward: Vector3, distance: float, delta: float) -> v
 		end_y = global_position.y + RIM_Y # по ободку — брызги, но без лужи
 	else:
 		_grow_puddle(Vector3(land.x, global_position.y + 0.005, land.z), delta)
-	var rise := 0.12 + distance * 0.25
+	var end := Vector3(land.x, end_y, land.z)
+	var distance := Vector2(end.x - origin.x, end.z - origin.z).length()
+	var rise := 0.08 + distance * 0.2
 	var drop_y := origin.y - end_y
 	for i in _drops.size():
 		var t := float(i) / (_drops.size() - 1)
-		var point := origin.lerp(land, t)
+		var point := origin.lerp(end, t)
 		point.y = origin.y + rise * t - (rise + drop_y) * t * t
 		point.x += sin(_time * 31.0 + i * 1.7) * 0.004
 		_drops[i].global_position = point
 		_drops[i].visible = true
-	_splash.global_position = Vector3(land.x, end_y + 0.01, land.z)
+	_splash.global_position = end + Vector3(0, 0.01, 0)
 	_splash.emitting = true
+
+
+## Высота воды в чаше (в мире) и уровень пола — для прицела мышкой.
+func water_height() -> float:
+	return bowl_position().y
+
+
+func floor_height() -> float:
+	return global_position.y
 
 
 func _process_flush(delta: float) -> void:

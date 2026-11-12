@@ -5,7 +5,8 @@ extends Node3D
 ## Стены внизу покрашены масляной краской (видно и сверху), выше — побелка только для вида
 ## от первого лица (как потолок и передние стены квартиры). Правая стена — на своём слое
 ## WALL_LAYER / WALL_HIGH_LAYER: камера «вид сбоку» на унитаз её не рисует и смотрит сквозь неё.
-## Внутри: унитаз (Toilet), лампочка на проводе, рулон бумаги, газета на гвозде.
+## Внутри: унитаз (Toilet), рукомойник с краном и зеркалом, держатель с рулоном справа от
+## унитаза, лампочка на проводе, газета на гвозде.
 
 const WALL_LAYER := 1 << 14
 ## Верх правой стены: видят только камеры от первого лица (общая камера лобби его не рисует —
@@ -132,17 +133,8 @@ func _build_details() -> void:
 	bulb.layers = Apartment.FP_ONLY_LAYER
 	var wire := _box(Vector3(0.01, 0.5, 0.01), light.position + Vector3(0, 0.3, 0), _mat(Color.BLACK))
 	wire.layers = Apartment.FP_ONLY_LAYER
-	# Рулон на правой стене (держатель — палочка).
-	var roll := MeshInstance3D.new()
-	var roll_mesh := CylinderMesh.new()
-	roll_mesh.top_radius = 0.055
-	roll_mesh.bottom_radius = 0.055
-	roll_mesh.height = 0.1
-	roll.mesh = roll_mesh
-	roll.material_override = _mat(Color("f4f1ea"))
-	roll.rotation.x = PI / 2.0 # ось вдоль стены
-	roll.position = Vector3(X1 - 0.08, 0.72, Z0 + 0.75)
-	add_child(roll)
+	_build_paper_holder()
+	_build_sink()
 	# Газета «Правда» на гвозде — на стене с дверью.
 	var paper := _box(Vector3(0.01, 0.32, 0.24), Vector3(X0 + 0.09, 0.95, Z0 + 0.35),
 		_mat(Color("d9d4c4")))
@@ -155,6 +147,68 @@ func _build_details() -> void:
 	title.position = Vector3(X0 + 0.1, 1.06, Z0 + 0.35)
 	title.rotation.y = PI / 2.0
 	add_child(title)
+
+
+## Держатель туалетной бумаги на задней стене справа от унитаза: кронштейн, палочка, рулон.
+func _build_paper_holder() -> void:
+	var chrome := _mat(Color(0.8, 0.8, 0.82))
+	chrome.metallic = 0.9
+	chrome.roughness = 0.25
+	var pos := Vector3(toilet.position.x + 0.5, 0.7, Z0)
+	_box(Vector3(0.16, 0.04, 0.02), pos + Vector3(0, 0, 0.03), chrome) # планка на стене
+	for side in [-1.0, 1.0]:
+		_box(Vector3(0.015, 0.015, 0.1), pos + Vector3(side * 0.07, 0, 0.08), chrome)
+	var rod := MeshInstance3D.new()
+	var rod_mesh := CylinderMesh.new()
+	rod_mesh.top_radius = 0.008
+	rod_mesh.bottom_radius = 0.008
+	rod_mesh.height = 0.15
+	rod.mesh = rod_mesh
+	rod.material_override = chrome
+	rod.rotation.z = PI / 2.0
+	rod.position = pos + Vector3(0, 0, 0.12)
+	add_child(rod)
+	var roll := MeshInstance3D.new()
+	var roll_mesh := CylinderMesh.new()
+	roll_mesh.top_radius = 0.055
+	roll_mesh.bottom_radius = 0.055
+	roll_mesh.height = 0.1
+	roll.mesh = roll_mesh
+	roll.material_override = _mat(Color("f4f1ea"))
+	roll.rotation.z = PI / 2.0 # ось вдоль стены
+	roll.position = pos + Vector3(0, 0, 0.12)
+	add_child(roll)
+	_box(Vector3(0.1, 0.12, 0.004), pos + Vector3(0, -0.1, 0.177), _mat(Color("f4f1ea"))) # свисает
+
+
+## Рукомойник с краном на правой стене у двери, над ним зеркало.
+func _build_sink() -> void:
+	var porcelain := _mat(Color(0.93, 0.93, 0.9))
+	porcelain.roughness = 0.25
+	var chrome := _mat(Color(0.8, 0.8, 0.82))
+	chrome.metallic = 0.9
+	chrome.roughness = 0.2
+	var z := 3.0
+	var x := X1 - 0.21
+	_solid(Vector3(0.4, 0.16, 0.5), Vector3(x, 0.8, z), porcelain) # чаша
+	_box(Vector3(0.32, 0.02, 0.4), Vector3(x - 0.01, 0.875, z), _mat(Color(0.75, 0.78, 0.8)))
+	_box(Vector3(0.14, 0.72, 0.16), Vector3(X1 - 0.12, 0.36, z), porcelain) # ножка
+	# Кран: стояк, излив к чаше, два вентиля (красный и синий).
+	_box(Vector3(0.03, 0.14, 0.03), Vector3(X1 - 0.05, 0.95, z), chrome)
+	_box(Vector3(0.14, 0.025, 0.025), Vector3(X1 - 0.11, 1.02, z), chrome)
+	_box(Vector3(0.02, 0.04, 0.02), Vector3(X1 - 0.17, 1.0, z), chrome)
+	for side in [-1.0, 1.0]:
+		var knob := _sphere(0.022, Vector3(X1 - 0.05, 0.98, z + side * 0.07),
+			_mat(Color("d93a2a") if side < 0 else Color("3a6fd9")))
+		knob.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+	# Зеркало в деревянной рамке.
+	_box(Vector3(0.03, 0.62, 0.5), Vector3(X1 - 0.015, 1.55, z), _mat(Color("6b4423")))
+	var mirror := _mat(Color(0.75, 0.82, 0.86))
+	mirror.metallic = 1.0
+	mirror.roughness = 0.03
+	_box(Vector3(0.01, 0.54, 0.42), Vector3(X1 - 0.035, 1.55, z), mirror)
+	# Мыло на краю чаши.
+	_box(Vector3(0.06, 0.03, 0.09), Vector3(x - 0.12, 0.9, z - 0.17), _mat(Color("e8c870")))
 
 
 func _mat(color: Color) -> StandardMaterial3D:
