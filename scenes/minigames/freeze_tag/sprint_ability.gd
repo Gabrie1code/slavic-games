@@ -1,7 +1,7 @@
 class_name SprintAbility
 extends RefCounted
-## Спринт убегающего в «Морожке»: Shift (LB/левый стик) — на SPRINT_TIME сек скорость +50%,
-## потом перезарядка COOLDOWN сек. Бот жмёт сам, когда водящий близко.
+## Спринт в «Морожке»: Shift (LB/левый стик) — на SPRINT_TIME сек скорость +bonus
+## (бегущим +50%, водящему +15%), потом перезарядка COOLDOWN сек. Бот жмёт сам.
 
 const BONUS := 0.5
 const SPRINT_TIME := 3.0
@@ -9,6 +9,8 @@ const COOLDOWN := 15.0
 
 ## Сколько ещё бежит быстро и сколько ждать до следующего спринта (сек).
 var left := 0.0
+## Прибавка к скорости во время спринта (0.5 = +50%).
+var bonus := BONUS
 var cooldown := 0.0
 
 
@@ -28,7 +30,7 @@ func update(delta: float, character: PlayerCharacter, input: PlayerInput, base_s
 		left = SPRINT_TIME
 		cooldown = COOLDOWN
 		started = true
-	character.speed = base_speed * (1.0 + BONUS if left > 0.0 else 1.0)
+	character.speed = base_speed * (1.0 + bonus if left > 0.0 else 1.0)
 	return started
 
 

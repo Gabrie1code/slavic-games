@@ -22,7 +22,9 @@ const CHARACTER_SCENE := preload("res://scenes/characters/test_character.tscn")
 
 const ROUND_TIME := 90.0
 const RUNNER_SPEED := 6.0
-const CHASER_SPEED := 5.6 # было 6.6, −15%: водящий слишком быстро догонял
+const CHASER_SPEED := 6.6
+## Спринт водящего слабее, чем у бегущих: +15% (у бегущих +50%).
+const CHASER_SPRINT := 0.15
 ## Водящий «считает до трёх»: стоит на месте после старта.
 const CHASER_HEAD_START := 2.0
 const TOUCH_DISTANCE := 1.1
@@ -65,7 +67,7 @@ class Racer:
 	var stun_left := 0.0
 	## Едет с горки или сидит на качелях — водящий не может заморозить.
 	var busy := false
-	## Спринт на Shift: +50% на 3 сек, перезарядка 15 сек (только у убегающих).
+	## Спринт на Shift: на 3 сек +50% у бегущих, +15% у водящего; перезарядка 15 сек.
 	var sprint := SprintAbility.new()
 	## Жёлтые лучики-вспышка у головы, пока размораживает друга.
 	var alert: Sprite3D
@@ -171,6 +173,7 @@ func _spawn_racers() -> void:
 
 		if r.is_chaser:
 			_chaser = r
+			r.sprint.bonus = CHASER_SPRINT
 			r.status.text = "ВОДЯЩИЙ"
 			r.status.modulate = Color("ff6b5a")
 			_add_chaser_hat(r.character)
@@ -218,6 +221,10 @@ func _physics_process(delta: float) -> void:
 			_show_message("%s включил спринт!" % r.player.display_name)
 	if _chaser.player.is_bot():
 		_bot_chaser()
+	var c := _chaser
+	if c.sprint.update(delta, c.character, c.player.input, CHASER_SPEED,
+			c.character.input_enabled and c.stun_left <= 0.0):
+		_show_message("Водящий ускорился!")
 
 	_update_playground(delta)
 	_run_fx.update(delta, _racers.filter(func(r: Racer) -> bool: return not r.frozen) \
@@ -550,13 +557,13 @@ func _bot_chaser() -> void:
 	var bot := c.player.bot_input()
 	var pos := c.character.global_position
 	var move := Vector2.ZERO
+	var best := INF # расстояние до ближайшего бегущего
 	if c.zone_time > ZONE_LIMIT * 0.5:
 		for f in _runners():
 			if f.frozen and _flat_distance(pos, f.character.global_position) < ZONE_RADIUS + 0.5:
 				var away := pos - f.character.global_position
 				move += Vector2(away.x, away.z).normalized()
 	else:
-		var best := INF
 		for r in _runners():
 			if r.frozen or r.immune_left > 0.0 or r.busy:
 				continue
@@ -566,6 +573,8 @@ func _bot_chaser() -> void:
 				var to := r.character.global_position - pos
 				move = Vector2(to.x, to.z).normalized()
 	bot.move = move.limit_length(1.0)
+	if c.sprint.ready() and best < 3.5:
+		bot.press("sprint") # бегущий совсем рядом — рывок
 
 
 ## Показать лучики у тех, кто сейчас размораживает (и спрятать у остальных).
@@ -720,10 +729,12 @@ func _setup_views() -> void:
 	_camera.cull_mask &= ~FOG_LAYER
 	if _chaser.player.is_bot():
 		return
+	# Экранный туман (см. chaser_fog.gdshader): квадрат 2×2 растягивается шейдером на весь экран.
 	var fog := MeshInstance3D.new()
-	var plane := PlaneMesh.new()
-	plane.size = Vector2(120, 120)
-	fog.mesh = plane
+	var quad := QuadMesh.new()
+	quad.size = Vector2(2, 2)
+	fog.mesh = quad
+	fog.custom_aabb = AABB(Vector3(-1000, -1000, -1000), Vector3(2000, 2000, 2000)) # не отсекать
 	_fog_material = ShaderMaterial.new()
 	_fog_material.shader = FOG_SHADER
 	_fog_material.set_shader_parameter("radius", FOG_RADIUS)
@@ -732,7 +743,6 @@ func _setup_views() -> void:
 	fog.material_override = _fog_material
 	fog.layers = FOG_LAYER
 	fog.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	fog.position.y = 2.7
 	add_child(fog)
 
 	var humans_running := _racers.any(func(r: Racer) -> bool:
@@ -742,7 +752,7 @@ func _setup_views() -> void:
 	add_child(layer)
 	_chaser_camera = _add_view(layer, Vector2(0, 0), Vector2(0.5 if humans_running else 1.0, 1),
 		0xFFFFF & ~HUD_LAYER)
-	var caption := _label("Ты водишь — видно только рядом", 28, Color("ff6b5a"))
+	var caption := _label("Ты водишь — видно только рядом · Shift — рывок", 28, Color("ff6b5a"))
 	caption.set_anchors_preset(Control.PRESET_CENTER_TOP)
 	caption.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	caption.offset_top = 70
@@ -852,7 +862,9 @@ func _clear_message_later() -> void:
 func _update_scores() -> void:
 	var scores := _scores()
 	for r in _racers:
-		var role := "водящий" if r.is_chaser else ("лёд" if r.frozen else r.sprint.status())
+		var role := ("лёд" if r.frozen else r.sprint.status())
+		if r.is_chaser:
+			role = "водящий, " + r.sprint.status()
 		(_score_labels[r.player.id] as Label).text = "%s (%s)\n%d очк." % [
 			r.player.display_name, role, scores[r.player.id]]
 
