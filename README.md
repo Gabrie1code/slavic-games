@@ -51,3 +51,4 @@ docs/            план разработки и дизайн-документ�
 ```
 
 Подробный план: [docs/ROADMAP.md](docs/ROADMAP.md).
+Вся история проекта и решений: [docs/PROJECT_LOG.md](docs/PROJECT_LOG.md).
