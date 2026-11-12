@@ -99,6 +99,9 @@ func _process(delta: float) -> void:
 		target = table.wheel_camera_transform()
 	elif _top_view:
 		target = table.felt_camera_transform()
+	# Сверху лампа над столом закрывает сукно — в этот момент камера стола её не рисует.
+	var hide_lamp := _top_view and table.phase == RubgameTable.Phase.BETTING
+	_camera.set_cull_mask_value(16, not hide_lamp) # слой 16 = Apartment.RUBGAME_LAMP_LAYER
 	_show_panels(table.phase == RubgameTable.Phase.BETTING)
 	# Рамка цвета игрока вокруг выбранной ставки на сукне.
 	table.set_selection(player, _bet(), _number)

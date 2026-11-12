@@ -20,6 +20,9 @@ const TV_SCENE := preload("res://assets/models/props/soviet_tv.glb")
 
 ## Слой видимости: только камеры от первого лица (потолок, передние стены).
 const FP_ONLY_LAYER := 1 << 19
+## Лампа над столом игры на рубли: отдельный слой, чтобы камера стола могла её не рисовать,
+## когда смотрит сверху (иначе абажур закрывает сукно). Остальным видна как FP-only вещь.
+const RUBGAME_LAMP_LAYER := 1 << 15
 
 const WALL_HEIGHT := 3.0
 const BACK_Z := -4.0
@@ -405,7 +408,7 @@ func _build_rubgame() -> void:
 	add_child(rubgame_table)
 	# Лампа над сукном — только от первого лица (сверху закрыла бы стол).
 	var lamp := _place(_rubgame_model("rubgame_lamp"), RUBGAME_TABLE_POS + Vector3(0.3, 0, 0))
-	_set_layers(lamp, FP_ONLY_LAYER)
+	_set_layers(lamp, RUBGAME_LAMP_LAYER)
 	var light := OmniLight3D.new()
 	light.light_color = Color(1.0, 0.9, 0.65)
 	light.light_energy = 1.6

@@ -13,8 +13,8 @@ const CAT_RADIUS := 1.3
 const LOOK_ANGLE := 50.0
 const GRAMOPHONE_RADIUS := 1.4
 const LAMP_RADIUS := 1.2
-## Сколько играет граммофон (три ноты) — пока играет, второй раз не заведёшь.
-const TUNE_TIME := 1.2
+## Через сколько граммофон можно завести снова (секунды).
+const TUNE_TIME := 3.0
 const NOTE := preload("res://assets/textures/fx/note_pixel.png")
 
 var apartment: Apartment

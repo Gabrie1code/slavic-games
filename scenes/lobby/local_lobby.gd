@@ -88,7 +88,7 @@ func _ready() -> void:
 	# Сверху видно всю квартиру: игровую комнату, гостиную и спальню.
 	_camera.look_at_from_position(Vector3(-1.2, 16.0, 15.0), Vector3(-1.2, 0, -0.5))
 	# Сверху не показываем потолок и передние стены.
-	_camera.cull_mask &= ~Apartment.FP_ONLY_LAYER & ~VIEWMODEL_LAYERS
+	_camera.cull_mask &= ~Apartment.FP_ONLY_LAYER & ~VIEWMODEL_LAYERS & ~Apartment.RUBGAME_LAMP_LAYER
 	var views_layer := CanvasLayer.new()
 	views_layer.layer = 0
 	add_child(views_layer)
