@@ -563,7 +563,8 @@ func _make_hp_card(f: Fighter) -> Dictionary:
 	var holder := Control.new()
 	holder.custom_minimum_size.y = 20
 	column.add_child(holder)
-	var ghost := _hp_progress(Color(1.0, 0.85, 0.6), Color(0.15, 0.12, 0.1))
+	# «Хвост» урона — красный: видно, сколько только что сняли.
+	var ghost := _hp_progress(Color(0.9, 0.15, 0.12), Color(0.15, 0.12, 0.1))
 	holder.add_child(ghost)
 	var main := _hp_progress(f.player.color.lightened(0.1), Color(0, 0, 0, 0))
 	holder.add_child(main)

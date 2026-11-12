@@ -1,6 +1,7 @@
 extends Control
 ## Итоги партии: 3D-пьедестал (PodiumStage) — персонажи игроков с кубками радуются
-## каждый по-своему; под ним — дефицит и рубли каждого, рубли уходят в кошелёк.
+## каждый по-своему; под ним — ник («(вы)» у живых игроков) и «Заработал: N ₽»,
+## рубли уходят в кошелёк.
 ## Кнопка «Вернуться в лобби» (мышью) или кнопка подтверждения игрока.
 
 ## Цвета мест: золото, серебро, бронза, остальные.
@@ -58,7 +59,7 @@ func _ready() -> void:
 	for place in range(3, standings.size()):
 		var p := standings[place]
 		var s := MatchState.get_stats(p)
-		var line := "%d.  %s  —  дефицит: %d,  %d ₽" % [place + 1, p.display_name, s.deficit, s.coins]
+		var line := "%d.  %s  —  заработал: %d ₽" % [place + 1, _shown_name(p), s.coins]
 		column.add_child(_label(line + _wallet_note(p, s.coins), 26, PLACE_COLORS[3]))
 
 	_add_button(column)
@@ -74,18 +75,23 @@ func _process(delta: float) -> void:
 			return
 
 
-## Подпись под ступенью: место и имя (цветом игрока), дефицит и рубли, прибавка в кошелёк.
+## Подпись под ступенью: ник (цветом игрока), сколько заработал, прибавка в кошелёк.
 func _stats_column(p: PlayerData, place: int) -> VBoxContainer:
 	var s := MatchState.get_stats(p)
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 2)
 	box.custom_minimum_size.x = 158
-	box.add_child(_label(p.display_name, 30, p.color.lightened(0.3)))
-	box.add_child(_label("дефицит: %d   %d ₽" % [s.deficit, s.coins], 22, PLACE_COLORS[place]))
+	box.add_child(_label(_shown_name(p), 30, p.color.lightened(0.3)))
+	box.add_child(_label("Заработал: %d ₽" % s.coins, 22, PLACE_COLORS[place]))
 	var note := _wallet_note(p, s.coins)
 	if note != "":
 		box.add_child(_label(note.strip_edges().replace(" (", "\n("), 18, Color("8fd694")))
 	return box
+
+
+## Ник для итогов: у живого игрока (не бота) — с пометкой «(вы)».
+func _shown_name(p: PlayerData) -> String:
+	return p.display_name if p.is_bot() else "%s (вы)" % p.display_name
 
 
 ## Рубли из партии уходят в кошелёк живого игрока (на них покупают одежду).
