@@ -32,6 +32,8 @@ const MOUSE_SENSITIVITY := 0.0025
 const STICK_LOOK_SPEED := 2.8
 const EYE_HEIGHT := 1.42
 const PITCH_LIMIT := 1.2
+## На сколько опускается камера, когда персонаж присел.
+const CROUCH_EYE_DROP := 0.45
 ## Удар рукой: дальность, перезарядка, сила толчка.
 const PUNCH_REACH := 1.4
 const PUNCH_COOLDOWN := 0.35
@@ -619,7 +621,8 @@ func _update_first_person(delta: float) -> void:
 			character.rotation.y -= look.x
 			character.fp_pitch = clampf(character.fp_pitch - look.y, -PITCH_LIMIT, PITCH_LIMIT)
 		var camera: Camera3D = _views[id]["camera"]
-		var eye_height := EYE_HEIGHT - (0.1 if character.sitting else 0.0)
+		var eye_height := EYE_HEIGHT - (0.1 if character.sitting else 0.0) \
+			- CROUCH_EYE_DROP * character.crouch_amount # присел — камера ниже
 		var eye := character.global_position + Vector3.UP * eye_height
 		camera.global_transform = Transform3D(
 			Basis.from_euler(Vector3(character.fp_pitch, character.rotation.y, 0.0)), eye)

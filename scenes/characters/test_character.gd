@@ -19,6 +19,10 @@ const SIT_LEGS := 1.45
 const FP_TURN_SPEED := 2.6
 const TURN_SPEED := 12.0
 const KNOCKBACK_DECAY := 18.0
+## Приседание (как Shift в Minecraft): медленнее, ниже, корпус наклонён вперёд.
+const CROUCH_SPEED := 0.4
+const CROUCH_DROP := 0.2
+const CROUCH_LEAN := 0.45
 ## Максимальная скорость взлёта (прыжок 7, отбрасывание битой до ~7 — хватает с запасом).
 const MAX_RISE_SPEED := 9.0
 ## Поворот правой руки: опущена / поднята вверх / вытянута в сторону.
@@ -44,6 +48,9 @@ var arm_pose_x := 0.0
 var sitting := false
 ## Вид от первого лица: движение относительно взгляда.
 var first_person := false
+## Насколько персонаж присел: 0 — стоит, 1 — сидит на корточках (плавно).
+var crouch_amount := 0.0
+var crouching := false
 ## От первого лица: true — A/D шагают вбок (поворот мышью/стиком), false — A/D поворачивают.
 var fp_strafe := false
 ## Наклон взгляда вверх/вниз (для камеры от первого лица).
@@ -100,6 +107,9 @@ func _ready() -> void:
 	_part("ArmR").add_child(right_hand)
 	_part("ArmL").rotation.z = -ARM_DOWN
 	_part("ArmR").rotation.z = ARM_DOWN
+	# Голова и руки — внутри туловища: при наклоне (приседание) они наклоняются вместе с ним.
+	for limb in ["Head", "ArmL", "ArmR"]:
+		_part(limb).reparent(_part("Torso"), true)
 
 	apply_outfit(player.outfit)
 	_name_label.text = player.display_name
@@ -111,9 +121,13 @@ func _physics_process(delta: float) -> void:
 		velocity.y -= _gravity * GRAVITY_SCALE * delta
 
 	var move := Vector2.ZERO
+	crouching = input_enabled and player.input != null and player.input.is_pressed("crouch") \
+		and not sitting
 	if input_enabled and player.input:
 		move = player.input.get_move()
-		if can_jump and player.input.is_just_pressed("confirm") and is_on_floor():
+		if crouching:
+			move *= CROUCH_SPEED # крадётся
+		elif can_jump and player.input.is_just_pressed("confirm") and is_on_floor():
 			velocity.y = JUMP_VELOCITY
 
 	# Камера смотрит спереди, поэтому «вверх» на экране — это -Z в мире.
@@ -153,22 +167,31 @@ func _process(delta: float) -> void:
 	var amount := clampf(walk_speed / 6.0, 0.0, 1.0)
 	_walk_phase += delta * STEP_FREQUENCY * TAU * amount
 	var swing := sin(_walk_phase) * SWING * amount
+	# Приседание: плавно опускаемся, корпус наклоняется вперёд, голова смотрит прямо.
+	crouch_amount = move_toward(crouch_amount, 1.0 if crouching else 0.0, delta * 6.0)
 	# Ноги и руки качаются навстречу друг другу; в стойке — плавно возвращаются.
 	var legs_back := 1.0 - minf(1.0, delta * 10.0)
 	if sitting:
 		_part("LegL").rotation.x = SIT_LEGS
 		_part("LegR").rotation.x = SIT_LEGS
 	else:
-		_part("LegL").rotation.x = swing if amount > 0.05 else _part("LegL").rotation.x * legs_back
-		_part("LegR").rotation.x = -swing if amount > 0.05 else _part("LegR").rotation.x * legs_back
+		# Присев, ноги чуть вынесены вперёд (crouch_legs); в стойке плавно возвращаются к нему.
+		var crouch_legs := 0.35 * crouch_amount
+		var settle := 1.0 - legs_back
+		_part("LegL").rotation.x = swing + crouch_legs if amount > 0.05 \
+			else lerpf(_part("LegL").rotation.x, crouch_legs, settle)
+		_part("LegR").rotation.x = -swing + crouch_legs if amount > 0.05 \
+			else lerpf(_part("LegR").rotation.x, crouch_legs, settle)
 	_part("ArmL").rotation.x = -swing * 0.8
 	if not _right_arm_busy:
 		_part("ArmR").rotation.x = swing * 0.8
 	else:
 		_part("ArmR").rotation.x = arm_pose_x
+	_part("Torso").rotation.x = -CROUCH_LEAN * crouch_amount
 	# Подпрыгивание при шаге и лёгкое «дыхание» в стойке.
 	_model.position.y = SIT_DROP if sitting else absf(sin(_walk_phase)) * 0.06 * amount
-	_part("Head").rotation.x = sin(_idle_time * 2.0) * 0.04
+	_model.position.y -= CROUCH_DROP * crouch_amount
+	_part("Head").rotation.x = sin(_idle_time * 2.0) * 0.04 + CROUCH_LEAN * crouch_amount * 0.8
 
 
 ## Сесть: персонаж ставится в точку (под сиденьем) и поворачивается на yaw.

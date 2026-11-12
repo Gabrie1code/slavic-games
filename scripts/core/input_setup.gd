@@ -10,7 +10,7 @@ extends RefCounted
 ## поэтому WASD работает и при русской раскладке.
 
 const ACTIONS: Array[String] = [
-	"move_left", "move_right", "move_up", "move_down", "confirm", "cancel", "attack",
+	"move_left", "move_right", "move_up", "move_down", "confirm", "cancel", "attack", "crouch",
 ]
 const DEADZONE := 0.3
 
@@ -75,6 +75,7 @@ static func _keyboard_layout(kind: PlayerData.DeviceKind) -> Dictionary:
 			"confirm": [KEY_SPACE, KEY_E],
 			"cancel": [KEY_Q],
 			"attack": [KEY_F], # + левая кнопка мыши (см. _events_for)
+			"crouch": [KEY_C], # + левый Shift (см. _events_for)
 		}
 	return {
 		"move_left": [KEY_LEFT],
@@ -82,8 +83,9 @@ static func _keyboard_layout(kind: PlayerData.DeviceKind) -> Dictionary:
 		"move_up": [KEY_UP],
 		"move_down": [KEY_DOWN],
 		"confirm": [KEY_ENTER, KEY_KP_ENTER],
-		"cancel": [KEY_BACKSPACE, KEY_SHIFT],
+		"cancel": [KEY_BACKSPACE], # + правый Shift (см. _events_for)
 		"attack": [KEY_SLASH, KEY_KP_0],
+		"crouch": [], # правый Ctrl (см. _events_for)
 	}
 
 
@@ -96,6 +98,10 @@ static func _events_for(player: PlayerData, action: String) -> Array[InputEvent]
 				e.physical_keycode = key
 				e.device = -1
 				events.append(e)
+			# Shift и Ctrl делятся на левый и правый: левые — игроку на WASD, правые — на стрелках.
+			var sided := _sided_key(player.device_kind, action)
+			if sided:
+				events.append(sided)
 			# Удар у игрока на WASD — ещё и левой кнопкой мыши.
 			if action == "attack" and player.device_kind == PlayerData.DeviceKind.KEYBOARD_WASD:
 				var click := InputEventMouseButton.new()
@@ -128,7 +134,32 @@ static func _joypad_events(action: String, device: int) -> Array[InputEvent]:
 			events.append(_button(JOY_BUTTON_B, device))
 		"attack":
 			events.append(_button(JOY_BUTTON_X, device))
+		"crouch":
+			events.append(_button(JOY_BUTTON_RIGHT_STICK, device))
+			events.append(_button(JOY_BUTTON_LEFT_SHOULDER, device))
 	return events
+
+
+## Клавиша с нужной стороной: присесть — левый Shift (WASD) / правый Ctrl (стрелки),
+## отмена у игрока на стрелках — правый Shift. null — такой клавиши нет.
+static func _sided_key(kind: PlayerData.DeviceKind, action: String) -> InputEventKey:
+	var key := KEY_NONE
+	var side := KEY_LOCATION_LEFT
+	if kind == PlayerData.DeviceKind.KEYBOARD_WASD and action == "crouch":
+		key = KEY_SHIFT
+	elif kind == PlayerData.DeviceKind.KEYBOARD_ARROWS and action == "crouch":
+		key = KEY_CTRL
+		side = KEY_LOCATION_RIGHT
+	elif kind == PlayerData.DeviceKind.KEYBOARD_ARROWS and action == "cancel":
+		key = KEY_SHIFT
+		side = KEY_LOCATION_RIGHT
+	if key == KEY_NONE:
+		return null
+	var e := InputEventKey.new()
+	e.physical_keycode = key
+	e.location = side
+	e.device = -1
+	return e
 
 
 static func _axis(axis: JoyAxis, value: float, device: int) -> InputEventJoypadMotion:
