@@ -2,31 +2,25 @@
 
 [ext_resource type="Script" path="res://scenes/minigames/sausage_queue/sausage_queue.gd" id="1_script"]
 [ext_resource type="PackedScene" path="res://assets/models/props/kiosk.glb" id="2_kiosk"]
+[ext_resource type="Script" path="res://scenes/minigames/sausage_queue/street_backdrop.gd" id="3_street"]
+
+[sub_resource type="ProceduralSkyMaterial" id="SkyMat_street"]
+sky_top_color = Color(0.36, 0.56, 0.84, 1)
+sky_horizon_color = Color(0.74, 0.82, 0.9, 1)
+ground_bottom_color = Color(0.3, 0.32, 0.28, 1)
+ground_horizon_color = Color(0.74, 0.82, 0.9, 1)
+
+[sub_resource type="Sky" id="Sky_street"]
+sky_material = SubResource("SkyMat_street")
 
 [sub_resource type="Environment" id="Environment_street"]
-background_mode = 1
-background_color = Color(0.62, 0.74, 0.84, 1)
+background_mode = 2
+sky = SubResource("Sky_street")
 ambient_light_source = 2
 ambient_light_color = Color(0.95, 0.92, 0.85, 1)
 ambient_light_energy = 0.6
 tonemap_mode = 2
 ssao_enabled = true
-
-[sub_resource type="StandardMaterial3D" id="Mat_asphalt"]
-albedo_color = Color(0.38, 0.38, 0.37, 1)
-roughness = 0.95
-
-[sub_resource type="BoxMesh" id="BoxMesh_ground"]
-material = SubResource("Mat_asphalt")
-size = Vector3(40, 0.2, 40)
-
-[sub_resource type="StandardMaterial3D" id="Mat_curb"]
-albedo_color = Color(0.75, 0.73, 0.68, 1)
-roughness = 0.9
-
-[sub_resource type="BoxMesh" id="BoxMesh_curb"]
-material = SubResource("Mat_curb")
-size = Vector3(40, 0.15, 0.3)
 
 [node name="SausageQueue" type="Node3D"]
 script = ExtResource("1_script")
@@ -41,13 +35,8 @@ shadow_enabled = true
 [node name="Camera3D" type="Camera3D" parent="."]
 fov = 50.0
 
-[node name="Ground" type="MeshInstance3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.1, 0)
-mesh = SubResource("BoxMesh_ground")
-
-[node name="Curb" type="MeshInstance3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.05, 3.5)
-mesh = SubResource("BoxMesh_curb")
+[node name="Street" type="Node3D" parent="."]
+script = ExtResource("3_street")
 
 [node name="Kiosk" parent="." instance=ExtResource("2_kiosk")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -3)
