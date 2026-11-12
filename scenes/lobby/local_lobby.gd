@@ -12,10 +12,6 @@ const SPAWN_RADIUS := 3.0
 const ROUNDS := 5
 const MARKET_POS := Vector3(7.0, 0.0, -1.6)
 const MARKET_RADIUS := 2.0
-const WARDROBE_SLOTS: Array[int] = [
-	Cosmetics.Slot.HAT, Cosmetics.Slot.FACE, Cosmetics.Slot.JACKET,
-	Cosmetics.Slot.PANTS, Cosmetics.Slot.SHOES, Cosmetics.Slot.NECK,
-]
 
 var _characters: Dictionary = {} # PlayerData.id -> персонаж
 var _slot_panels: Array[PanelContainer] = []
@@ -25,8 +21,9 @@ var _bot_dialog: PanelContainer
 var _bot_count_label: Label
 var _bot_count := 0
 
-## Открытые гардеробы: PlayerData.id -> {"panel": PanelContainer, "label": Label, "row": int}
-var _wardrobes: Dictionary = {}
+## Открытые примерочные: PlayerData.id -> DressingRoom
+var _rooms: Dictionary = {}
+var _rooms_root: Control
 
 @onready var _players_root: Node3D = $Players
 @onready var _camera: Camera3D = $Camera3D
@@ -108,9 +105,9 @@ func _process(_delta: float) -> void:
 	for p in PlayerManager.players.duplicate():
 		if p.input == null or p.is_bot():
 			continue
-		if _wardrobes.has(p.id):
-			_process_wardrobe(p)
-		elif p.input.is_just_pressed("confirm") and _is_at_market(p):
+		if _rooms.has(p.id):
+			continue # примерочная сама обрабатывает кнопки игрока
+		if p.input.is_just_pressed("confirm") and _is_at_market(p):
 			_open_wardrobe(p)
 		elif p.input.is_just_pressed("cancel"):
 			PlayerManager.remove_player(p)
@@ -122,8 +119,8 @@ func _process(_delta: float) -> void:
 func _test_add_money() -> void:
 	for p in PlayerManager.players:
 		PlayerManager.add_to_wallet(p, 500)
-		if _wardrobes.has(p.id):
-			_update_wardrobe(p)
+		if _rooms.has(p.id):
+			(_rooms[p.id] as DressingRoom).refresh()
 
 
 func _is_at_market(p: PlayerData) -> bool:
@@ -137,122 +134,47 @@ func _open_wardrobe(p: PlayerData) -> void:
 	var character: PlayerCharacter = _characters[p.id]
 	character.input_enabled = false
 	character.velocity = Vector3.ZERO
-	character.rotation.y = PI # лицом к камере, чтобы было видно наряд
-
-	var panel := PanelContainer.new()
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.1, 0.07, 0.06, 0.92)
-	style.border_color = p.color
-	style.set_border_width_all(4)
-	style.set_corner_radius_all(12)
-	style.set_content_margin_all(14)
-	panel.add_theme_stylebox_override("panel", style)
-	panel.custom_minimum_size = Vector2(440, 0)
-	# Окна игроков — сеткой 2×2 у правого края.
-	var screen_width := get_viewport().get_visible_rect().size.x
-	panel.position = Vector2(screen_width - 470 - (p.slot % 2) * 455, 130 + (p.slot / 2) * 390)
-	var label := Label.new()
-	label.add_theme_font_size_override("font_size", 20)
-	panel.add_child(label)
-	_ui.add_child(panel)
-	# saved — наряд до примерки: при выходе некупленные вещи вернутся к нему.
-	_wardrobes[p.id] = {
-		"panel": panel, "label": label, "row": 0, "message": "", "saved": p.outfit.duplicate(),
-	}
-	_update_wardrobe(p)
+	var room := DressingRoom.new()
+	room.setup(p, character)
+	room.closed.connect(_on_room_closed)
+	_rooms_root.add_child(room)
+	_rooms[p.id] = room
+	_layout_rooms()
 
 
-func _close_wardrobe(p: PlayerData) -> void:
-	if not _wardrobes.has(p.id):
+func _on_room_closed(p: PlayerData) -> void:
+	if not _rooms.has(p.id):
 		return
-	var state: Dictionary = _wardrobes[p.id]
-	(state["panel"] as Node).queue_free()
-	_wardrobes.erase(p.id)
-	# Примеренные, но не купленные вещи снимаем — возвращаем то, что было.
-	var saved: Dictionary = state["saved"]
-	for slot: int in WARDROBE_SLOTS:
-		var id: String = p.outfit.get(slot, "")
-		if not PlayerManager.owns(p, id):
-			var back: String = saved.get(slot, "")
-			if back == "":
-				p.outfit.erase(slot)
-			else:
-				p.outfit[slot] = back
-			if _characters.has(p.id):
-				(_characters[p.id] as PlayerCharacter).wear(slot, back)
-	PlayerManager.save_outfit(p)
+	(_rooms[p.id] as Node).queue_free()
+	_rooms.erase(p.id)
 	if _characters.has(p.id):
 		(_characters[p.id] as PlayerCharacter).input_enabled = true
+	_layout_rooms()
 
 
 func _close_all_wardrobes() -> void:
-	for p in PlayerManager.players:
-		_close_wardrobe(p)
+	for room: DressingRoom in _rooms.values():
+		room.close()
 
 
-## Вверх/вниз — слот, влево/вправо — листать (примерка).
-## Подтвердить: на закрытой вещи — купить, иначе — готово. Отмена — выйти.
-func _process_wardrobe(p: PlayerData) -> void:
-	var state: Dictionary = _wardrobes[p.id]
-	var row: int = state["row"]
-	var slot := WARDROBE_SLOTS[row]
-	var current: String = p.outfit.get(slot, "")
-	if p.input.is_just_pressed("cancel"):
-		_close_wardrobe(p)
-		return
-	if p.input.is_just_pressed("confirm"):
-		if PlayerManager.owns(p, current):
-			_close_wardrobe(p)
-			return
-		if PlayerManager.buy(p, current):
-			state["message"] = "Куплено: %s!" % Cosmetics.item_name(current)
-		else:
-			state["message"] = "Не хватает рублей: нужно %d ₽" % Cosmetics.price(current)
-	elif p.input.is_just_pressed("move_up"):
-		state["row"] = posmod(row - 1, WARDROBE_SLOTS.size())
-		state["message"] = ""
-	elif p.input.is_just_pressed("move_down"):
-		state["row"] = posmod(row + 1, WARDROBE_SLOTS.size())
-		state["message"] = ""
-	elif p.input.is_just_pressed("move_left") or p.input.is_just_pressed("move_right"):
-		var options: Array[String] = [""]
-		options.append_array(Cosmetics.items_for_slot(slot as Cosmetics.Slot))
-		var step := -1 if p.input.is_just_pressed("move_left") else 1
-		var next_id := options[posmod(options.find(current) + step, options.size())]
-		if next_id == "":
-			p.outfit.erase(slot)
-		else:
-			p.outfit[slot] = next_id
-		(_characters[p.id] as PlayerCharacter).wear(slot, next_id)
-		state["message"] = ""
-	else:
-		return
-	_update_wardrobe(p)
-
-
-func _update_wardrobe(p: PlayerData) -> void:
-	var state: Dictionary = _wardrobes[p.id]
-	var lines: PackedStringArray = [
-		"%s — рынок         Кошелёк: %d ₽" % [p.display_name, PlayerManager.wallet(p)], "",
-	]
-	for i in WARDROBE_SLOTS.size():
-		var slot := WARDROBE_SLOTS[i]
-		var id: String = p.outfit.get(slot, "")
-		var label := Cosmetics.item_name(id)
-		if not PlayerManager.owns(p, id):
-			label += "  [%d ₽]" % Cosmetics.price(id)
-		var marker := "▶ " if i == state["row"] else "   "
-		lines.append("%s%s:  ◀ %s ▶" % [marker, Cosmetics.SLOT_NAMES[slot], label])
-	lines.append("")
-	var row_id: String = p.outfit.get(WARDROBE_SLOTS[state["row"]], "")
-	if not PlayerManager.owns(p, row_id):
-		lines.append("Примерка. Подтвердить — купить за %d ₽" % Cosmetics.price(row_id))
-	else:
-		lines.append("вверх/вниз — слот, влево/вправо — листать")
-		lines.append("подтвердить — готово")
-	if state["message"] != "":
-		lines.append(state["message"])
-	(state["label"] as Label).text = "\n".join(lines)
+## Одна примерочная — на весь экран, две — пополам, три-четыре — по четвертям.
+func _layout_rooms() -> void:
+	var screen := get_viewport().get_visible_rect().size
+	var rooms: Array[DressingRoom] = []
+	for room: DressingRoom in _rooms.values():
+		rooms.append(room)
+	rooms.sort_custom(func(a: DressingRoom, b: DressingRoom) -> bool:
+		return a.player.slot < b.player.slot)
+	var n := rooms.size()
+	for i in n:
+		var rect := Rect2(Vector2.ZERO, screen)
+		if n == 2:
+			rect = Rect2(Vector2(screen.x / 2.0 * i, 0), Vector2(screen.x / 2.0, screen.y))
+		elif n > 2:
+			var half := screen / 2.0
+			rect = Rect2(Vector2(half.x * (i % 2), half.y * (i / 2)), half)
+		rooms[i].position = rect.position
+		rooms[i].size = rect.size
 
 
 func _build_market() -> void:
@@ -275,7 +197,7 @@ func _build_market() -> void:
 		_add_box(market, Vector3(0.55, 0.08, 1.4), Vector3(-1.38 + i * 0.55, 2.62, -2.0),
 			red if i % 2 == 0 else white, false)
 	# На прилавке выложен товар.
-	for item_info in [["hat_kepka", -0.8], ["hat_ushanka", 0.0], ["face_glasses_drops", 0.8]]:
+	for item_info in [["hat_kepka", -0.8], ["hat_ushanka", 0.0], ["hat_fedora", 0.8]]:
 		var item := Cosmetics.load_item(item_info[0]).instantiate() as Node3D
 		item.position = Vector3(item_info[1], -0.45, -1.9)
 		market.add_child(item)
@@ -396,9 +318,10 @@ func _on_player_joined(p: PlayerData) -> void:
 
 
 func _on_player_left(p: PlayerData) -> void:
-	if _wardrobes.has(p.id):
-		(_wardrobes[p.id]["panel"] as Node).queue_free()
-		_wardrobes.erase(p.id)
+	if _rooms.has(p.id):
+		(_rooms[p.id] as Node).queue_free()
+		_rooms.erase(p.id)
+		_layout_rooms()
 	if _characters.has(p.id):
 		_characters[p.id].queue_free()
 		_characters.erase(p.id)
@@ -442,6 +365,14 @@ func _build_ui() -> void:
 	column.add_child(spacer)
 
 	_build_bot_dialog()
+
+	var rooms_layer := CanvasLayer.new()
+	rooms_layer.layer = 10
+	add_child(rooms_layer)
+	_rooms_root = Control.new()
+	_rooms_root.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_rooms_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	rooms_layer.add_child(_rooms_root)
 
 	var slots := HBoxContainer.new()
 	slots.add_theme_constant_override("separation", 12)

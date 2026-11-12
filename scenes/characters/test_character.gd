@@ -7,7 +7,9 @@ extends CharacterBody3D
 ## и держит предметы, всё тело крутится при атаке.
 
 const ACCELERATION := 40.0
-const JUMP_VELOCITY := 6.5
+## Прыжок: короткий и «тяжёлый» — гравитация персонажа сильнее стандартной.
+const JUMP_VELOCITY := 7.0
+const GRAVITY_SCALE := 2.2
 const TURN_SPEED := 12.0
 const KNOCKBACK_DECAY := 18.0
 ## Поворот правой руки: опущена / поднята вверх / вытянута в сторону.
@@ -80,7 +82,7 @@ func _ready() -> void:
 
 func _physics_process(delta: float) -> void:
 	if not is_on_floor():
-		velocity.y -= _gravity * delta
+		velocity.y -= _gravity * GRAVITY_SCALE * delta
 
 	var move := Vector2.ZERO
 	if input_enabled and player.input:
@@ -156,6 +158,11 @@ func hold_item(item: Node3D) -> void:
 	if item:
 		right_hand.add_child(item)
 		_right_arm_busy = true
+
+
+## Показать или спрятать имя над головой (в примерочной не нужно).
+func show_name(visible_name: bool) -> void:
+	_name_label.visible = visible_name
 
 
 ## Перекрасить «основной» цвет (например, белый халат продавщицы).

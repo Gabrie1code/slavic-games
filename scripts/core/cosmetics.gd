@@ -36,14 +36,14 @@ const ITEMS := {
 	"hat_tubeteika": {"slot": Slot.HAT, "name": "Тюбетейка", "price": 100},
 	"hat_hardhat": {"slot": Slot.HAT, "name": "Каска строителя", "price": 100},
 	"hat_fedora": {"slot": Slot.HAT, "name": "Фетровая шляпа", "price": 150},
-	"hat_curlers": {"slot": Slot.HAT, "name": "Бигуди с платком", "price": 150},
-	"hat_bandana": {"slot": Slot.HAT, "name": "Бандана бандита", "price": 200},
 	"hat_ushanka": {"slot": Slot.HAT, "name": "Ушанка", "price": 250},
 	# Лицо
 	"face_mustache": {"slot": Slot.FACE, "name": "Усы", "price": 0},
 	"face_unibrow": {"slot": Slot.FACE, "name": "Монобровь", "price": 0},
-	"face_glasses_drops": {"slot": Slot.FACE, "name": "Очки-капельки", "price": 150},
-	"face_terminator": {"slot": Slot.FACE, "name": "Очки «Терминатор»", "price": 250},
+	"face_plaster": {"slot": Slot.FACE, "name": "Пластырь", "price": 0},
+	"face_bruise": {"slot": Slot.FACE, "name": "Фингал", "price": 0},
+	"face_beard": {"slot": Slot.FACE, "name": "Борода-лопата", "price": 150},
+	"face_welder_mask": {"slot": Slot.FACE, "name": "Маска сварщика", "price": 250},
 	# Верх
 	"jacket_abibas": {"slot": Slot.JACKET, "name": "Олимпийка «Абибас»", "price": 0},
 	"jacket_alkogolichka": {"slot": Slot.JACKET, "name": "Майка-алкоголичка", "price": 0},
@@ -53,7 +53,7 @@ const ITEMS := {
 	"jacket_seller_robe": {"slot": Slot.JACKET, "name": "Халат продавщицы", "price": 150},
 	"jacket_dutik": {"slot": Slot.JACKET, "name": "Пуховик-«дутик»", "price": 200},
 	"jacket_kosuha": {"slot": Slot.JACKET, "name": "Кожанка-косуха", "price": 300},
-	"jacket_blazer": {"slot": Slot.JACKET, "name": "Пиджак с подплечниками", "price": 300},
+	"jacket_blazer": {"slot": Slot.JACKET, "name": "Малиновый пиджак", "price": 300},
 	# Штаны
 	"pants_abibas": {"slot": Slot.PANTS, "name": "Треники «Абибас»", "price": 0},
 	"pants_school": {"slot": Slot.PANTS, "name": "Брюки со стрелками", "price": 0},
@@ -72,9 +72,9 @@ const ITEMS := {
 	"shoes_platform": {"slot": Slot.SHOES, "name": "Туфли на платформе", "price": 200},
 	"shoes_pumba": {"slot": Slot.SHOES, "name": "Кроссовки «Пумба»", "price": 250},
 	# Шея и спина
-	"neck_whistle": {"slot": Slot.NECK, "name": "Свисток физрука", "price": 100},
 	"back_ranets": {"slot": Slot.NECK, "name": "Школьный ранец", "price": 100},
 	"back_bag": {"slot": Slot.NECK, "name": "Челночная сумка", "price": 200},
+	"back_guitar": {"slot": Slot.NECK, "name": "Гитара", "price": 300},
 	"neck_gold_chain": {"slot": Slot.NECK, "name": "Золотая цепь", "price": 400},
 }
 
