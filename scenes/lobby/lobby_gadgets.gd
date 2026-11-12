@@ -93,6 +93,9 @@ func try_interact(p: PlayerData) -> bool:
 	if _near_tippable(p, apartment.floor_lamp, LAMP_RADIUS) and apartment.lamp_lit():
 		apartment.turn_off_lamp()
 		return true
+	if _near_night_lamp(p):
+		apartment.toggle_night_lamp()
+		return true
 	if _near_cat(p) and apartment.cat.pet():
 		# Персонаж тянет руку к коту.
 		character.set_arm_pose(0.25, 0.9, 0.15)
@@ -121,14 +124,22 @@ func hint(p: PlayerData) -> Array[Dictionary]:
 	return _furniture_hint(p)
 
 
-## Граммофон и торшер: кнопка есть, только пока вещь стоит на месте.
+## Граммофон, торшер и ночник: кнопка есть, только пока вещь стоит на месте.
 func _furniture_hint(p: PlayerData) -> Array[Dictionary]:
 	if _near_tippable(p, apartment.gramophone, GRAMOPHONE_RADIUS):
 		return [entry(confirm_key(p), "Завести граммофон", not _gramophone_ready())]
 	# Выключенный торшер «чинится» сам — кнопки нет, пока снова не загорится.
 	if _near_tippable(p, apartment.floor_lamp, LAMP_RADIUS) and apartment.lamp_lit():
 		return [entry(confirm_key(p), "Выключить торшер")]
+	if _near_night_lamp(p):
+		var action := "Выключить ночник" if apartment.night_lamp_on else "Включить ночник"
+		return [entry(confirm_key(p), action)]
 	return []
+
+
+## Рядом с целым ночником (разбитый ждёт восстановления — кнопки нет).
+func _near_night_lamp(p: PlayerData) -> bool:
+	return apartment.night_lamp_ready() and _near(p, apartment.night_lamp_position(), LAMP_RADIUS)
 
 
 ## Рядом с вещью, которая стоит на месте (поваленную трогать нельзя — кнопки нет).

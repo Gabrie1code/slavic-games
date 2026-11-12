@@ -74,6 +74,8 @@ var floor_lamp: Tippable
 ## Торшер включён (горит, только пока стоит на месте). Выключили кнопкой — через LAMP_BACK сек
 ## сам включается и плавно разгорается (как восстанавливается разбитая посуда).
 var lamp_on := true
+## Ночник в спальне включён.
+var night_lamp_on := true
 ## Дисковый телефон (гостиная, у двери в игровую) и кот.
 var phone: RotaryPhone
 var cat: LobbyCat
@@ -83,10 +85,10 @@ var _lamp_glow: MeshInstance3D
 var _lamp_glow_mat: StandardMaterial3D
 var _lamp_level := 1.0 # 0 — не горит, 1 — горит в полную силу
 var _lamp_back_at := 0.0
-## «Работающий» экран телевизора: фон, кнопка «ИГРАТЬ», бегущая полоса развёртки.
-var _tv_bg_mat: StandardMaterial3D
-var _tv_button: MeshInstance3D
-var _tv_scan: MeshInstance3D
+## Ночник на тумбочке в спальне: включается и выключается кнопкой; разбили — не светит.
+var _night_lamp: Breakable
+var _night_light: OmniLight3D
+var _night_bulb_mat: StandardMaterial3D
 var _time := 0.0
 
 
@@ -176,7 +178,7 @@ func _build_living_room() -> void:
 			_breakable(item, Vector3(x, shelf_heights[row], sideboard_pos.z - 0.05), [CRYSTAL], 0.6, 0.05)
 	var tv := TV_SCENE.instantiate() as Node3D
 	tv.scale = Vector3.ONE * 1.3
-	_build_tv_screen(tv)
+	tv.add_child(TvScreen.new()) # картинка «▶ ИГРАТЬ» прямо на выпуклом стекле
 	_solid(tv, Vector3(1.3, 1.5, 1.0), 0.75, TV_POS)
 	var shelf_pos := Vector3(-0.7, 0, -3.75)
 	_solid(_model("bookshelf"), Vector3(1.3, 2.3, 0.45), 1.15, shelf_pos)
@@ -262,7 +264,9 @@ func _build_bedroom() -> void:
 	_place(_model("wall_carpet"), Vector3(bed_pos.x - 0.35, 0.75, BACK_Z + 0.08))
 	var stand_pos := Vector3(6.75, 0, -3.65)
 	_solid(_model("nightstand"), Vector3(0.45, 0.6, 0.4), 0.3, stand_pos)
-	_breakable("table_lamp", stand_pos + Vector3(0, 0.6, 0), [Color("2a7040"), Color("c0a050")], 0.4)
+	_night_lamp = _breakable("table_lamp", stand_pos + Vector3(0, 0.6, 0),
+		[Color("2a7040"), Color("c0a050")], 0.4)
+	_build_night_light()
 	_place(_model("floor_rug"), Vector3(6.4, 0.005, -0.7)).rotation_degrees.y = 90.0
 	_tippable("dumbbell", Vector3(0.34, 0.12, 0.12), 0.06, Vector3(8.5, 0, 0.6), 3.0, 30.0)
 	_tippable("stool", Vector3(0.36, 0.47, 0.36), 0.24, Vector3(8.4, 0, -0.4), 2.0)
@@ -272,7 +276,6 @@ func _build_bedroom() -> void:
 
 func _process(delta: float) -> void:
 	_time += delta
-	_animate_tv()
 	if not lamp_on and _time >= _lamp_back_at:
 		lamp_on = true
 	# Гаснет сразу, разгорается плавно.
@@ -284,6 +287,9 @@ func _process(delta: float) -> void:
 	_lamp_light.light_energy = LAMP_ENERGY * _lamp_level
 	_lamp_light.visible = _lamp_level > 0.01
 	_lamp_glow_mat.albedo_color = Color(0.3, 0.27, 0.22).lerp(Color(1.0, 0.92, 0.7), _lamp_level)
+	var night_lit := night_lamp_on and not _night_lamp.is_broken()
+	_night_light.visible = night_lit
+	_night_bulb_mat.albedo_color = Color(1.0, 0.92, 0.7) if night_lit else Color(0.3, 0.27, 0.22)
 
 
 ## Торшер горит в полную силу (только тогда его можно выключить).
@@ -297,51 +303,40 @@ func turn_off_lamp() -> void:
 	_lamp_back_at = _time + LAMP_BACK
 
 
-## Экран кинескопа: картинка поверх экрана модели (координаты — в модели телевизора).
-func _build_tv_screen(tv: Node3D) -> void:
-	var center := Vector3(-0.12, 0.78, 0.465)
-	var bg := _screen_quad("res://assets/textures/tv/tv_screen_bg.png", Vector2(0.54, 0.44), center)
-	_tv_bg_mat = bg.material_override as StandardMaterial3D
-	tv.add_child(bg)
-	_tv_button = _screen_quad("res://assets/textures/tv/tv_play_button.png", Vector2(0.44, 0.17),
-		center + Vector3(0, 0, 0.003))
-	tv.add_child(_tv_button)
-	_tv_scan = MeshInstance3D.new()
-	var scan_mesh := QuadMesh.new()
-	scan_mesh.size = Vector2(0.54, 0.035)
-	_tv_scan.mesh = scan_mesh
-	var scan_mat := StandardMaterial3D.new()
-	scan_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	scan_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	scan_mat.albedo_color = Color(0.7, 1.0, 0.9, 0.08)
-	_tv_scan.material_override = scan_mat
-	_tv_scan.position = center + Vector3(0, 0, 0.005)
-	tv.add_child(_tv_scan)
+## Ночник цел (разбитый не включить, пока не восстановится).
+func night_lamp_ready() -> bool:
+	return not _night_lamp.is_broken()
 
 
-func _screen_quad(texture_path: String, size: Vector2, pos: Vector3) -> MeshInstance3D:
-	var quad := MeshInstance3D.new()
-	var mesh := QuadMesh.new()
-	mesh.size = size
-	quad.mesh = mesh
-	var mat := StandardMaterial3D.new()
-	mat.albedo_texture = load(texture_path)
-	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	quad.material_override = mat
-	quad.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	quad.position = pos
-	return quad
+## Где стоит ночник (для зоны кнопки).
+func night_lamp_position() -> Vector3:
+	return _night_lamp.global_position
 
 
-## Телевизор «работает»: кнопка дышит и чуть дрожит, яркость мерцает, бежит полоса.
-func _animate_tv() -> void:
-	var pulse := 1.0 + sin(_time * 3.0) * 0.04
-	_tv_button.scale = Vector3(pulse, pulse, 1.0)
-	_tv_button.position.x = -0.12 + (randf() - 0.5) * 0.002
-	var flicker := 0.93 + randf() * 0.07
-	_tv_bg_mat.albedo_color = Color(flicker, flicker, flicker)
-	_tv_scan.position.y = 0.78 + 0.2 - fmod(_time * 0.12, 0.4)
+## Щёлкнуть выключателем ночника.
+func toggle_night_lamp() -> void:
+	night_lamp_on = not night_lamp_on
+
+
+## Лампочка под зелёным абажуром ночника.
+func _build_night_light() -> void:
+	_night_light = OmniLight3D.new()
+	_night_light.light_color = Color(1.0, 0.82, 0.55)
+	_night_light.light_energy = 0.9
+	_night_light.omni_range = 2.6
+	_night_light.position = Vector3(0, 0.3, 0)
+	_night_lamp.add_child(_night_light)
+	var bulb := MeshInstance3D.new()
+	var sphere := SphereMesh.new()
+	sphere.radius = 0.04
+	sphere.height = 0.08
+	bulb.mesh = sphere
+	_night_bulb_mat = StandardMaterial3D.new()
+	_night_bulb_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	bulb.material_override = _night_bulb_mat
+	bulb.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	bulb.position = Vector3(0, 0.29, 0)
+	_night_lamp.add_child(bulb)
 
 
 ## Лампочка под абажуром торшера: тёплый свет и светящийся шарик.
