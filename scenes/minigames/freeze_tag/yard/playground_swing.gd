@@ -44,13 +44,8 @@ func _ready() -> void:
 		shape.position = Vector3(x, 1.2, 0)
 		body.add_child(shape)
 		add_child(body)
-	var hint := Label3D.new()
-	hint.text = "КАЧЕЛИ\nсесть — подтвердить"
-	hint.font_size = 36
-	hint.outline_size = 10
-	hint.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	hint.position = Vector3(0, 3.0, 0)
-	add_child(hint)
+	var badge := ZoneBadge.new().setup("zone_swing", 3.0)
+	add_child(badge)
 
 
 ## Толкнуть качели проходящими персонажами и раскачать сиденья.

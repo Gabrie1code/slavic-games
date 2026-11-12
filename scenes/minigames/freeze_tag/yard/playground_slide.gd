@@ -33,13 +33,9 @@ func _ready() -> void:
 	shape.position = Vector3(1.35, 0.85, 0)
 	body.add_child(shape)
 	add_child(body)
-	var hint := Label3D.new()
-	hint.text = "ГОРКА\nподтвердить у лесенки"
-	hint.font_size = 36
-	hint.outline_size = 10
-	hint.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	hint.position = Vector3(1.3, 2.7, 0)
-	add_child(hint)
+	var badge := ZoneBadge.new().setup("zone_slide", 2.8)
+	badge.position += Vector3(1.3, 0, 0)
+	add_child(badge)
 
 
 ## Точка у лесенки (в мире): отсюда можно залезть.

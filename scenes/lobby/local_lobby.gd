@@ -93,11 +93,11 @@ func _ready() -> void:
 	_sun.rotation_degrees = Vector3(-55, -35, 0)
 	_build_ui()
 	_build_zone(Apartment.TV_ZONE, TV_ZONE_RADIUS, Color(0.56, 0.84, 0.58),
-		"ИГРАТЬ: встань в круг\nи нажми Пробел / Enter / A")
+		"zone_play")
 	_build_zone(Apartment.WARDROBE_ZONE, WARDROBE_RADIUS, Color(0.96, 0.76, 0.26),
-		"ШКАФ: переодеться\nи купить одежду")
+		"zone_wardrobe")
 	_build_zone(Apartment.RUBGAME_ZONE, RUBGAME_RADIUS, Color(1.0, 0.35, 0.75),
-		"ИГРА НА РУБЛИ\nкруг каждые 20 сек")
+		"zone_rubgame")
 
 	# Боты прошлой партии в лобби не нужны: при старте спросим заново.
 	PlayerManager.remove_bots()
@@ -275,7 +275,9 @@ func _is_near(p: PlayerData, point: Vector3, radius: float) -> bool:
 # ---------------- Зоны, диван, примерочная ----------------
 
 ## Круг на полу с подписью: встань и нажми кнопку.
-func _build_zone(pos: Vector3, radius: float, color: Color, text: String) -> void:
+## Зона на полу (круг) и над ней — компактная «кнопка»-значок (assets/ui/prompts/<badge>.png),
+## которая плавно покачивается. Какую клавишу жать — подсказка у прицела игрока (KeyPrompt).
+func _build_zone(pos: Vector3, radius: float, color: Color, badge: String) -> void:
 	var zone := MeshInstance3D.new()
 	var zone_mesh := CylinderMesh.new()
 	zone_mesh.top_radius = radius
@@ -290,13 +292,9 @@ func _build_zone(pos: Vector3, radius: float, color: Color, text: String) -> voi
 	zone.material_override = zone_mat
 	zone.position = pos + Vector3.UP * 0.04
 	add_child(zone)
-	var hint := Label3D.new()
-	hint.text = text
-	hint.font_size = 30
-	hint.outline_size = 10
-	hint.rotation_degrees.x = -90
-	hint.position = pos + Vector3(0, 0.06, radius * 0.5)
-	add_child(hint)
+	var badge_node := ZoneBadge.new().setup(badge, 2.25)
+	badge_node.position += pos
+	add_child(badge_node)
 
 
 ## Удар рукой: от третьего лица — взмах вперёд, от первого — тычок кулаком в кадре.
@@ -428,31 +426,40 @@ func _near_cat(p: PlayerData) -> bool:
 	return _is_near(p, _apartment.cat.position, CAT_RADIUS)
 
 
-## Подсказка у телефона и кота. «~» в начале — действие сейчас недоступно (серым).
-func _phone_cat_hint(p: PlayerData) -> String:
+## Подсказка у телефона и кота: список действий для KeyPrompt (пусто — рядом ничего нет).
+func _phone_cat_hint(p: PlayerData) -> Array[Dictionary]:
 	var phone := _apartment.phone
 	if phone.user == p:
-		return "%s — крутить диск   %s — положить трубку" % [_attack_key(p), _confirm_key(p)]
+		return [_entry(_attack_key(p), "Крутить диск"), _entry(_confirm_key(p), "Положить трубку")]
 	if _near_phone(p):
 		if phone.can_use(p):
-			return "%s — снять трубку" % _confirm_key(p)
-		return "~%s — снять трубку (телефон занят: %s)" % [_confirm_key(p), phone.user.display_name]
-	return _cat_hint(p) if _near_cat(p) else ""
+			return [_entry(_confirm_key(p), "Снять трубку")]
+		return [_entry(_confirm_key(p), "Телефон занят: %s" % phone.user.display_name, true)]
+	if _near_cat(p):
+		return _cat_hint(p)
+	return []
 
 
-func _cat_hint(p: PlayerData) -> String:
+func _cat_hint(p: PlayerData) -> Array[Dictionary]:
 	var cat := _apartment.cat
+	var cat_name := LobbyCat.CAT_NAME
 	if cat.is_sleepy():
-		return "~%s спит — не будить" % LobbyCat.CAT_NAME
+		return [_entry(_confirm_key(p), "%s спит — не будить" % cat_name, true)]
 	if not cat.can_pet():
-		return "~Баггета только что погладили (%d с)" % ceili(cat.cooldown_left())
-	return "%s — погладить Баггета" % _confirm_key(p)
+		return [_entry(_confirm_key(p), "Погладить %sа (%d с)" % [cat_name, ceili(cat.cooldown_left())],
+			true)]
+	return [_entry(_confirm_key(p), "Погладить %sа" % cat_name)]
+
+
+## Одна строка подсказки: кнопка, действие, недоступно ли (серым).
+func _entry(key: String, text: String, off: bool = false) -> Dictionary:
+	return {"key": key, "text": text, "off": off}
 
 
 func _attack_key(p: PlayerData) -> String:
 	match p.device_kind:
 		PlayerData.DeviceKind.KEYBOARD_WASD:
-			return "ЛКМ / F"
+			return "ЛКМ"
 		PlayerData.DeviceKind.KEYBOARD_ARROWS:
 			return "/"
 		_:
@@ -585,11 +592,11 @@ func _create_view(p: PlayerData) -> void:
 	var dot := _overlay_label("•", 28)
 	dot.set_anchors_preset(Control.PRESET_CENTER)
 	container.add_child(dot)
-	var prompt := _overlay_label("", 24)
-	prompt.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
-	prompt.offset_top = -120
-	prompt.offset_bottom = -80
-	prompt.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	# Подсказка «кнопка + действие» — чуть правее и ниже прицела, как в шутерах.
+	var prompt := KeyPrompt.new()
+	prompt.set_anchors_preset(Control.PRESET_CENTER)
+	prompt.offset_left = 36
+	prompt.offset_top = 20
 	container.add_child(prompt)
 	_views_root.add_child(container)
 	_views[p.id] = {"container": container, "camera": camera, "prompt": prompt, "fist": fist}
@@ -660,11 +667,7 @@ func _update_first_person(delta: float) -> void:
 		var eye := character.global_position + Vector3.UP * eye_height
 		camera.global_transform = Transform3D(
 			Basis.from_euler(Vector3(character.fp_pitch, character.rotation.y, 0.0)), eye)
-		# «~» в начале подсказки — действие сейчас недоступно: показываем серым.
-		var prompt_text := _prompt_for(p, character)
-		var prompt: Label = _views[id]["prompt"]
-		prompt.modulate = Color(0.6, 0.6, 0.6, 0.8) if prompt_text.begins_with("~") else Color.WHITE
-		prompt.text = prompt_text.trim_prefix("~")
+		(_views[id]["prompt"] as KeyPrompt).set_entries(_prompt_for(p, character))
 	# Мышь ловим, только если есть игрок на WASD и не открыто окно/примерочная.
 	var want_capture := _view == View.FIRST_PERSON and _rooms.is_empty() and not _bot_dialog.visible \
 		and PlayerManager.is_device_taken(PlayerData.DeviceKind.KEYBOARD_WASD)
@@ -674,25 +677,26 @@ func _update_first_person(delta: float) -> void:
 
 
 ## Подсказка внизу экрана игрока: что можно сделать здесь.
-func _prompt_for(p: PlayerData, character: PlayerCharacter) -> String:
+func _prompt_for(p: PlayerData, character: PlayerCharacter) -> Array[Dictionary]:
 	var key := _confirm_key(p)
 	var hint := _phone_cat_hint(p)
-	if hint != "":
+	if not hint.is_empty():
 		return hint
 	var action := ""
 	if character.sitting:
-		action = "встать"
+		action = "Встать"
 	elif _is_near(p, Apartment.WARDROBE_ZONE, WARDROBE_RADIUS):
-		action = "открыть шкаф (переодеться)"
+		action = "Шкаф: переодеться"
 	elif _near_rubgame(p):
-		action = "сыграть в рулетку"
+		action = "Игра на рубли"
 	elif _is_near(p, Apartment.TV_ZONE, TV_ZONE_RADIUS):
-		if _ready_marks.has(p.id):
-			return "Ты ГОТОВ! Ждём остальных  (%s — отменить)" % key
-		action = "ГОТОВ к игре"
+		action = "Отменить «Готов» (ждём остальных)" if _ready_marks.has(p.id) else "Готов к игре"
 	elif _free_seat_near(p) >= 0:
-		action = "сесть на диван"
-	return "" if action == "" else "%s — %s" % [key, action]
+		action = "Сесть на диван"
+	var result: Array[Dictionary] = []
+	if action != "":
+		result.append(_entry(key, action))
+	return result
 
 
 func _confirm_key(p: PlayerData) -> String:
