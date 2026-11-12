@@ -19,6 +19,8 @@ const SIT_LEGS := 1.45
 const FP_TURN_SPEED := 2.6
 const TURN_SPEED := 12.0
 const KNOCKBACK_DECAY := 18.0
+## Максимальная скорость взлёта (прыжок 7, отбрасывание битой до ~7 — хватает с запасом).
+const MAX_RISE_SPEED := 9.0
 ## Поворот правой руки: опущена / поднята вверх / вытянута в сторону.
 const ARM_DOWN := 0.12
 const ARM_UP := 2.75
@@ -84,6 +86,9 @@ func setup(p: PlayerData, spawn: Vector3) -> void:
 
 
 func _ready() -> void:
+	# Разлетающиеся осколки и опрокинутые вещи — не «движущаяся платформа»: их скорость
+	# персонажу не передаётся (карусель в «Морожке» по-прежнему везёт, пока на ней стоишь).
+	platform_on_leave = CharacterBody3D.PLATFORM_ON_LEAVE_DO_NOTHING
 	_primary_material = StandardMaterial3D.new()
 	_primary_material.albedo_color = player.color
 	_primary_material.roughness = 0.6
@@ -130,6 +135,9 @@ func _physics_process(delta: float) -> void:
 		rotation.y = lerp_angle(rotation.y, yaw, TURN_SPEED * delta)
 
 	move_and_slide()
+	# Защита от «катапульты»: персонаж не взлетает быстрее MAX_RISE_SPEED, что бы его ни подбросило
+	# (раньше удар по полке с хрусталём мог запустить персонажа под потолок и выше).
+	velocity.y = minf(velocity.y, MAX_RISE_SPEED)
 	_push_bodies()
 
 	if respawn_on_fall and global_position.y < fall_limit:

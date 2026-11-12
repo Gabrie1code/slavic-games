@@ -25,8 +25,6 @@ const ROUNDS := 5
 const WARDROBE_RADIUS := 1.2
 const TV_ZONE_RADIUS := 1.3
 const RUBGAME_RADIUS := 1.3
-const PHONE_RADIUS := 1.2
-const CAT_RADIUS := 1.3
 const SEAT_RADIUS := 0.9
 const COUNTDOWN := 5.0
 ## Вид от первого лица: чувствительность мыши и скорость обзора правым стиком.
@@ -70,6 +68,8 @@ var _mouse_delta := Vector2.ZERO
 ## Открытые окна игроков (примерочная, стол игры на рубли): PlayerData.id -> LobbyRoom
 var _rooms: Dictionary = {}
 var _rooms_root: Control
+## Телефон и кот: подсказки, нажатия, игрок с трубкой.
+var _gadgets: LobbyGadgets
 
 @onready var _players_root: Node3D = $Players
 @onready var _camera: Camera3D = $Camera3D
@@ -91,6 +91,7 @@ func _ready() -> void:
 	_views_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	views_layer.add_child(_views_root)
 	_sun.rotation_degrees = Vector3(-55, -35, 0)
+	_gadgets = LobbyGadgets.new(_apartment, _characters)
 	_build_ui()
 	_build_zone(Apartment.TV_ZONE, TV_ZONE_RADIUS, Color(0.56, 0.84, 0.58),
 		"zone_play")
@@ -208,12 +209,16 @@ func _process(delta: float) -> void:
 			if since > 0.35 and pressed:
 				_stand(p)
 			continue
-		if _apartment.phone.user == p:
-			_process_phone(p)
+		if _gadgets.holds_phone(p):
+			_gadgets.process_holder(p) # с трубкой ходят, но не дерутся и не садятся
 			continue
+		# Рядом с чем-то, что делается «подтверждением» (кот, телефон, диван, шкаф…), прыжка нет:
+		# Пробел должен погладить кота, а не подбросить персонажа.
+		if character:
+			character.can_jump = _prompt_for(p, character).is_empty()
 		if p.input.is_just_pressed("attack"):
 			_punch(p)
-		if p.input.is_just_pressed("confirm") and _try_phone_or_cat(p):
+		if p.input.is_just_pressed("confirm") and _gadgets.try_interact(p):
 			continue
 		var at_tv := _is_near(p, Apartment.TV_ZONE, TV_ZONE_RADIUS)
 		var seat := _free_seat_near(p)
@@ -385,88 +390,12 @@ func _open_wardrobe(p: PlayerData) -> void:
 	var room := DressingRoom.new()
 	room.setup(p, character)
 	room.closed.connect(_on_room_closed)
-	room.color_changed.connect(func(_p: PlayerData) -> void: _refresh_slots())
+	room.color_changed.connect(func(changed: PlayerData) -> void:
+		_refresh_slots()
+		_update_fist_color(changed))
 	_rooms_root.add_child(room)
 	_rooms[p.id] = room
 	_layout_rooms()
-
-
-# ---------------- Телефон и кот ----------------
-
-## С трубкой у уха: удар (ЛКМ/F) — крутить диск, подтвердить/отмена — положить трубку.
-func _process_phone(p: PlayerData) -> void:
-	(_characters[p.id] as PlayerCharacter).input_enabled = false # говорит — стоит на месте
-	if p.input.is_just_pressed("attack"):
-		_apartment.phone.dial()
-	elif p.input.is_just_pressed("confirm") or p.input.is_just_pressed("cancel"):
-		_apartment.phone.hang_up()
-		(_characters[p.id] as PlayerCharacter).input_enabled = true
-
-
-## Подтвердить рядом с телефоном или котом. true — нажатие использовано.
-func _try_phone_or_cat(p: PlayerData) -> bool:
-	var character: PlayerCharacter = _characters[p.id]
-	if _near_phone(p) and _apartment.phone.can_use(p):
-		character.input_enabled = false
-		character.velocity = Vector3.ZERO
-		_apartment.phone.pick_up(p, character)
-		return true
-	if _near_cat(p) and _apartment.cat.pet():
-		# Персонаж тянет руку к коту.
-		character.set_arm_pose(0.25, 0.9, 0.15)
-		get_tree().create_timer(0.7).timeout.connect(func() -> void:
-			if is_instance_valid(character) and _apartment.phone.user != p:
-				character.set_arm_angle(PlayerCharacter.ARM_DOWN, 0.2))
-		return true
-	return false
-
-
-func _near_phone(p: PlayerData) -> bool:
-	return _is_near(p, Apartment.PHONE_TABLE_POS, PHONE_RADIUS)
-
-
-func _near_cat(p: PlayerData) -> bool:
-	return _is_near(p, _apartment.cat.position, CAT_RADIUS)
-
-
-## Подсказка у телефона и кота: список действий для KeyPrompt (пусто — рядом ничего нет).
-func _phone_cat_hint(p: PlayerData) -> Array[Dictionary]:
-	var phone := _apartment.phone
-	if phone.user == p:
-		return [_entry(_attack_key(p), "Крутить диск"), _entry(_confirm_key(p), "Положить трубку")]
-	if _near_phone(p):
-		if phone.can_use(p):
-			return [_entry(_confirm_key(p), "Снять трубку")]
-		return [_entry(_confirm_key(p), "Телефон занят: %s" % phone.user.display_name, true)]
-	if _near_cat(p):
-		return _cat_hint(p)
-	return []
-
-
-func _cat_hint(p: PlayerData) -> Array[Dictionary]:
-	var cat := _apartment.cat
-	var cat_name := LobbyCat.CAT_NAME
-	if cat.is_sleepy():
-		return [_entry(_confirm_key(p), "%s спит — не будить" % cat_name, true)]
-	if not cat.can_pet():
-		return [_entry(_confirm_key(p), "Погладить %sа (%d с)" % [cat_name, ceili(cat.cooldown_left())],
-			true)]
-	return [_entry(_confirm_key(p), "Погладить %sа" % cat_name)]
-
-
-## Одна строка подсказки: кнопка, действие, недоступно ли (серым).
-func _entry(key: String, text: String, off: bool = false) -> Dictionary:
-	return {"key": key, "text": text, "off": off}
-
-
-func _attack_key(p: PlayerData) -> String:
-	match p.device_kind:
-		PlayerData.DeviceKind.KEYBOARD_WASD:
-			return "ЛКМ"
-		PlayerData.DeviceKind.KEYBOARD_ARROWS:
-			return "/"
-		_:
-			return "X"
 
 
 func _open_rubgame(p: PlayerData) -> void:
@@ -584,6 +513,15 @@ func _create_view(p: PlayerData) -> void:
 	fist.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	fist.position = Vector3(0.26, -0.24, -0.45)
 	camera.add_child(fist)
+	# Трубка телефона «в кадре» — видна, пока игрок говорит по телефону (вместо кулака).
+	var handset := (load("res://assets/models/apartment/phone_handset.glb") as PackedScene) \
+		.instantiate() as Node3D
+	handset.position = Vector3(0.24, -0.16, -0.36)
+	handset.rotation = Vector3(0.3, -0.5, 1.2)
+	handset.scale = Vector3.ONE * 1.3
+	handset.visible = false
+	_set_layers(handset, _viewmodel_layer(p))
+	camera.add_child(handset)
 
 	var frame := ReferenceRect.new()
 	frame.border_color = p.color
@@ -602,8 +540,23 @@ func _create_view(p: PlayerData) -> void:
 	prompt.offset_top = 20
 	container.add_child(prompt)
 	_views_root.add_child(container)
-	_views[p.id] = {"container": container, "camera": camera, "prompt": prompt, "fist": fist}
+	_views[p.id] = {"container": container, "camera": camera, "prompt": prompt, "fist": fist,
+		"handset": handset}
 	_layout_views()
+
+
+func _set_layers(node: Node, layer: int) -> void:
+	if node is VisualInstance3D:
+		(node as VisualInstance3D).layers = layer
+	for child in node.get_children():
+		_set_layers(child, layer)
+
+
+## Кулак «в кадре» — цвета игрока: после смены цвета в шкафу перекрасить сразу.
+func _update_fist_color(p: PlayerData) -> void:
+	if _views.has(p.id):
+		var fist: MeshInstance3D = _views[p.id]["fist"]
+		(fist.material_override as StandardMaterial3D).albedo_color = p.color
 
 
 func _remove_view(p: PlayerData) -> void:
@@ -671,6 +624,9 @@ func _update_first_person(delta: float) -> void:
 		camera.global_transform = Transform3D(
 			Basis.from_euler(Vector3(character.fp_pitch, character.rotation.y, 0.0)), eye)
 		(_views[id]["prompt"] as KeyPrompt).set_entries(_prompt_for(p, character))
+		var on_phone := _gadgets.holds_phone(p)
+		(_views[id]["fist"] as Node3D).visible = not on_phone
+		(_views[id]["handset"] as Node3D).visible = on_phone
 	# Мышь ловим, только если есть игрок на WASD и не открыто окно/примерочная.
 	var want_capture := _view == View.FIRST_PERSON and _rooms.is_empty() and not _bot_dialog.visible \
 		and PlayerManager.is_device_taken(PlayerData.DeviceKind.KEYBOARD_WASD)
@@ -681,8 +637,8 @@ func _update_first_person(delta: float) -> void:
 
 ## Подсказка внизу экрана игрока: что можно сделать здесь.
 func _prompt_for(p: PlayerData, character: PlayerCharacter) -> Array[Dictionary]:
-	var key := _confirm_key(p)
-	var hint := _phone_cat_hint(p)
+	var key := LobbyGadgets.confirm_key(p)
+	var hint := _gadgets.hint(p)
 	if not hint.is_empty():
 		return hint
 	var action := ""
@@ -698,18 +654,8 @@ func _prompt_for(p: PlayerData, character: PlayerCharacter) -> Array[Dictionary]
 		action = "Сесть на диван"
 	var result: Array[Dictionary] = []
 	if action != "":
-		result.append(_entry(key, action))
+		result.append(LobbyGadgets.entry(key, action))
 	return result
-
-
-func _confirm_key(p: PlayerData) -> String:
-	match p.device_kind:
-		PlayerData.DeviceKind.KEYBOARD_WASD:
-			return "Пробел"
-		PlayerData.DeviceKind.KEYBOARD_ARROWS:
-			return "Enter"
-		_:
-			return "A"
 
 
 func _overlay_label(text: String, font_size: int) -> Label:

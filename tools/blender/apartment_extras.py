@@ -103,7 +103,9 @@ def export(name, objs):
 
 WOOD = mat("Wood", (0.35, 0.18, 0.08), 0.5)
 WOOD_D = mat("WoodDark", (0.2, 0.09, 0.03), 0.5)
-BRASS = mat("Brass", (0.85, 0.65, 0.25), 0.3, 1.0)
+# Золото светлое и почти не металл: в комнате нечему отражаться, металл в Godot выходит тёмным.
+BRASS = mat("Brass", (1.0, 0.76, 0.25), 0.35, 0.3)
+HORN = mat("Horn", (1.0, 0.74, 0.22), 0.3, 0.3)
 BLACK = mat("Black", (0.03, 0.03, 0.03), 0.3)
 WHITE = mat("White", (0.93, 0.92, 0.88), 0.4)
 
@@ -127,6 +129,8 @@ for x in (-0.085, 0.085):                                           # рычаг
     P.append(box((0.035, 0.05, 0.05), (x, 0.07, 0.12), RED))
 # Подложка диска на переднем скате (сам диск — отдельная модель, точка DIAL_POS).
 P.append(cyl(0.064, 0.006, (0, -0.045, 0.103), WHITE, verts=24, rot=(math.radians(16), 0, 0)))
+# Упор диска (чёрный «клювик») — на корпусе, а не на диске: он не крутится.
+P.append(box((0.006, 0.022, 0.014), (0.045, -0.0899, 0.1051), BLACK, rot=(math.radians(16), 0, 0)))
 export("phone_base", [join("PhoneBase", P)])
 
 # Диск (крутится вокруг своей оси Z; в Godot — вокруг Y, наклон задаёт узел).
@@ -135,7 +139,6 @@ for i in range(10):
     a = math.radians(60 + i * 26)
     P.append(cyl(0.009, 0.01, (math.cos(a) * 0.043, math.sin(a) * 0.043, 0.002), BLACK, verts=8))
 P.append(cyl(0.018, 0.012, (0, 0, 0.002), RED, verts=12))
-P.append(box((0.005, 0.02, 0.012), (0.045, -0.042, 0.004), BRASS))  # упор
 export("phone_dial", [join("PhoneDial", P)])
 
 # Трубка: вдоль X, центр в начале координат.
@@ -158,18 +161,27 @@ P.append(cyl(0.012, 0.05, (-0.17, 0.0, 0.08), BRASS, verts=8, rot=(0, math.pi / 
 path = [(0.13, 0.15, 0.17), (0.12, 0.18, 0.3), (0.06, 0.15, 0.45), (0.0, 0.05, 0.55)]
 for a, b in zip(path, path[1:]):
     P.append(rod(a, b, 0.025, BRASS))
-horn = cyl(0.025, 0.32, (0, 0, 0), BRASS, verts=20, r2=0.22)
+# Раструб — полая труба (без крышек) с толщиной: изнутри тоже золотой, без «рваных» граней.
+bpy.ops.mesh.primitive_cone_add(vertices=24, radius1=0.025, radius2=0.22, depth=0.32, end_fill_type="NOTHING",
+                                location=(0, 0, 0))
+horn = flat(bpy.context.object, HORN)
+mod = horn.modifiers.new("Thick", "SOLIDIFY")
+mod.thickness = 0.008
+bpy.context.view_layer.objects.active = horn
+bpy.ops.object.modifier_apply(modifier="Thick")
 horn.rotation_euler = (math.radians(-60), 0, 0)
 horn.location = (0, -0.08, 0.63)
-bpy.context.view_layer.objects.active = horn
 bpy.ops.object.transform_apply(location=True, rotation=True)
 P.append(horn)
-inner = cyl(0.2, 0.01, (0, 0, 0), mat("HornIn", (0.35, 0.22, 0.08), 0.4, 1.0), verts=20)
-inner.rotation_euler = (math.radians(-60), 0, 0)
-inner.location = (0, -0.21, 0.71)
-bpy.context.view_layer.objects.active = inner
+bpy.ops.mesh.primitive_torus_add(major_radius=0.22, minor_radius=0.012, major_segments=24, minor_segments=5,
+                                 location=(0, 0, 0))                          # кант по краю раструба
+rim = flat(bpy.context.object, HORN)
+rim.rotation_euler = (math.radians(-60), 0, 0)
+# Сдвиг края раструба (0, 0, 0.16) после поворота на −60° по X + положение раструба.
+rim.location = Vector((0, -0.08, 0.63)) + Vector((0, 0.16 * math.sin(math.radians(60)), 0.16 * 0.5))
 bpy.ops.object.transform_apply(location=True, rotation=True)
-P.append(inner)
+bpy.context.view_layer.objects.active = rim
+P.append(rim)
 export("gramophone", [join("Gramophone", P)])
 
 # ---------------- Часы с кукушкой (висят на стене, задняя стенка в y = 0) ----------------
