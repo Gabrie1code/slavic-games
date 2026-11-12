@@ -29,6 +29,8 @@ var input_enabled := true
 var can_jump := true
 var respawn_on_fall := true
 var fall_limit := -10.0
+## Наклон правой руки вперёд (>0) / назад (<0), когда рука занята (держит предмет).
+var arm_pose_x := 0.0
 
 var _knockback := Vector3.ZERO
 var _gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity")
@@ -124,7 +126,7 @@ func _process(delta: float) -> void:
 	if not _right_arm_busy:
 		_part("ArmR").rotation.x = swing * 0.8
 	else:
-		_part("ArmR").rotation.x = 0.0
+		_part("ArmR").rotation.x = arm_pose_x
 	# Подпрыгивание при шаге и лёгкое «дыхание» в стойке.
 	_model.position.y = absf(sin(_walk_phase)) * 0.06 * amount
 	_part("Head").rotation.x = sin(_idle_time * 2.0) * 0.04
@@ -144,6 +146,7 @@ func raise_hand(up: bool, time: float = 0.15) -> void:
 ## Повернуть правую руку на угол (радианы, ARM_DOWN = опущена).
 func set_arm_angle(angle: float, time: float = 0.15) -> void:
 	_right_arm_busy = absf(angle - ARM_DOWN) > 0.01
+	arm_pose_x = 0.0
 	if _arm_tween:
 		_arm_tween.kill()
 	_arm_tween = create_tween()
@@ -151,13 +154,25 @@ func set_arm_angle(angle: float, time: float = 0.15) -> void:
 		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 
-## Взять предмет в правую руку (старый предмет удаляется).
-func hold_item(item: Node3D) -> void:
+## Поза правой руки: angle_z — в сторону (ARM_DOWN = опущена), angle_x — вперёд (>0) / назад.
+func set_arm_pose(angle_z: float, angle_x: float, time: float = 0.15) -> void:
+	_right_arm_busy = true
+	if _arm_tween:
+		_arm_tween.kill()
+	_arm_tween = create_tween().set_parallel(true)
+	_arm_tween.tween_property(_part("ArmR"), "rotation:z", angle_z, time) \
+		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	_arm_tween.tween_property(self, "arm_pose_x", angle_x, time)
+
+
+## Взять предмет в правую руку (старый предмет удаляется). Возвращает сам предмет.
+func hold_item(item: Node3D) -> Node3D:
 	for child in right_hand.get_children():
 		child.queue_free()
 	if item:
 		right_hand.add_child(item)
 		_right_arm_busy = true
+	return item
 
 
 ## Показать или спрятать имя над головой (в примерочной не нужно).

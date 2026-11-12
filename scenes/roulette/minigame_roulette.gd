@@ -43,18 +43,30 @@ func _spin(picked: int) -> void:
 	var reps := ceili(float(MIN_CARDS_IN_STRIP) / count)
 	# Останавливаемся на нужной карточке ближе к концу ленты.
 	var target_card := (reps - 2) * count + picked
-	var step := CARD_SIZE.x + CARD_GAP
-	var center := get_viewport_rect().size.x / 2.0
-	_strip.position.x = center - CARD_SIZE.x / 2.0
-	var target_x := center - (target_card * step + CARD_SIZE.x / 2.0)
+	# Ждём, пока контейнер расставит карточки, и берём их настоящие места:
+	# карточка может быть шире из-за длинного текста.
+	await get_tree().process_frame
+	await get_tree().process_frame
+	var card := _strip.get_child(target_card) as Control
+	var first := _strip.get_child(0) as Control
+	var center := (_strip.get_parent() as Control).size.x / 2.0
+	_strip.position.x = center - (first.position.x + first.size.x / 2.0)
+	var target_x := center - (card.position.x + card.size.x / 2.0)
 
+	# 1) Разгон и замедление — останавливаемся чуть-чуть не доехав или проехав.
+	var miss := card.size.x * randf_range(0.18, 0.35) * (1.0 if randf() < 0.5 else -1.0)
 	var tween := create_tween()
-	tween.tween_property(_strip, "position:x", target_x, SPIN_TIME) \
+	tween.tween_property(_strip, "position:x", target_x + miss, SPIN_TIME) \
 		.set_trans(Tween.TRANS_QUART).set_ease(Tween.EASE_OUT)
 	await tween.finished
+	# 2) Короткая пауза и плавный «доводящий» рывок точно в центр.
+	await get_tree().create_timer(0.15).timeout
+	var snap := create_tween()
+	snap.tween_property(_strip, "position:x", target_x, 0.45) \
+		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	await snap.finished
 
-	var card := _strip.get_child(target_card) as Control
-	card.pivot_offset = CARD_SIZE / 2.0
+	card.pivot_offset = card.size / 2.0
 	var pulse := create_tween().set_loops(3)
 	pulse.tween_property(card, "scale", Vector2.ONE * 1.12, 0.15)
 	pulse.tween_property(card, "scale", Vector2.ONE, 0.15)

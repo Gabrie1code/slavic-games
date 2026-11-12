@@ -27,6 +27,10 @@ const OUT_Y := -1.5
 const SPIN_TIME := 0.35
 const SPIN_COOLDOWN := 0.9
 const SPIN_SPEED_FACTOR := 0.6
+## Как держать биту в покое: рука согнута перед грудью, бита лежит на плече.
+const REST_ARM_Z := 0.42
+const REST_ARM_X := 0.9 # рука согнута вперёд, кисть перед грудью
+const REST_BAT_X := 2.76 # ≈158°: бита смотрит вверх и назад, за плечо
 const HIT_RADIUS := 2.1
 const HIT_DAMAGE := 20
 const HIT_KNOCKBACK := 9.0
@@ -59,6 +63,7 @@ class Fighter:
 	var super_left := 0.0
 	var drink_left := 0.0
 	var spinning := false
+	var bat: Node3D
 
 
 var _fighters: Array[Fighter] = []
@@ -115,8 +120,7 @@ func _spawn_fighters() -> void:
 		# Повернуть лицом к центру крыши.
 		var to_center := -f.character.position
 		f.character.rotation.y = atan2(-to_center.x, -to_center.z)
-		f.character.set_arm_angle(PlayerCharacter.ARM_SIDE, 0.01)
-		f.character.hold_item(BAT_SCENE.instantiate())
+		_give_bat(f, BAT_SCENE)
 
 		f.hp_label = Label3D.new()
 		f.hp_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
@@ -157,7 +161,7 @@ func _physics_process(delta: float) -> void:
 		f.drink_left = maxf(0.0, f.drink_left - delta)
 		if f.has_super_bat and f.super_left == 0.0:
 			f.has_super_bat = false
-			f.character.hold_item(BAT_SCENE.instantiate())
+			_give_bat(f, BAT_SCENE)
 
 		if f.player.is_bot():
 			_bot_think(f)
@@ -171,6 +175,20 @@ func _physics_process(delta: float) -> void:
 	_check_end()
 
 
+## Дать бойцу биту (обычную или супер) и поставить в позу «бита на плече».
+func _give_bat(f: Fighter, scene: PackedScene) -> void:
+	f.bat = f.character.hold_item(scene.instantiate())
+	_rest_pose(f, 0.01)
+
+
+## Поза покоя: рука согнута перед грудью, бита лежит на плече.
+func _rest_pose(f: Fighter, time: float) -> void:
+	if not is_instance_valid(f.bat):
+		return
+	f.character.set_arm_pose(REST_ARM_Z, REST_ARM_X, time)
+	create_tween().tween_property(f.bat, "rotation:x", REST_BAT_X, time)
+
+
 ## Атака: вращение с битой, урон и отбрасывание всем, кто рядом.
 func _spin(f: Fighter) -> void:
 	var is_super := f.has_super_bat
@@ -178,13 +196,20 @@ func _spin(f: Fighter) -> void:
 	f.spinning = true
 	f.character.speed = 6.0 * SPIN_SPEED_FACTOR
 
+	# Замах: рука с битой выносится в сторону, бита — продолжение руки; затем оборот.
+	f.character.set_arm_pose(PlayerCharacter.ARM_SIDE, 0.0, 0.06)
+	if f.bat:
+		create_tween().tween_property(f.bat, "rotation:x", 0.0, 0.06)
 	var tween := create_tween()
 	f.character.visual.rotation.y = 0.0
-	tween.tween_property(f.character.visual, "rotation:y", -TAU, SPIN_TIME)
+	tween.tween_interval(0.05)
+	tween.tween_property(f.character.visual, "rotation:y", -TAU, SPIN_TIME) \
+		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	tween.tween_callback(func() -> void:
 		f.character.visual.rotation.y = 0.0
 		f.character.speed = 6.0
-		f.spinning = false)
+		f.spinning = false
+		_rest_pose(f, 0.2))
 
 	var radius := SUPER_RADIUS if is_super else HIT_RADIUS
 	var damage := SUPER_DAMAGE if is_super else HIT_DAMAGE
@@ -363,7 +388,7 @@ func _apply_boost(f: Fighter, type: Boost) -> void:
 	if type == Boost.SUPER_BAT:
 		f.super_left = SUPER_TIME
 		f.has_super_bat = true
-		f.character.hold_item(SUPER_BAT_SCENE.instantiate())
+		_give_bat(f, SUPER_BAT_SCENE)
 		_message_label.text = "%s взял СУПЕР-БИТУ!" % f.player.display_name
 	else:
 		f.drink_left = DRINK_TIME

@@ -6,6 +6,16 @@ extends Node3D
 ## и продолжает с того же места (всё состояние хранится в MatchState).
 
 const CHARACTER_SCENE := preload("res://scenes/characters/test_character.tscn")
+const DICE_SCENE := preload("res://assets/models/props/dice.glb")
+const BOTTLE_SCENE := preload("res://assets/models/props/bottle.glb")
+## Сколько ждать броска кубика, потом он бросается сам.
+const ROLL_TIMEOUT := 15.0
+const DICE_HEIGHT := 2.9
+## Поворот кубика (в градусах), при котором грань с числом смотрит на камеру.
+const DICE_FACES := {
+	1: Vector3(0, 0, 0), 2: Vector3(0, -90, 0), 3: Vector3(90, 0, 0),
+	4: Vector3(-90, 0, 0), 5: Vector3(0, 90, 0), 6: Vector3(0, 180, 0),
+}
 const DEFAULT_ROUNDS := 5
 const CAMERA_OFFSET := Vector3(0, 9.0, 8.0)
 const HOP_TIME := 0.28
@@ -26,7 +36,12 @@ const EVENTS := [
 var _spaces: Array[BoardSpace] = []
 var _pawns: Dictionary = {} # PlayerData.id -> персонаж
 var _camera_target: Node3D
-var _dice_label: Label3D
+## Кубик: «стержень» всегда повёрнут к камере, внутри него крутится сам кубик.
+var _dice_pivot: Node3D
+var _dice: Node3D
+var _dice_spinning := false
+var _bottle: Node3D
+var _timer_bar: ProgressBar
 
 var _round_label: Label
 var _message_label: Label
@@ -58,15 +73,15 @@ func _ready() -> void:
 		pawn.set_physics_process(false)
 		_pawns[p.id] = pawn
 
-	_dice_label = Label3D.new()
-	_dice_label.font_size = 160
-	_dice_label.outline_size = 32
-	_dice_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	_dice_label.no_depth_test = true
-	_dice_label.modulate = Color("f6c343")
-	_dice_label.outline_modulate = Color("7a1410")
-	_dice_label.visible = false
-	add_child(_dice_label)
+	_dice_pivot = Node3D.new()
+	_dice_pivot.visible = false
+	add_child(_dice_pivot)
+	_dice = DICE_SCENE.instantiate()
+	_dice_pivot.add_child(_dice)
+	_bottle = BOTTLE_SCENE.instantiate()
+	_bottle.scale = Vector3.ONE * 2.2
+	_bottle.visible = false
+	add_child(_bottle)
 
 	_build_ui()
 	_update_ui()
@@ -75,6 +90,11 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
+	if _dice_pivot.visible:
+		# Грань кубика всегда видна с камеры.
+		_dice_pivot.look_at(_dice_pivot.global_position * 2.0 - _camera.global_position)
+		if _dice_spinning:
+			_dice.rotate(Vector3(1.0, 0.8, 0.3).normalized(), delta * 9.0)
 	if _camera_target:
 		var target_pos := _camera_target.global_position + CAMERA_OFFSET
 		_camera.global_position = _camera.global_position.lerp(target_pos, minf(1.0, 4.0 * delta))
@@ -116,27 +136,25 @@ func _play_turn(p: PlayerData) -> void:
 	_camera_target = pawn
 	_highlight_score(p)
 
-	# Кубик: числа крутятся, игрок жмёт — останавливается.
+	# Кубик крутится над головой. Жмёшь — бросается. Не жмёшь 15 сек — бросается сам.
 	if p.is_bot():
 		_set_message("Ходит %s (бот)..." % p.display_name)
 		_bot_press_later(p, "confirm", randf_range(0.8, 1.4))
 	else:
 		_set_message("Ходит %s. Жми «%s», чтобы бросить кубик!" % [p.display_name, _confirm_hint(p)])
-	_dice_label.visible = true
-	var roll := 1
-	var spin := 0.0
-	_dice_label.global_position = pawn.global_position + Vector3.UP * 3.0
+	_dice_pivot.global_position = pawn.global_position + Vector3.UP * DICE_HEIGHT
+	_dice_pivot.visible = true
+	_dice_spinning = true
+	_timer_bar.visible = not p.is_bot()
+	var waited := 0.0
 	await get_tree().process_frame
-	# Проверяем нажатие каждый кадр, а число меняем раз в 0.06 сек.
-	while not p.input.is_just_pressed("confirm"):
-		spin += get_process_delta_time()
-		if spin >= 0.06:
-			spin = 0.0
-			roll = roll % 6 + 1
-			_dice_label.text = str(roll)
+	while not p.input.is_just_pressed("confirm") and waited < ROLL_TIMEOUT:
+		waited += get_process_delta_time()
+		_timer_bar.value = 1.0 - waited / ROLL_TIMEOUT
 		await get_tree().process_frame
-	roll = randi_range(1, 6)
-	_dice_label.text = str(roll)
+	_timer_bar.visible = false
+	var roll := randi_range(1, 6)
+	await _throw_dice(roll)
 	_set_message("%s: выпало %d!" % [p.display_name, roll])
 	await get_tree().create_timer(0.6).timeout
 
@@ -149,42 +167,67 @@ func _play_turn(p: PlayerData) -> void:
 		await _hop(pawn, target.stand_position(p.slot))
 		stats.space_index = target.index
 		steps -= 1
-		_dice_label.text = str(steps) if steps > 0 else ""
-		_dice_label.global_position = pawn.global_position + Vector3.UP * 3.0
+		# Кубик летит над фишкой и показывает, сколько шагов осталось.
+		_dice_pivot.global_position = pawn.global_position + Vector3.UP * DICE_HEIGHT
+		if steps > 0:
+			_show_dice_face(steps, 0.15)
 		# Проходя мимо ларька, можно купить дефицит.
 		if target.index == MatchState.deficit_space:
 			await _offer_deficit(p)
 
-	_dice_label.visible = false
+	_dice_pivot.visible = false
 	await _apply_space(p, _spaces[stats.space_index])
 	_update_ui()
 
 
-## Развилка: игрок листает варианты влево/вправо и подтверждает.
-func _choose_path(p: PlayerData, from: BoardSpace) -> BoardSpace:
+## Развилка: крутим бутылочку — горлышко случайно указывает путь.
+func _choose_path(_p: PlayerData, from: BoardSpace) -> BoardSpace:
 	var options := from.next
-	var selected := 0
-	_set_message("Развилка! Выбери путь: влево/вправо, «%s» — идти" % _confirm_hint(p))
-	options[selected].set_highlight(true)
-	if p.is_bot():
-		# Бот иногда рискует и идёт срезкой.
-		if randf() < 0.5:
-			_bot_press_later(p, "move_right", 0.6)
-		_bot_press_later(p, "confirm", 1.3)
-	await get_tree().process_frame
-	while not p.input.is_just_pressed("confirm"):
-		var dir := 0
-		if p.input.is_just_pressed("move_left") or p.input.is_just_pressed("move_up"):
-			dir = -1
-		elif p.input.is_just_pressed("move_right") or p.input.is_just_pressed("move_down"):
-			dir = 1
-		if dir != 0:
-			options[selected].set_highlight(false)
-			selected = posmod(selected + dir, options.size())
-			options[selected].set_highlight(true)
-		await get_tree().process_frame
-	options[selected].set_highlight(false)
-	return options[selected]
+	var chosen := randi() % options.size()
+	_set_message("Развилка! Крутим бутылочку...")
+	_bottle.global_position = from.global_position + Vector3.UP * 0.7
+	_bottle.rotation = Vector3.ZERO
+	_bottle.visible = true
+	# Горлышко (−Z бутылки) должно смотреть на выбранную клетку.
+	var dir := options[chosen].global_position - from.global_position
+	var target_yaw := atan2(-dir.x, -dir.z) + TAU * randi_range(4, 6)
+	var tween := create_tween()
+	tween.tween_property(_bottle, "rotation:y", target_yaw, 2.4) \
+		.set_trans(Tween.TRANS_QUART).set_ease(Tween.EASE_OUT)
+	await tween.finished
+	options[chosen].set_highlight(true)
+	var way := "срезкой!" if chosen > 0 else "по кругу!"
+	await _show_message("Бутылочка указала: идём %s" % way, 1.0)
+	options[chosen].set_highlight(false)
+	_bottle.visible = false
+	return options[chosen]
+
+
+## Бросок: кубик подпрыгивает, кувыркается и встаёт выпавшей гранью к камере.
+func _throw_dice(value: int) -> void:
+	_dice_spinning = false
+	var start_y := _dice_pivot.position.y
+	var up := create_tween()
+	up.tween_property(_dice_pivot, "position:y", start_y + 1.2, 0.25) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	up.parallel().tween_method(func(t: float) -> void:
+		_dice.rotate(Vector3(0.6, 1.0, 0.2).normalized(), t * 0.5), 0.0, 1.0, 0.25)
+	await up.finished
+	var down := create_tween()
+	down.tween_property(_dice_pivot, "position:y", start_y, 0.3) \
+		.set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
+	await _show_dice_face(value, 0.35)
+	await down.finished
+
+
+## Плавно повернуть кубик гранью value к камере.
+func _show_dice_face(value: int, time: float) -> void:
+	var from := _dice.quaternion
+	var to := Quaternion.from_euler((DICE_FACES[value] as Vector3) * (PI / 180.0))
+	var tween := create_tween()
+	tween.tween_method(func(t: float) -> void: _dice.quaternion = from.slerp(to, t), 0.0, 1.0, time) \
+		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	await tween.finished
 
 
 func _offer_deficit(p: PlayerData) -> void:
@@ -335,10 +378,28 @@ func _build_ui() -> void:
 	spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	column.add_child(spacer)
 
+	_timer_bar = ProgressBar.new()
+	_timer_bar.max_value = 1.0
+	_timer_bar.value = 1.0
+	_timer_bar.show_percentage = false
+	_timer_bar.custom_minimum_size = Vector2(0, 14)
+	_timer_bar.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	_timer_bar.custom_minimum_size.x = 520
+	var fill := StyleBoxFlat.new()
+	fill.bg_color = Color("f6c343")
+	fill.set_corner_radius_all(7)
+	_timer_bar.add_theme_stylebox_override("fill", fill)
+	var back := StyleBoxFlat.new()
+	back.bg_color = Color(0, 0, 0, 0.5)
+	back.set_corner_radius_all(7)
+	_timer_bar.add_theme_stylebox_override("background", back)
+	_timer_bar.visible = false
+
 	_message_label = _make_label(34)
 	_message_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_message_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	column.add_child(_message_label)
+	column.add_child(_timer_bar)
 
 	var hint := _make_label(16)
 	hint.text = "Esc — выйти в лобби"
