@@ -1,21 +1,34 @@
-extends Control
-## Мини-игра «Очередь за колбасой» (первая простая мини-игра на реакцию).
+extends Node3D
+## Мини-игра «Очередь за колбасой» (реакция).
 ##
-## Ждём, пока продавщица крикнет «КОЛБАСА!», и жмём свою кнопку быстрее всех.
-## Нажал раньше времени — фальстарт, последнее место.
+## Игроки стоят перед ларьком. Продавщица тётя Валя держит колбасу.
+## Когда она кричит «КОЛБАСА!» и поднимает её — жми свою кнопку быстрее всех:
+## у нажавшего поднимается рука. Нажал раньше — фальстарт, последнее место.
+## Победитель забирает колбасу.
 
 enum Phase { INTRO, WAIT, GO, DONE }
 
+const CHARACTER_SCENE := preload("res://scenes/characters/test_character.tscn")
+const SAUSAGE_SCENE := preload("res://assets/models/props/sausage.glb")
 const GO_TIMEOUT := 2.5
+const PLAYER_SPACING := 1.5
+const PLAYERS_Z := 0.4
 
 var _phase := Phase.INTRO
 var _go_time_ms := 0
 var _pressed: Array[PlayerData] = []
 var _false_starts: Array[PlayerData] = []
+var _characters: Dictionary = {} # PlayerData.id -> PlayerCharacter
 var _cards: Dictionary = {} # PlayerData.id -> Label
 
-var _shout_label: Label
-var _background: ColorRect
+var _seller: PlayerCharacter
+var _sausage: Node3D
+var _speech: Label3D
+
+@onready var _camera: Camera3D = $Camera3D
+@onready var _sun: DirectionalLight3D = $Sun
+@onready var _characters_root: Node3D = $Characters
+@onready var _ui: CanvasLayer = $UI
 
 
 func _ready() -> void:
@@ -25,6 +38,11 @@ func _ready() -> void:
 			PlayerManager.add_local_player(PlayerData.DeviceKind.KEYBOARD_WASD)
 			PlayerManager.add_local_player(PlayerData.DeviceKind.KEYBOARD_ARROWS)
 		MatchState.start_new_match(1)
+
+	_sun.rotation_degrees = Vector3(-50, 30, 0)
+	_camera.look_at_from_position(Vector3(5.0, 3.6, 6.2), Vector3(0, 1.3, -1.2))
+	_spawn_seller()
+	_spawn_players()
 	_build_ui()
 	_run.call_deferred()
 
@@ -43,9 +61,12 @@ func _process(_delta: float) -> void:
 			continue
 		if not p.input.is_just_pressed("confirm"):
 			continue
+		var character: PlayerCharacter = _characters[p.id]
+		character.raise_hand(true)
 		if _phase == Phase.WAIT:
 			_false_starts.append(p)
 			_set_card(p, "ФАЛЬСТАРТ!", Color("ff6b5a"))
+			_lower_hand_later(character)
 		else:
 			_pressed.append(p)
 			var ms := Time.get_ticks_msec() - _go_time_ms
@@ -53,18 +74,17 @@ func _process(_delta: float) -> void:
 
 
 func _run() -> void:
-	_shout_label.text = "Приготовились..."
+	_say("Подходим, не толпимся!")
 	await get_tree().create_timer(2.5).timeout
 
 	_phase = Phase.WAIT
-	_shout_label.text = "Ждём завоза..."
+	_say("Ждём завоза...")
 	await get_tree().create_timer(randf_range(1.5, 4.0)).timeout
 
 	_phase = Phase.GO
 	_go_time_ms = Time.get_ticks_msec()
-	_shout_label.text = "КОЛБАСА!"
-	_shout_label.add_theme_color_override("font_color", Color("ffe14d"))
-	_background.color = Color("8c1c13")
+	_say("КОЛБАСА!", Color("ffe14d"), 200)
+	_seller.raise_hand(true, 0.1)
 
 	var waited := 0.0
 	var total := MatchState.turn_order().size()
@@ -81,14 +101,84 @@ func _run() -> void:
 			_set_card(p, "Не успел...", Color(1, 1, 1, 0.6))
 	places.append_array(_false_starts)
 
-	_shout_label.text = "Колбасы хватило не всем!"
-	_background.color = Color("3b2a22")
 	for i in places.size():
 		var reward: int = MatchState.MINIGAME_REWARDS[i] if i < MatchState.MINIGAME_REWARDS.size() else 0
 		var card := _cards[places[i].id] as Label
 		card.text += "\n%d место: +%d ₽" % [i + 1, reward]
+
+	# Колбаса достаётся первому в очереди.
+	if not _pressed.is_empty():
+		var winner: PlayerCharacter = _characters[_pressed[0].id]
+		_sausage.reparent(winner.right_hand, false)
+		_seller.raise_hand(false)
+		_say("Держи, %s! Следующий!" % _pressed[0].display_name)
+	else:
+		_say("Колбасы хватило не всем!")
+
 	await get_tree().create_timer(3.0).timeout
 	MatchState.finish_minigame(places)
+
+
+func _lower_hand_later(character: PlayerCharacter) -> void:
+	await get_tree().create_timer(0.6).timeout
+	character.raise_hand(false)
+
+
+func _spawn_seller() -> void:
+	var seller_data := PlayerData.new()
+	seller_data.display_name = "Тётя Валя"
+	seller_data.color = Color("f2efe6") # белый халат
+	seller_data.slot = 0
+	_seller = CHARACTER_SCENE.instantiate()
+	_seller.setup(seller_data, Vector3(0, 0, -3.1))
+	_seller.name = "Seller"
+	_seller.rotation.y = PI # лицом к покупателям
+	_seller.scale = Vector3.ONE * 1.1
+	_characters_root.add_child(_seller)
+	_seller.set_physics_process(false)
+
+	# Белый колпак продавщицы.
+	var cap := MeshInstance3D.new()
+	var cap_mesh := CylinderMesh.new()
+	cap_mesh.top_radius = 0.3
+	cap_mesh.bottom_radius = 0.34
+	cap_mesh.height = 0.26
+	cap_mesh.radial_segments = 10
+	cap.mesh = cap_mesh
+	cap.position.y = 1.62
+	var cap_mat := StandardMaterial3D.new()
+	cap_mat.albedo_color = Color.WHITE
+	cap.material_override = cap_mat
+	_seller.visual.add_child(cap)
+
+	_sausage = SAUSAGE_SCENE.instantiate()
+	_sausage.scale = Vector3.ONE * 1.4
+	_seller.hold_item(_sausage)
+
+	_speech = Label3D.new()
+	_speech.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	_speech.no_depth_test = true
+	_speech.outline_size = 24
+	_speech.position = Vector3(0, 3.6, -2.6)
+	add_child(_speech)
+
+
+func _spawn_players() -> void:
+	var order := MatchState.turn_order()
+	for i in order.size():
+		var p := order[i]
+		var character: PlayerCharacter = CHARACTER_SCENE.instantiate()
+		var x := (i - (order.size() - 1) / 2.0) * PLAYER_SPACING
+		character.setup(p, Vector3(x, 0, PLAYERS_Z))
+		_characters_root.add_child(character)
+		character.set_physics_process(false) # стоят в очереди, не ходят
+		_characters[p.id] = character
+
+
+func _say(text: String, color: Color = Color.WHITE, font_size: int = 110) -> void:
+	_speech.text = text
+	_speech.modulate = color
+	_speech.font_size = font_size
 
 
 func _set_card(p: PlayerData, text: String, color: Color) -> void:
@@ -98,40 +188,38 @@ func _set_card(p: PlayerData, text: String, color: Color) -> void:
 
 
 func _build_ui() -> void:
-	set_anchors_preset(Control.PRESET_FULL_RECT)
-	_background = ColorRect.new()
-	_background.color = Color("3b2a22")
-	_background.set_anchors_preset(Control.PRESET_FULL_RECT)
-	add_child(_background)
+	var root := MarginContainer.new()
+	root.set_anchors_preset(Control.PRESET_FULL_RECT)
+	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	for side in ["left", "right", "top", "bottom"]:
+		root.add_theme_constant_override("margin_" + side, 28)
+	_ui.add_child(root)
 
 	var column := VBoxContainer.new()
-	column.set_anchors_preset(Control.PRESET_FULL_RECT)
-	column.alignment = BoxContainer.ALIGNMENT_CENTER
-	column.add_theme_constant_override("separation", 40)
-	add_child(column)
+	column.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(column)
+	column.add_child(_label("Очередь за колбасой", 52, Color("f6c343")))
+	column.add_child(_label("Жми «Пробел» / «Enter» / «A», когда тётя Валя крикнет «КОЛБАСА!»\n"
+		+ "Нажмёшь раньше — фальстарт и в конец очереди.", 22, Color.WHITE))
 
-	var title := _label("Очередь за колбасой", 56, Color("f6c343"))
-	column.add_child(title)
-	var rules := _label("Жми «Пробел» / «Enter» / «A», когда продавщица крикнет «КОЛБАСА!»\n"
-		+ "Нажмёшь раньше — фальстарт и в конец очереди.", 24, Color.WHITE)
-	column.add_child(rules)
-
-	_shout_label = _label("", 110, Color.WHITE)
-	column.add_child(_shout_label)
+	var spacer := Control.new()
+	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	column.add_child(spacer)
 
 	var row := HBoxContainer.new()
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
-	row.add_theme_constant_override("separation", 24)
+	row.add_theme_constant_override("separation", 20)
 	column.add_child(row)
 	for p in MatchState.turn_order():
 		var panel := PanelContainer.new()
-		panel.custom_minimum_size = Vector2(260, 150)
+		panel.custom_minimum_size = Vector2(250, 120)
 		var style := StyleBoxFlat.new()
 		style.bg_color = p.color.darkened(0.3)
 		style.set_corner_radius_all(12)
-		style.set_content_margin_all(12)
+		style.set_content_margin_all(10)
 		panel.add_theme_stylebox_override("panel", style)
-		var card := _label("%s\nЖдёт..." % p.display_name, 26, Color.WHITE)
+		var card := _label("%s\nЖдёт..." % p.display_name, 24, Color.WHITE)
 		panel.add_child(card)
 		row.add_child(panel)
 		_cards[p.id] = card

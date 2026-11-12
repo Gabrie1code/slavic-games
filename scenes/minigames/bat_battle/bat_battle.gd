@@ -1,0 +1,411 @@
+extends Node3D
+## Мини-игра «Битва на битах»: все против всех на крыше гаражей.
+##
+## У каждого 100 HP и бита. Атака — вращение вокруг себя: бьёт всех рядом
+## и отбрасывает. Вылетел с крыши или кончились HP — выбыл.
+## На крыше появляются бусты: улучшенная бита и энергетик «Ягуарр».
+## Места: последний выживший — первый; дальше по порядку выбывания.
+## Если время вышло — у кого больше HP, тот выше.
+
+enum Boost { SUPER_BAT, DRINK }
+
+const CHARACTER_SCENE := preload("res://scenes/characters/test_character.tscn")
+const BAT_SCENE := preload("res://assets/models/props/bat.glb")
+const SUPER_BAT_SCENE := preload("res://assets/models/props/bat_super.glb")
+const CAN_SCENE := preload("res://assets/models/props/energy_can.glb")
+
+const MAX_HP := 100
+const ROUND_TIME := 75.0
+const SPAWN_POINTS: Array[Vector3] = [
+	Vector3(-5.5, 0.3, -2.5), Vector3(5.5, 0.3, -2.5), Vector3(-5.5, 0.3, 2.5), Vector3(5.5, 0.3, 2.5),
+]
+## Крыша: прямоугольник по X и Z. Ниже OUT_Y — значит упал с крыши.
+const ROOF_HALF := Vector2(8.5, 4.5)
+const OUT_Y := -1.5
+
+## Атака-вращение.
+const SPIN_TIME := 0.35
+const SPIN_COOLDOWN := 0.9
+const SPIN_SPEED_FACTOR := 0.6
+const HIT_RADIUS := 2.1
+const HIT_DAMAGE := 20
+const HIT_KNOCKBACK := 9.0
+## С улучшенной битой.
+const SUPER_RADIUS := 2.6
+const SUPER_DAMAGE := 34
+const SUPER_KNOCKBACK := 13.0
+const SUPER_TIME := 15.0
+## Энергетик «Ягуарр»: быстрее атака + немного лечения.
+const DRINK_TIME := 8.0
+const DRINK_COOLDOWN := 0.4
+const DRINK_HEAL := 20
+
+const BOOST_INTERVAL := 7.0
+const MAX_BOOSTS := 2
+const PICKUP_RADIUS := 1.1
+
+
+## Состояние одного бойца.
+class Fighter:
+	var player: PlayerData
+	var character: PlayerCharacter
+	var hp_label: Label3D
+	var hp := 100
+	var alive := true
+	var has_super_bat := false
+	var cooldown := 0.0
+	var super_left := 0.0
+	var drink_left := 0.0
+	var spinning := false
+
+
+var _fighters: Array[Fighter] = []
+## Выбывшие по порядку (первый выбывший — последнее место).
+var _out_order: Array[PlayerData] = []
+var _boosts: Array[Node3D] = []
+var _time_left := ROUND_TIME
+var _boost_timer := BOOST_INTERVAL / 2.0
+var _fighting := false
+var _finished := false
+
+var _timer_label: Label
+var _message_label: Label
+var _hp_bars: Dictionary = {} # PlayerData.id -> ProgressBar
+
+@onready var _camera: Camera3D = $Camera3D
+@onready var _sun: DirectionalLight3D = $Sun
+@onready var _fighters_root: Node3D = $Fighters
+@onready var _ui: CanvasLayer = $UI
+
+
+func _ready() -> void:
+	if not MatchState.in_progress:
+		# Запуск сцены напрямую (F6) для теста.
+		if PlayerManager.players.is_empty():
+			PlayerManager.add_local_player(PlayerData.DeviceKind.KEYBOARD_WASD)
+			PlayerManager.add_local_player(PlayerData.DeviceKind.KEYBOARD_ARROWS)
+		MatchState.start_new_match(1)
+
+	_sun.rotation_degrees = Vector3(-55, -30, 0)
+	_camera.look_at_from_position(Vector3(0, 13.5, 12.5), Vector3(0, -0.5, 0.8))
+	_spawn_fighters()
+	_build_ui()
+	_run_intro.call_deferred()
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventKey and event.is_pressed() and not event.is_echo():
+		if (event as InputEventKey).physical_keycode == KEY_ESCAPE:
+			MatchState.abort_to_lobby()
+
+
+func _spawn_fighters() -> void:
+	var order := MatchState.turn_order()
+	for i in order.size():
+		var f := Fighter.new()
+		f.player = order[i]
+		f.character = CHARACTER_SCENE.instantiate()
+		f.character.setup(f.player, SPAWN_POINTS[i % SPAWN_POINTS.size()])
+		f.character.can_jump = false # кнопка подтверждения = атака
+		f.character.respawn_on_fall = false
+		f.character.input_enabled = false # включим после отсчёта
+		_fighters_root.add_child(f.character)
+		# Повернуть лицом к центру крыши.
+		var to_center := -f.character.position
+		f.character.rotation.y = atan2(-to_center.x, -to_center.z)
+		f.character.set_arm_angle(PlayerCharacter.ARM_SIDE, 0.01)
+		f.character.hold_item(BAT_SCENE.instantiate())
+
+		f.hp_label = Label3D.new()
+		f.hp_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		f.hp_label.no_depth_test = true
+		f.hp_label.font_size = 40
+		f.hp_label.outline_size = 10
+		f.hp_label.position.y = 2.45
+		f.character.add_child(f.hp_label)
+		_fighters.append(f)
+		_update_hp(f)
+
+
+func _run_intro() -> void:
+	for text in ["3", "2", "1"]:
+		_message_label.text = text
+		await get_tree().create_timer(0.7).timeout
+	_message_label.text = "БЕЙ!"
+	_fighting = true
+	for f in _fighters:
+		f.character.input_enabled = true
+	await get_tree().create_timer(0.8).timeout
+	if not _finished:
+		_message_label.text = ""
+
+
+func _physics_process(delta: float) -> void:
+	if not _fighting:
+		return
+
+	_time_left -= delta
+	_timer_label.text = "%d" % ceili(maxf(_time_left, 0.0))
+
+	for f in _fighters:
+		if not f.alive:
+			continue
+		f.cooldown = maxf(0.0, f.cooldown - delta)
+		f.super_left = maxf(0.0, f.super_left - delta)
+		f.drink_left = maxf(0.0, f.drink_left - delta)
+		if f.has_super_bat and f.super_left == 0.0:
+			f.has_super_bat = false
+			f.character.hold_item(BAT_SCENE.instantiate())
+
+		if f.player.input and f.player.input.is_just_pressed("confirm") and f.cooldown == 0.0:
+			_spin(f)
+
+		if f.character.global_position.y < OUT_Y:
+			_eliminate(f, "вылетел с крыши")
+
+	_update_boosts(delta)
+	_check_end()
+
+
+## Атака: вращение с битой, урон и отбрасывание всем, кто рядом.
+func _spin(f: Fighter) -> void:
+	var is_super := f.has_super_bat
+	f.cooldown = DRINK_COOLDOWN if f.drink_left > 0.0 else SPIN_COOLDOWN
+	f.spinning = true
+	f.character.speed = 6.0 * SPIN_SPEED_FACTOR
+
+	var tween := create_tween()
+	f.character.visual.rotation.y = 0.0
+	tween.tween_property(f.character.visual, "rotation:y", -TAU, SPIN_TIME)
+	tween.tween_callback(func() -> void:
+		f.character.visual.rotation.y = 0.0
+		f.character.speed = 6.0
+		f.spinning = false)
+
+	var radius := SUPER_RADIUS if is_super else HIT_RADIUS
+	var damage := SUPER_DAMAGE if is_super else HIT_DAMAGE
+	var force := SUPER_KNOCKBACK if is_super else HIT_KNOCKBACK
+	var origin := f.character.global_position
+	for other in _fighters:
+		if other == f or not other.alive:
+			continue
+		var offset := other.character.global_position - origin
+		offset.y = 0.0
+		if offset.length() > radius:
+			continue
+		var dir := offset.normalized() if offset.length() > 0.01 else Vector3.FORWARD
+		other.character.apply_knockback(dir * force + Vector3.UP * 4.0)
+		other.hp = maxi(0, other.hp - damage)
+		_update_hp(other)
+		_flash(other.character)
+		if other.hp == 0:
+			_eliminate(other, "выбит")
+
+
+func _eliminate(f: Fighter, reason: String) -> void:
+	if not f.alive:
+		return
+	f.alive = false
+	f.hp = 0
+	_update_hp(f)
+	_out_order.append(f.player)
+	f.character.input_enabled = false
+	f.hp_label.text = "ВЫБЫЛ"
+	_message_label.text = "%s %s!" % [f.player.display_name, reason]
+	# Выбитого (не упавшего) уносит с крыши.
+	if f.character.global_position.y > OUT_Y:
+		var away := f.character.global_position
+		away.y = 0.0
+		away = away.normalized() if away.length() > 0.1 else Vector3.BACK
+		f.character.apply_knockback(away * 16.0 + Vector3.UP * 7.0)
+	_hide_later(f.character)
+
+
+func _hide_later(character: PlayerCharacter) -> void:
+	await get_tree().create_timer(1.5).timeout
+	character.visible = false
+	character.set_physics_process(false)
+
+
+func _check_end() -> void:
+	if _finished:
+		return
+	var alive := _fighters.filter(func(f: Fighter) -> bool: return f.alive)
+	var solo := _fighters.size() == 1
+	if _time_left <= 0.0 or (not solo and alive.size() <= 1) or alive.is_empty():
+		_finish(alive)
+
+
+func _finish(alive: Array) -> void:
+	_finished = true
+	_fighting = false
+	for f in _fighters:
+		f.character.input_enabled = false
+	# Выжившие — по HP, затем выбывшие с конца.
+	alive.sort_custom(func(a: Fighter, b: Fighter) -> bool: return a.hp > b.hp)
+	var places: Array[PlayerData] = []
+	for f in alive:
+		places.append(f.player)
+	for i in range(_out_order.size() - 1, -1, -1):
+		places.append(_out_order[i])
+
+	var lines: PackedStringArray = []
+	for i in places.size():
+		var reward: int = MatchState.MINIGAME_REWARDS[i] if i < MatchState.MINIGAME_REWARDS.size() else 0
+		lines.append("%d. %s  +%d ₽" % [i + 1, places[i].display_name, reward])
+	var header := "Время вышло!" if _time_left <= 0.0 else "Победитель: %s!" % places[0].display_name
+	_message_label.text = header + "\n" + "\n".join(lines)
+	await get_tree().create_timer(3.5).timeout
+	MatchState.finish_minigame(places)
+
+
+# ---------------- Бусты ----------------
+
+func _update_boosts(delta: float) -> void:
+	_boost_timer -= delta
+	if _boost_timer <= 0.0:
+		_boost_timer = BOOST_INTERVAL
+		if _boosts.size() < MAX_BOOSTS:
+			_spawn_boost(Boost.values().pick_random())
+
+	for boost in _boosts.duplicate():
+		boost.rotate_y(2.0 * delta)
+		for f in _fighters:
+			if not f.alive:
+				continue
+			var d := f.character.global_position - boost.global_position
+			d.y = 0.0
+			if d.length() < PICKUP_RADIUS:
+				_apply_boost(f, boost.get_meta("type"))
+				_boosts.erase(boost)
+				boost.queue_free()
+				break
+
+
+func _spawn_boost(type: Boost) -> void:
+	var root := Node3D.new()
+	root.set_meta("type", type)
+	var model: Node3D
+	var label := Label3D.new()
+	if type == Boost.SUPER_BAT:
+		model = SUPER_BAT_SCENE.instantiate()
+		model.rotation_degrees.z = 90.0
+		model.position = Vector3(0.4, 0.7, 0)
+		label.text = "СУПЕР-БИТА"
+		label.modulate = Color("ff6b5a")
+	else:
+		model = CAN_SCENE.instantiate()
+		model.scale = Vector3.ONE * 4.0
+		model.position.y = 0.25
+		label.text = "«ЯГУАРР»"
+		label.modulate = Color("ffb52e")
+	root.add_child(model)
+	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	label.font_size = 36
+	label.outline_size = 10
+	label.position.y = 1.6
+	root.add_child(label)
+	root.position = Vector3(
+		randf_range(-ROOF_HALF.x + 1.5, ROOF_HALF.x - 1.5), 0.0,
+		randf_range(-ROOF_HALF.y + 1.0, ROOF_HALF.y - 1.0))
+	add_child(root)
+	_boosts.append(root)
+
+
+func _apply_boost(f: Fighter, type: Boost) -> void:
+	if type == Boost.SUPER_BAT:
+		f.super_left = SUPER_TIME
+		f.has_super_bat = true
+		f.character.hold_item(SUPER_BAT_SCENE.instantiate())
+		_message_label.text = "%s взял СУПЕР-БИТУ!" % f.player.display_name
+	else:
+		f.drink_left = DRINK_TIME
+		f.hp = mini(MAX_HP, f.hp + DRINK_HEAL)
+		_update_hp(f)
+		_message_label.text = "%s выпил «Ягуарр»! Крутится быстрее!" % f.player.display_name
+	_clear_message_later()
+
+
+func _clear_message_later() -> void:
+	var text := _message_label.text
+	await get_tree().create_timer(1.5).timeout
+	if not _finished and _message_label.text == text:
+		_message_label.text = ""
+
+
+# ---------------- Отображение ----------------
+
+func _update_hp(f: Fighter) -> void:
+	f.hp_label.text = "%d HP" % f.hp
+	f.hp_label.modulate = Color("a8f0a0").lerp(Color("ff6b5a"), 1.0 - float(f.hp) / MAX_HP)
+	if _hp_bars.has(f.player.id):
+		(_hp_bars[f.player.id] as ProgressBar).value = f.hp
+
+
+## Краткая вспышка при получении удара.
+func _flash(character: PlayerCharacter) -> void:
+	var tween := create_tween()
+	tween.tween_property(character.visual, "scale", Vector3(1.25, 0.8, 1.25), 0.06)
+	tween.tween_property(character.visual, "scale", Vector3.ONE, 0.12)
+
+
+func _build_ui() -> void:
+	var root := MarginContainer.new()
+	root.set_anchors_preset(Control.PRESET_FULL_RECT)
+	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	for side in ["left", "right", "top", "bottom"]:
+		root.add_theme_constant_override("margin_" + side, 24)
+	_ui.add_child(root)
+
+	var column := VBoxContainer.new()
+	column.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(column)
+
+	var top := HBoxContainer.new()
+	column.add_child(top)
+	var title := _label("Битва на битах", 44, Color("f6c343"))
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	top.add_child(title)
+	_timer_label = _label("%d" % int(ROUND_TIME), 52, Color.WHITE)
+	top.add_child(_timer_label)
+
+	var rules := "Атака (вращение): Пробел / Enter / A.  Скинь всех с крыши!"
+	column.add_child(_label(rules, 20, Color.WHITE))
+
+	_message_label = _label("", 54, Color.WHITE)
+	_message_label.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	column.add_child(_message_label)
+
+	var row := HBoxContainer.new()
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_theme_constant_override("separation", 20)
+	column.add_child(row)
+	for f in _fighters:
+		var box := VBoxContainer.new()
+		box.custom_minimum_size.x = 240
+		box.add_child(_label(f.player.display_name, 22, f.player.color.lightened(0.3)))
+		var bar := ProgressBar.new()
+		bar.max_value = MAX_HP
+		bar.value = f.hp
+		bar.show_percentage = false
+		bar.custom_minimum_size.y = 22
+		var fill := StyleBoxFlat.new()
+		fill.bg_color = f.player.color
+		fill.set_corner_radius_all(6)
+		bar.add_theme_stylebox_override("fill", fill)
+		box.add_child(bar)
+		row.add_child(box)
+		_hp_bars[f.player.id] = bar
+
+
+func _label(text: String, font_size: int, color: Color) -> Label:
+	var label := Label.new()
+	label.text = text
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label.add_theme_font_size_override("font_size", font_size)
+	label.add_theme_color_override("font_color", color)
+	label.add_theme_color_override("font_outline_color", Color.BLACK)
+	label.add_theme_constant_override("outline_size", 10)
+	return label

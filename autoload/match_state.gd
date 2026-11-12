@@ -12,8 +12,22 @@ const MINIGAME_REWARDS: Array[int] = [10, 5, 3, 1]
 const SCENE_LOBBY := "res://scenes/lobby/local_lobby.tscn"
 const SCENE_BOARD := "res://scenes/board/board_game.tscn"
 const SCENE_RESULTS := "res://scenes/results/results.tscn"
-const MINIGAMES: Array[String] = [
-	"res://scenes/minigames/sausage_queue/sausage_queue.tscn",
+const SCENE_ROULETTE := "res://scenes/roulette/minigame_roulette.tscn"
+
+## Все мини-игры: сцена, название, подпись и цвет карточки в рулетке.
+const MINIGAMES: Array[Dictionary] = [
+	{
+		"scene": "res://scenes/minigames/sausage_queue/sausage_queue.tscn",
+		"title": "Очередь\nза колбасой",
+		"tagline": "Реакция",
+		"color": Color("8c1c13"),
+	},
+	{
+		"scene": "res://scenes/minigames/bat_battle/bat_battle.tscn",
+		"title": "Битва\nна битах",
+		"tagline": "Все против всех",
+		"color": Color("2f5f8a"),
+	},
 ]
 
 var in_progress := false
@@ -25,6 +39,8 @@ var turn_index := 0
 var deficit_space := -1
 ## PlayerData.id -> PlayerStats
 var stats: Dictionary = {}
+## Индексы мини-игр (в MINIGAMES), которые уже были в этой партии.
+var played_minigames: Array[int] = []
 
 
 func start_new_match(rounds: int) -> void:
@@ -34,6 +50,7 @@ func start_new_match(rounds: int) -> void:
 	turn_index = 0
 	deficit_space = -1
 	stats.clear()
+	played_minigames.clear()
 	for p in PlayerManager.players:
 		var s := PlayerStats.new()
 		s.coins = START_COINS
@@ -76,8 +93,19 @@ func standings() -> Array[PlayerData]:
 	return order
 
 
-func random_minigame() -> String:
-	return MINIGAMES.pick_random()
+## Выбирает следующую мини-игру: только из ещё не сыгранных.
+## Когда сыграны все — круг начинается заново. Возвращает индекс в MINIGAMES.
+func pick_next_minigame() -> int:
+	var available: Array[int] = []
+	for i in MINIGAMES.size():
+		if not played_minigames.has(i):
+			available.append(i)
+	if available.is_empty():
+		played_minigames.clear()
+		available.assign(range(MINIGAMES.size()))
+	var picked: int = available.pick_random()
+	played_minigames.append(picked)
+	return picked
 
 
 ## Мини-игра закончилась: раздаём награды и решаем, куда идти дальше.

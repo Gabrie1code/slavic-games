@@ -107,7 +107,7 @@ func _run_round() -> void:
 		MatchState.turn_index += 1
 	_camera_target = null
 	await _show_message("Все походили. Время мини-игры!", 1.5)
-	SceneManager.change_scene(MatchState.random_minigame())
+	SceneManager.change_scene(MatchState.SCENE_ROULETTE)
 
 
 func _play_turn(p: PlayerData) -> void:
