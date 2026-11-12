@@ -1,0 +1,14 @@
+# Кэш и служебные файлы Godot 4
+.godot/
+/android/
+
+# Собранные билды игры
+/build/
+/export/
+*.pck
+*.exe
+
+# Системный мусор
+.DS_Store
+Thumbs.db
+*.blend1

@@ -1,0 +1,10 @@
+# Единые переводы строк для текстовых файлов Godot
+* text=auto eol=lf
+
+*.glb binary
+*.png binary
+*.jpg binary
+*.ogg binary
+*.wav binary
+*.ttf binary
+*.otf binary
