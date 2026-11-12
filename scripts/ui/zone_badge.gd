@@ -4,6 +4,9 @@ extends Sprite3D
 ## цветная плашка с иконкой и коротким словом (assets/ui/prompts/<name>.png, см.
 ## tools/textures/prompt_badges.py). Всегда смотрит в камеру и плавно покачивается.
 
+## Слой значков и табло над столом: их не показывает камера крупного плана у стола
+## (там они только мешают), а все остальные камеры — показывают.
+const OVERHEAD_LAYER := 1 << 18
 const BOB := 0.15
 const BOB_TIME := 1.2
 
@@ -16,6 +19,7 @@ func setup(badge_name: String, height: float) -> ZoneBadge:
 	billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	pixel_size = 0.0028
 	shaded = false
+	layers = OVERHEAD_LAYER
 	position.y += height
 	return self
 

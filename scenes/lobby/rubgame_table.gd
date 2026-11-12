@@ -371,6 +371,7 @@ func _build() -> void:
 	_board.pixel_size = 0.004
 	_board.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	_board.position = WHEEL_CENTER + Vector3(0, 1.0, 0)
+	_board.layers = ZoneBadge.OVERHEAD_LAYER # у стола крупным планом табло не нужно
 	add_child(_board)
 
 

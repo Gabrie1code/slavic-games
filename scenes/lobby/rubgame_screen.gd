@@ -62,6 +62,9 @@ var _rows: Dictionary = {}
 var _value_labels: Dictionary = {} # строка -> Label с текущим значением
 var _buy_buttons: Array[Button] = []
 var _fonts: Array[Array] = [] # [Control, множитель размера шрифта]
+## Магазин фишек и панель ставок: прячутся, пока крутится колесо (чтобы видеть шарик).
+var _panels: Array[Control] = []
+var _panels_shown := true
 
 
 func setup(p: PlayerData, character: PlayerCharacter, rubgame_table: RubgameTable) -> void:
@@ -96,6 +99,7 @@ func _process(delta: float) -> void:
 		target = table.wheel_camera_transform()
 	elif _top_view:
 		target = table.felt_camera_transform()
+	_show_panels(table.phase == RubgameTable.Phase.BETTING)
 	# Рамка цвета игрока вокруг выбранной ставки на сукне.
 	table.set_selection(player, _bet(), _number)
 	_camera.global_transform = _camera.global_transform.interpolate_with(target,
@@ -187,6 +191,21 @@ func _cycle(row: int, step: int) -> void:
 		ROW_CHIP:
 			_chip_index = posmod(_chip_index + step, PlayerManager.CHIP_VALUES.size())
 	_refresh()
+
+
+## Плавно спрятать/показать магазин и панель ставок (во время вращения — не видно шарика).
+func _show_panels(on: bool) -> void:
+	if on == _panels_shown:
+		return
+	_panels_shown = on
+	for panel in _panels:
+		var tween := create_tween()
+		if on:
+			panel.visible = true
+			tween.tween_property(panel, "modulate:a", 1.0, 0.3)
+		else:
+			tween.tween_property(panel, "modulate:a", 0.0, 0.3)
+			tween.tween_callback(panel.hide) # невидимые кнопки нажать нельзя
 
 
 func _on_view_input(event: InputEvent) -> void:
@@ -349,7 +368,8 @@ func _build() -> void:
 	view.add_child(viewport)
 	_camera = Camera3D.new()
 	_camera.fov = 50.0
-	_camera.cull_mask = 0xFFFFF & ~VIEWMODEL_LAYERS
+	# Без «кулаков в кадре» и без значков/табло над столом (они закрывают стол и колесо).
+	_camera.cull_mask = 0xFFFFF & ~VIEWMODEL_LAYERS & ~ZoneBadge.OVERHEAD_LAYER
 	viewport.add_child(_camera)
 	_camera.current = true
 
@@ -398,6 +418,7 @@ func _build() -> void:
 ## Справа: фишки с ценами и «Купить», ниже — обмен фишек на рубли.
 func _build_shop() -> void:
 	var shop := _panel()
+	_panels.append(shop)
 	shop.set_anchors_preset(Control.PRESET_CENTER_RIGHT)
 	shop.grow_horizontal = Control.GROW_DIRECTION_BEGIN
 	shop.grow_vertical = Control.GROW_DIRECTION_BOTH
@@ -433,6 +454,7 @@ func _build_shop() -> void:
 ## Снизу: «У вас» (фишки), выбор ставки и кнопки.
 func _build_bottom() -> void:
 	var bottom := _panel()
+	_panels.append(bottom)
 	bottom.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
 	bottom.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	bottom.grow_vertical = Control.GROW_DIRECTION_BEGIN
