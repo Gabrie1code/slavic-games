@@ -173,7 +173,7 @@ func _drop() -> void:
 	_set_layers(_handset, 1)
 	_handset.global_position = at + Vector3(randf_range(-0.3, 0.3), 1.3, randf_range(-0.3, 0.3))
 	_handset.rotation = Vector3(0, randf() * TAU, 0)
-	var floor_y := get_parent().global_position.y + 0.03
+	var floor_y := (get_parent() as Node3D).global_position.y + 0.03
 	var fall := create_tween()
 	fall.tween_property(_handset, "global_position:y", floor_y, 0.45) \
 		.set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
