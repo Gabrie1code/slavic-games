@@ -96,6 +96,11 @@ func _ready() -> void:
 	_sun.rotation_degrees = Vector3(-55, -30, 0)
 	_camera.look_at_from_position(Vector3(0, 13.5, 12.5), Vector3(0, -0.5, 0.8))
 	_spawn_fighters()
+	# Двор вокруг крыши: дома, машины, голуби, собака.
+	var yard := GarageYard.new()
+	for f in _fighters:
+		yard.watchers.append(f.character)
+	add_child(yard)
 	_build_ui()
 	_run_intro.call_deferred()
 
@@ -169,11 +174,18 @@ func _physics_process(delta: float) -> void:
 		if f.player.input and f.player.input.is_pressed("confirm") and f.cooldown == 0.0:
 			_spin(f)
 
-		if f.character.global_position.y < OUT_Y:
+		if _fell_off(f.character.global_position):
 			_eliminate(f, "вылетел с крыши")
 
 	_update_boosts(delta)
 	_check_end()
+
+
+## Слетел с крыши: ниже OUT_Y или за краем крыши и ниже её уровня (например, упал на гелик —
+## его крыша выше OUT_Y, но это всё равно падение).
+func _fell_off(pos: Vector3) -> bool:
+	var outside := absf(pos.x) > ROOF_HALF.x or absf(pos.z) > ROOF_HALF.y
+	return pos.y < OUT_Y or (outside and pos.y < -0.6)
 
 
 ## Дать бойцу биту (обычную или супер) и поставить в позу «бита на плече».
@@ -294,13 +306,8 @@ func _eliminate(f: Fighter, reason: String) -> void:
 		away.y = 0.0
 		away = away.normalized() if away.length() > 0.1 else Vector3.BACK
 		f.character.apply_knockback(away * 16.0 + Vector3.UP * 7.0)
-	_hide_later(f.character)
-
-
-func _hide_later(character: PlayerCharacter) -> void:
-	await get_tree().create_timer(1.5).timeout
-	character.visible = false
-	character.set_physics_process(false)
+	# Краснеет, падает, крестики на глазах, плавно исчезает.
+	f.character.play_death()
 
 
 func _check_end() -> void:

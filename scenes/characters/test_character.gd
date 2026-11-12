@@ -301,6 +301,53 @@ func set_render_layer(layer: int) -> void:
 	_apply_layer(self)
 
 
+## Смерть: персонаж краснеет, падает навзничь, на глазах крестики, потом плавно исчезает
+## (прозрачность растёт) и прячется. Физика не выключается сразу — тело ещё может лететь.
+func play_death(fade_delay: float = 0.9, fade_time: float = 1.0) -> void:
+	input_enabled = false
+	var meshes: Array[GeometryInstance3D] = []
+	_collect_geometry(visual, meshes)
+	var red := StandardMaterial3D.new()
+	red.albedo_color = Color(1.0, 0.1, 0.05, 0.55)
+	red.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	red.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	for mesh in meshes:
+		mesh.material_overlay = red
+	# Крестики вместо глаз: по две чёрные планки на каждый глаз.
+	var cross_mat := StandardMaterial3D.new()
+	cross_mat.albedo_color = Color(0.05, 0.02, 0.02)
+	cross_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	var cross_mesh := BoxMesh.new()
+	cross_mesh.size = Vector3(0.12, 0.028, 0.012)
+	for x in [-0.11, 0.11]:
+		for angle in [PI / 4, -PI / 4]:
+			var bar := MeshInstance3D.new()
+			bar.mesh = cross_mesh
+			bar.material_override = cross_mat
+			bar.position = Vector3(x, 0.32, -0.322)
+			bar.rotation.z = angle
+			attach_to_part("Head", bar)
+			meshes.append(bar)
+	create_tween().tween_property(visual, "rotation:x", PI / 2, 0.45) \
+		.set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
+	# Исчезновение — все части сразу, после падения и паузы.
+	var fade := create_tween().set_parallel(true)
+	var start := 0.45 + fade_delay
+	for mesh in meshes:
+		fade.tween_property(mesh, "transparency", 1.0, fade_time).set_delay(start)
+	fade.tween_property(_name_label, "modulate:a", 0.0, fade_time).set_delay(start)
+	fade.chain().tween_callback(func() -> void:
+		visible = false
+		set_physics_process(false))
+
+
+func _collect_geometry(node: Node, out: Array[GeometryInstance3D]) -> void:
+	if node is GeometryInstance3D:
+		out.append(node as GeometryInstance3D)
+	for child in node.get_children():
+		_collect_geometry(child, out)
+
+
 ## Прикрепить предмет к части тела (Torso/Head/ArmL/ArmR/LegL/LegR), например трубку к уху.
 ## Предмет получает слой видимости персонажа (от первого лица своя трубка не мешает обзору).
 func attach_to_part(part_name: String, node: Node3D) -> void:

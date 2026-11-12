@@ -225,7 +225,7 @@ func _animate(delta: float) -> void:
 	var drop := -0.05 if sleeping else (absf(sin(phase)) * 0.015 if walking else 0.0)
 	_model.position.y = lerpf(_model.position.y, drop, minf(1.0, delta * 6.0))
 	var head := _parts["CatHead"] as Node3D
-	var nod := 0.35 if sleeping else (sin(_time * 1.3) * 0.08)
+	var nod := -0.35 if sleeping else (sin(_time * 1.3) * 0.08)
 	head.rotation.x = lerpf(head.rotation.x, nod, minf(1.0, delta * 5.0))
 	var tail := _parts["CatTail"] as Node3D
 	var wag := 0.15
