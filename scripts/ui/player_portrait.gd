@@ -27,7 +27,8 @@ func setup(p: PlayerData, size_px: float) -> PlayerPortrait:
 	world.add_child(_character)
 	_character.set_physics_process(false)
 	_character.input_enabled = false
-	_character.show_name(false)
+	# Имя над головой не нужно; надпись появляется в _ready персонажа — прячем после него.
+	_character.ready.connect(func() -> void: _character.show_name(false))
 	_character.rotation.y = PI # лицом к камере
 	var camera := Camera3D.new()
 	camera.fov = 21.0 # голова (1.05–1.62 м) и плечи (~1.08 м)
