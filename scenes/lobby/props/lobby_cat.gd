@@ -38,18 +38,18 @@ const WAYPOINTS: Array[Vector3] = [
 	Vector3(-10.7, 0, 1.2),   # 15 у автомата
 	Vector3(-11.05, 0, -0.4), # 16 у левой стены
 	Vector3(-9.0, 0, -1.3),   # 17 за столом
-	Vector3(5.3, 0, 0.62),    # 18 у миски
+	Vector3(-0.1, 0, 2.75),   # 18 у миски (гостиная, у стены между стулом и торшером)
 ]
 const LINKS: Array[Vector2i] = [
 	Vector2i(0, 1), Vector2i(1, 2), Vector2i(2, 3), Vector2i(3, 4), Vector2i(4, 5),
 	Vector2i(5, 6), Vector2i(6, 0), Vector2i(0, 7), Vector2i(7, 8), Vector2i(8, 9),
 	Vector2i(9, 10), Vector2i(10, 11), Vector2i(4, 12), Vector2i(12, 13), Vector2i(13, 14),
-	Vector2i(14, 15), Vector2i(15, 16), Vector2i(16, 17), Vector2i(10, 18), Vector2i(11, 18),
+	Vector2i(14, 15), Vector2i(15, 16), Vector2i(16, 17), Vector2i(2, 18), Vector2i(1, 18),
 ]
 const BED_POINT := 11
 const BED_POS := Vector3(6.0, 0, 0.95)
 const FOOD_POINT := 18
-const BOWL_POS := Vector3(5.3, 0, 1.0)
+const BOWL_POS := Vector3(-0.1, 0, 3.15)
 const EAT_TIME := 3.0
 const FOOD_RESPAWN := 25.0
 
