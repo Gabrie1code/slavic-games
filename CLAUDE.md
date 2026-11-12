@@ -24,5 +24,12 @@ Party-игра на Godot 4.7 (GDScript), стилизованный low-poly, �
 - Осторожно с `:=` при обходе нетипизированных массивов (`.duplicate()`, `.filter()`, `.values()`):
   Godot не выведет тип и не запустит скрипт. Копировать в типизированную переменную.
 
+## Персонаж и одежда
+- `PlayerCharacter` (scenes/characters/test_character.*): модель `character_base.glb` из частей
+  Torso/Head/ArmL/ArmR/LegL/LegR, точка поворота в суставе; анимация в `_process` кодом.
+- Одежда: `Cosmetics.ITEMS` (scripts/core/cosmetics.gd), модели `assets/models/character/cosmetics/<id>.glb`.
+  Куски с именами частей тела кладутся внутрь частей. Материал `Primary` = цвет игрока.
+- Наряд: `PlayerData.outfit` {Slot: id}, сохраняется в `user://outfits.cfg` по `device_key()`.
+
 ## Модели
 Генерируются скриптами в `tools/blender/` (модуль `bpy` 4.2, Python 3.11), экспорт в `assets/models/`.

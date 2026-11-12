@@ -26,6 +26,8 @@ var device_kind: DeviceKind = DeviceKind.KEYBOARD_WASD
 var joypad_id: int = -1
 ## Сетевой peer, которому принадлежит игрок. 1 = хост / локальная игра.
 var peer_id: int = 1
+## Наряд: {Cosmetics.Slot: id вещи}. Пустой слот — ничего не надето.
+var outfit: Dictionary = {}
 
 ## Управление локального игрока. У сетевых игроков = null.
 var input: PlayerInput = null
@@ -42,6 +44,19 @@ func is_bot() -> bool:
 ## Управление бота (его «виртуальный геймпад»). У людей = null.
 func bot_input() -> BotInput:
 	return input as BotInput if is_bot() else null
+
+
+## Ключ для сохранения наряда: одно устройство — один сохранённый наряд.
+func device_key() -> String:
+	match device_kind:
+		DeviceKind.KEYBOARD_WASD:
+			return "keyboard_wasd"
+		DeviceKind.KEYBOARD_ARROWS:
+			return "keyboard_arrows"
+		DeviceKind.JOYPAD:
+			return "joypad_%d" % joypad_id
+		_:
+			return ""
 
 
 func device_label() -> String:

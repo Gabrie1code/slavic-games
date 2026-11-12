@@ -8,6 +8,8 @@ signal player_left(player: PlayerData)
 
 ## Партия и мини-игры рассчитаны на 1–4 игроков (пустые места позже займут боты).
 const MAX_PLAYERS := 4
+## Файл с нарядами игроков (в папке сохранений пользователя).
+const OUTFITS_PATH := "user://outfits.cfg"
 
 ## Цвета игроков по слотам.
 const SLOT_COLORS: Array[Color] = [
@@ -52,6 +54,7 @@ func add_local_player(kind: PlayerData.DeviceKind, joypad_id: int = -1) -> Playe
 
 	InputSetup.register_player(p)
 	p.input = PlayerInput.new(p.slot)
+	p.outfit = load_outfit(p.device_key())
 
 	players.append(p)
 	player_joined.emit(p)
@@ -69,6 +72,7 @@ func add_bot() -> PlayerData:
 	p.color = SLOT_COLORS[p.slot]
 	p.device_kind = PlayerData.DeviceKind.BOT
 	p.input = BotInput.new()
+	p.outfit = Cosmetics.random_outfit()
 	var taken: Array[String] = []
 	for other in players:
 		taken.append(other.display_name)
@@ -79,6 +83,28 @@ func add_bot() -> PlayerData:
 	players.append(p)
 	player_joined.emit(p)
 	return p
+
+
+## Сохранить наряд игрока (привязан к его устройству).
+func save_outfit(p: PlayerData) -> void:
+	if p.device_key() == "":
+		return
+	var config := ConfigFile.new()
+	config.load(OUTFITS_PATH) # если файла нет — начнём с пустого
+	config.set_value("outfits", p.device_key(), p.outfit)
+	config.save(OUTFITS_PATH)
+
+
+func load_outfit(key: String) -> Dictionary:
+	var config := ConfigFile.new()
+	if key == "" or config.load(OUTFITS_PATH) != OK:
+		return {}
+	var outfit: Dictionary = config.get_value("outfits", key, {})
+	# Вещи, которых больше нет в каталоге, пропускаем.
+	for slot: int in outfit.keys():
+		if not Cosmetics.ITEMS.has(outfit[slot]):
+			outfit.erase(slot)
+	return outfit
 
 
 func free_slots() -> int:
