@@ -435,9 +435,32 @@ func _build_rubgame() -> void:
 		cabinet.add_child(screen)
 
 	# Неоновые вывески: в игровой и над дверью со стороны гостиной.
-	_neon("ИГРА НА РУБЛИ", Vector3(-8.3, 2.35, RUBGAME_BACK_Z + 0.02), 0.0, 80)
+	# Внутри комнаты вместо надписи — ретро-постеры игровых автоматов 80-х.
+	var poster_size := Vector2(0.75, 1.12)
+	_poster("poster_star_flight", poster_size, Vector3(-8.7, 1.75, RUBGAME_BACK_Z + 0.012), 0.0)
+	_poster("poster_race", poster_size, Vector3(-7.3, 1.75, RUBGAME_BACK_Z + 0.012), 0.0)
+	_poster("poster_sub_hunt", poster_size, Vector3(RUBGAME_LEFT_X + 0.012, 1.7, 0.6), PI / 2)
+	_poster("poster_air_battle", poster_size, Vector3(LEFT_X - 0.232, 1.7, -1.0), -PI / 2)
 	var door_z := (RUBGAME_DOOR_FROM_Z + RUBGAME_DOOR_TO_Z) / 2
 	_neon("ИГРА\nНА РУБЛИ", Vector3(LEFT_X + 0.02, 2.7, door_z), PI / 2, 36)
+
+
+## Постер на стене (картинка из tools/textures/posters.py), освещается как стена.
+func _poster(poster_name: String, size: Vector2, pos: Vector3, yaw: float) -> void:
+	var quad := MeshInstance3D.new()
+	var mesh := QuadMesh.new()
+	mesh.size = size
+	quad.mesh = mesh
+	var poster_mat := StandardMaterial3D.new()
+	poster_mat.albedo_texture = load("res://assets/textures/posters/%s.png" % poster_name)
+	poster_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR # скотч по углам
+	poster_mat.roughness = 0.85
+	poster_mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
+	quad.material_override = poster_mat
+	quad.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	quad.position = pos
+	quad.rotation.y = yaw
+	add_child(quad)
 
 
 func _neon(text: String, pos: Vector3, yaw: float, font_size: int) -> void:
