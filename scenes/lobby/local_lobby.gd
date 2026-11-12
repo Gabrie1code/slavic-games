@@ -7,7 +7,7 @@ extends Node3D
 ## Когда готовы все — спросим про ботов (если есть места), потом отсчёт 5 сек и старт.
 ## Лобби — советская квартира (см. Apartment): в гостиной всё можно ломать, на диване — сидеть.
 ## Шкаф в спальне: подойти и нажать кнопку подтверждения — откроется примерочная.
-## Казино (дверь в левой стене гостиной): у стола рулетки та же кнопка
+## Игровая комната (дверь в левой стене гостиной): у стола рулетки та же кнопка
 ## открывает стол крупным планом.
 ##
 ## Вид от первого лица (по умолчанию) или от третьего — F2 (пока идёт разработка).
@@ -24,7 +24,7 @@ const ROUNDS := 5
 ## Зоны в квартире (координаты — в Apartment).
 const WARDROBE_RADIUS := 1.2
 const TV_ZONE_RADIUS := 1.3
-const CASINO_RADIUS := 1.3
+const RUBGAME_RADIUS := 1.3
 const PHONE_RADIUS := 1.2
 const CAT_RADIUS := 1.3
 const SEAT_RADIUS := 0.9
@@ -67,7 +67,7 @@ var _views: Dictionary = {}
 var _views_root: Control
 var _mouse_delta := Vector2.ZERO
 
-## Открытые окна игроков (примерочная, стол казино): PlayerData.id -> LobbyRoom
+## Открытые окна игроков (примерочная, стол игры на рубли): PlayerData.id -> LobbyRoom
 var _rooms: Dictionary = {}
 var _rooms_root: Control
 
@@ -79,7 +79,7 @@ var _rooms_root: Control
 
 
 func _ready() -> void:
-	# Сверху видно всю квартиру: казино, гостиную и спальню.
+	# Сверху видно всю квартиру: игровую комнату, гостиную и спальню.
 	_camera.look_at_from_position(Vector3(-1.2, 16.0, 15.0), Vector3(-1.2, 0, -0.5))
 	# Сверху не показываем потолок и передние стены.
 	_camera.cull_mask &= ~Apartment.FP_ONLY_LAYER & ~VIEWMODEL_LAYERS
@@ -96,8 +96,8 @@ func _ready() -> void:
 		"ИГРАТЬ: встань в круг\nи нажми Пробел / Enter / A")
 	_build_zone(Apartment.WARDROBE_ZONE, WARDROBE_RADIUS, Color(0.96, 0.76, 0.26),
 		"ШКАФ: переодеться\nи купить одежду")
-	_build_zone(Apartment.CASINO_ZONE, CASINO_RADIUS, Color(1.0, 0.35, 0.75),
-		"КАЗИНО: рулетка\nставки каждые 20 сек")
+	_build_zone(Apartment.RUBGAME_ZONE, RUBGAME_RADIUS, Color(1.0, 0.35, 0.75),
+		"ИГРА НА РУБЛИ\nкруг каждые 20 сек")
 
 	# Боты прошлой партии в лобби не нужны: при старте спросим заново.
 	PlayerManager.remove_bots()
@@ -216,8 +216,8 @@ func _process(delta: float) -> void:
 		var seat := _free_seat_near(p)
 		if p.input.is_just_pressed("confirm") and _is_near(p, Apartment.WARDROBE_ZONE, WARDROBE_RADIUS):
 			_open_wardrobe(p)
-		elif p.input.is_just_pressed("confirm") and _near_casino(p):
-			_open_casino(p)
+		elif p.input.is_just_pressed("confirm") and _near_rubgame(p):
+			_open_rubgame(p)
 		elif p.input.is_just_pressed("confirm") and at_tv:
 			_set_ready(p, not _ready_marks.has(p.id))
 		elif p.input.is_just_pressed("confirm") and seat >= 0:
@@ -459,12 +459,12 @@ func _attack_key(p: PlayerData) -> String:
 			return "X"
 
 
-func _open_casino(p: PlayerData) -> void:
+func _open_rubgame(p: PlayerData) -> void:
 	var character: PlayerCharacter = _characters[p.id]
 	character.input_enabled = false
 	character.velocity = Vector3.ZERO
-	var screen := CasinoScreen.new()
-	screen.setup(p, character, _apartment.casino_table)
+	var screen := RubgameScreen.new()
+	screen.setup(p, character, _apartment.rubgame_table)
 	screen.closed.connect(_on_room_closed)
 	_rooms_root.add_child(screen)
 	_rooms[p.id] = screen
@@ -472,12 +472,12 @@ func _open_casino(p: PlayerData) -> void:
 
 
 ## Рядом со столом рулетки: в круге перед столом или вплотную к столу с любой стороны.
-func _near_casino(p: PlayerData) -> bool:
-	if _is_near(p, Apartment.CASINO_ZONE, CASINO_RADIUS):
+func _near_rubgame(p: PlayerData) -> bool:
+	if _is_near(p, Apartment.RUBGAME_ZONE, RUBGAME_RADIUS):
 		return true
 	if not _characters.has(p.id):
 		return false
-	var table := _apartment.casino_table
+	var table := _apartment.rubgame_table
 	var local := table.to_local((_characters[p.id] as Node3D).global_position)
 	return absf(local.x) < 2.4 and absf(local.z) < 1.3
 
@@ -684,7 +684,7 @@ func _prompt_for(p: PlayerData, character: PlayerCharacter) -> String:
 		action = "встать"
 	elif _is_near(p, Apartment.WARDROBE_ZONE, WARDROBE_RADIUS):
 		action = "открыть шкаф (переодеться)"
-	elif _near_casino(p):
+	elif _near_rubgame(p):
 		action = "сыграть в рулетку"
 	elif _is_near(p, Apartment.TV_ZONE, TV_ZONE_RADIUS):
 		if _ready_marks.has(p.id):

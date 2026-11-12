@@ -1,6 +1,6 @@
-class_name CasinoTable
+class_name RubgameTable
 extends Node3D
-## Стол рулетки в казино. Крутится сам по кругу, даже если у стола никого нет:
+## Стол рулетки в игровой комнате. Крутится сам по кругу, даже если у стола никого нет:
 ##   ставки (BET_TIME) → колесо крутится (SPIN_TIME) → результат (RESULT_TIME) → снова ставки.
 ## Весь круг — 20 секунд.
 ##
@@ -18,9 +18,9 @@ const BET_TIME := 12.0
 const SPIN_TIME := 5.0
 const RESULT_TIME := 3.0
 
-const DIR := "res://assets/models/casino/"
-const FELT_TEXTURE := preload("res://assets/textures/casino/felt.png")
-const WHEEL_TEXTURE := preload("res://assets/textures/casino/wheel.png")
+const DIR := "res://assets/models/rubgame/"
+const FELT_TEXTURE := preload("res://assets/textures/rubgame/felt.png")
+const WHEEL_TEXTURE := preload("res://assets/textures/rubgame/wheel.png")
 ## Сукно: центр и размер (локальные координаты стола).
 const FELT_CENTER := Vector3(0.6, 0.918, 0.0)
 const FELT_SIZE := Vector2(2.6, 1.06)

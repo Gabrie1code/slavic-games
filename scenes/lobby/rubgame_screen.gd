@@ -1,4 +1,4 @@
-class_name CasinoScreen
+class_name RubgameScreen
 extends LobbyRoom
 ## Экран игрока у стола рулетки: стол крупным планом (тот же мир, что и лобби —
 ## видно, как персонаж стоит у стола и как другие ставят фишки).
@@ -28,7 +28,7 @@ const BET_ORDER: Array[int] = [
 	Roulette.Bet.EVEN, Roulette.Bet.ODD, Roulette.Bet.NUMBER,
 ]
 
-var table: CasinoTable
+var table: RubgameTable
 var lobby_character: PlayerCharacter
 
 var _row := ROW_BET
@@ -57,10 +57,10 @@ var _buy_buttons: Array[Button] = []
 var _fonts: Array[Array] = [] # [Control, множитель размера шрифта]
 
 
-func setup(p: PlayerData, character: PlayerCharacter, casino_table: CasinoTable) -> void:
+func setup(p: PlayerData, character: PlayerCharacter, rubgame_table: RubgameTable) -> void:
 	player = p
 	lobby_character = character
-	table = casino_table
+	table = rubgame_table
 
 
 func _ready() -> void:
@@ -187,7 +187,7 @@ func _on_confirm_answered(yes: bool) -> void:
 
 func _place() -> void:
 	var value: int = PlayerManager.CHIP_VALUES[_chip_index]
-	if table.phase != CasinoTable.Phase.BETTING:
+	if table.phase != RubgameTable.Phase.BETTING:
 		_say("Ставки закрыты — ждём следующий круг", RED)
 	elif int(PlayerManager.chips(player)[value]) < 1:
 		_say("Нет фишки «%d» — купи справа" % value, RED)
@@ -234,13 +234,13 @@ func _chips_total() -> int:
 
 func _update_status() -> void:
 	match table.phase:
-		CasinoTable.Phase.BETTING:
+		RubgameTable.Phase.BETTING:
 			_status.text = "Ставки принимаются: %d с" % ceili(table.time_left)
 			_status.add_theme_color_override("font_color", GREEN)
-		CasinoTable.Phase.SPINNING:
+		RubgameTable.Phase.SPINNING:
 			_status.text = "Ставок больше нет — крутим!"
 			_status.add_theme_color_override("font_color", GOLD)
-		CasinoTable.Phase.RESULT:
+		RubgameTable.Phase.RESULT:
 			_status.text = "Выпало: %d (%s)" % [table.result, Roulette.color_name(table.result)]
 			_status.add_theme_color_override("font_color", Color.WHITE)
 	_message_label.text = _message

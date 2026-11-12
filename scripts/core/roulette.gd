@@ -7,7 +7,7 @@ extends RefCounted
 ## Если выпало зеро, ставки на цвет и чёт/нечёт проигрывают.
 ##
 ## Разметка сукна в долях текстуры (u — вдоль стола, v — поперёк) совпадает
-## с tools/textures/casino_textures.py: по ней на сукно кладутся фишки.
+## с tools/textures/rubgame_textures.py: по ней на сукно кладутся фишки.
 
 enum Bet { RED, BLACK, ZERO, EVEN, ODD, NUMBER }
 

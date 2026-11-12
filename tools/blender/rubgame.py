@@ -1,11 +1,11 @@
-"""Казино в квартире: стол рулетки (без сукна — сукно и колесо — текстуры в Godot),
+"""Игровая комната в квартире: стол рулетки (без сукна — сукно и колесо — текстуры в Godot),
 чаша колеса с крестовиной, игровой автомат 90-х, лампа над столом.
 
 Стол лежит вдоль X: слева (x −1.95..−0.75) чаша колеса, справа (x −0.7..1.9) поле ставок.
 Верх стола — на высоте 0.92.
 
 Запуск:
-    python tools/blender/casino.py assets/models/casino
+    python tools/blender/rubgame.py assets/models/rubgame
 """
 import bpy, math, sys, os
 from mathutils import Vector
@@ -139,10 +139,10 @@ P.append(box((0.7, 0.12, 0.2), (0, -0.25, 1.65), PANEL, bevel=0.01))
 export("arcade_cabinet", P)
 
 # ---------------- Лампа над столом (верх в z = 3: крепится к потолку) ----------------
-SHADE = mat("CasinoShade", (0.1, 0.4, 0.2), 0.5)
-BULB = mat("CasinoBulb", (1.0, 0.9, 0.6), 0.3, 0, 2.0)
+SHADE = mat("RubgameShade", (0.1, 0.4, 0.2), 0.5)
+BULB = mat("RubgameBulb", (1.0, 0.9, 0.6), 0.3, 0, 2.0)
 P = [cyl(0.008, 1.0, (0, 0, 2.5), BRASS, verts=6)]
 P.append(cyl(0.6, 0.18, (0, 0, 1.95), SHADE, verts=6, r2=0.25))
 P.append(cyl(0.18, 0.04, (0, 0, 1.86), BULB, verts=12))
-export("casino_lamp", P)
+export("rubgame_lamp", P)
 print("DONE")

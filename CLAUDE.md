@@ -44,8 +44,8 @@ Party-игра на Godot 4.7 (GDScript), стилизованный low-poly, �
 - `Breakable` — ломается от касания игрока и восстанавливается; `Tippable` — RigidBody, падает и
   возвращается на место. Осколки на слое 2 (не мешают игрокам).
 - Персонаж толкает RigidBody (`_push_bodies`), умеет `sit_at()` / `stand_up()`.
-- Казино слева от гостиной: `CasinoTable` (круг 20 сек, правила в `Roulette`), экран у стола
-  `CasinoScreen`. Окна игроков в лобби (примерочная, стол) наследуют `LobbyRoom`.
+- Игровая комната («игра на рубли», rubgame) слева от гостиной: `RubgameTable` (круг 20 сек, правила в `Roulette`), экран у стола
+  `RubgameScreen`. Окна игроков в лобби (примерочная, стол) наследуют `LobbyRoom`.
   Фишки в профиле: `PlayerManager.chips / add_chips`, номиналы `CHIP_VALUES`.
 - Живые вещи: `RotaryPhone`, `CuckooClock`, `LobbyCat` (scenes/lobby/props/). Подсказка лобби с «~»
   в начале показывается серой (действие недоступно).

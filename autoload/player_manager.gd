@@ -24,7 +24,7 @@ const COLOR_NAMES: Array[String] = [
 
 ## Имена ботов.
 const BOT_NAMES: Array[String] = ["Колян", "Серёга", "Вовчик", "Лёха"]
-## Номиналы фишек казино (цена фишки в рублях = номинал).
+## Номиналы фишек игры на рубли (цена фишки в рублях = номинал).
 const CHIP_VALUES: Array[int] = [10, 50, 100, 500]
 
 var players: Array[PlayerData] = []
@@ -141,7 +141,7 @@ func buy(p: PlayerData, id: String) -> bool:
 	return true
 
 
-# ---------------- Фишки казино ----------------
+# ---------------- Фишки игры на рубли ----------------
 
 ## Сколько фишек каждого номинала у игрока: {10: 3, 50: 0, ...}.
 func chips(p: PlayerData) -> Dictionary:

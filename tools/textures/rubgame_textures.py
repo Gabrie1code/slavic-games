@@ -1,10 +1,10 @@
-"""Текстуры казино: сукно стола рулетки и колесо.
+"""Текстуры игры на рубли: сукно стола рулетки и колесо.
 
 Разметка сукна в долях (u — по длине стола, v — по ширине) совпадает с Roulette.layout_*
 в scripts/core/roulette.gd — по ней на сукно ставятся фишки.
 
 Запуск (обычный Python с Pillow):
-    python3 tools/textures/casino_textures.py assets/textures/casino
+    python3 tools/textures/rubgame_textures.py assets/textures/rubgame
 """
 import math
 import os
