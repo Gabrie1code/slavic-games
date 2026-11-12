@@ -254,6 +254,11 @@ func show_name(visible_name: bool) -> void:
 	_name_label.visible = visible_name
 
 
+## Слой видимости надписи с именем (например, чтобы её не видел водящий в тумане).
+func set_name_layer(layer: int) -> void:
+	_name_label.layers = layer
+
+
 ## Перекрасить «основной» цвет (например, белый халат продавщицы).
 func set_body_color(color: Color) -> void:
 	_primary_material.albedo_color = color
