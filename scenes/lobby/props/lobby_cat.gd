@@ -64,10 +64,11 @@ func _ready() -> void:
 	add_child(_model)
 	for part in ["CatBody", "CatHead", "CatTail", "LegFL", "LegFR", "LegBL", "LegBR"]:
 		_parts[part] = _model.find_child(part, true, false)
-	var bed := (load("res://assets/models/apartment/cat_bed.glb") as PackedScene).instantiate()
+	var bed_scene := load("res://assets/models/apartment/cat_bed.glb") as PackedScene
+	var bed := bed_scene.instantiate() as Node3D
 	bed.top_level = true
 	add_child(bed)
-	(bed as Node3D).position = BED_POS
+	bed.position = BED_POS
 	_zzz = Label3D.new()
 	_zzz.text = "z Z Z"
 	_zzz.font_size = 48

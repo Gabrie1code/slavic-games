@@ -371,6 +371,9 @@ docs/                        ROADMAP, MINIGAMES, COSMETICS, PROJECT_LOG (это�
 
 1. **Тип через `:=` из нетипизированного массива** (`.duplicate()`, `.filter()`, `.values()`) — Godot
    не запускает скрипт. Копировать в типизированную переменную (`var a: Array[Node3D] = x.duplicate()`).
+   Повторилось в `local_lobby.gd` (`for p in PlayerManager.players.duplicate()` → `var pressed := p.input…`):
+   проект не запускался по F5. Исправлено копией в `var players: Array[PlayerData]`.
+   То же для `instantiate()` без `as Node3D`, если потом трогаем свойства Node3D (лежанка кота).
 2. **`await tween.finished` у уже закончившегося твина** — ждёт вечно. Проверять `is_running()`.
 3. `set_physics_process(false)` делать **после** `add_child` (иначе Godot включит обратно).
 4. Не масштабировать физические тела (RigidBody/StaticBody) — масштабировать модель внутри.

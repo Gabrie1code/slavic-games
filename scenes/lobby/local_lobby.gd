@@ -189,7 +189,10 @@ func _process(delta: float) -> void:
 	if _bot_dialog.visible:
 		_process_bot_dialog()
 		return
-	for p in PlayerManager.players.duplicate():
+	# Копия списка (игрок может выйти посреди цикла) — обязательно в типизированную переменную,
+	# иначе Godot не знает тип p и не загружает скрипт (см. «Уроки» в PROJECT_LOG).
+	var players: Array[PlayerData] = PlayerManager.players.duplicate()
+	for p in players:
 		if p.input == null or p.is_bot():
 			continue
 		if _rooms.has(p.id):
