@@ -14,7 +14,8 @@ const BAT_SCENE := preload("res://assets/models/props/bat.glb")
 const SUPER_BAT_SCENE := preload("res://assets/models/props/bat_super.glb")
 const CAN_SCENE := preload("res://assets/models/props/energy_can.glb")
 
-const MAX_HP := 100
+## 250 HP: раунд не кончается слишком быстро (удар 20, супер-бита 34).
+const MAX_HP := 250
 const ROUND_TIME := 75.0
 const SPAWN_POINTS: Array[Vector3] = [
 	Vector3(-5.5, 0.3, -2.5), Vector3(5.5, 0.3, -2.5), Vector3(-5.5, 0.3, 2.5), Vector3(5.5, 0.3, 2.5),
@@ -42,7 +43,7 @@ const SUPER_TIME := 15.0
 ## Энергетик «Ягуарр»: быстрее атака + немного лечения.
 const DRINK_TIME := 8.0
 const DRINK_COOLDOWN := 0.4
-const DRINK_HEAL := 20
+const DRINK_HEAL := 50
 
 const BOOST_INTERVAL := 7.0
 const MAX_BOOSTS := 2
@@ -56,7 +57,7 @@ class Fighter:
 	var player: PlayerData
 	var character: PlayerCharacter
 	var hp_label: Label3D
-	var hp := 100
+	var hp := MAX_HP
 	var alive := true
 	var has_super_bat := false
 	var cooldown := 0.0
@@ -77,7 +78,8 @@ var _finished := false
 
 var _timer_label: Label
 var _message_label: Label
-var _hp_bars: Dictionary = {} # PlayerData.id -> ProgressBar
+## Полоски здоровья внизу: PlayerData.id -> {"main", "ghost", "text", "card"}.
+var _hp_bars: Dictionary = {}
 
 @onready var _camera: Camera3D = $Camera3D
 @onready var _sun: DirectionalLight3D = $Sun
@@ -427,7 +429,7 @@ func _update_hp(f: Fighter) -> void:
 	f.hp_label.text = "%d HP" % f.hp
 	f.hp_label.modulate = Color("a8f0a0").lerp(Color("ff6b5a"), 1.0 - float(f.hp) / MAX_HP)
 	if _hp_bars.has(f.player.id):
-		(_hp_bars[f.player.id] as ProgressBar).value = f.hp
+		_set_hp_bar(_hp_bars[f.player.id], f.hp, f.alive)
 
 
 ## Всплывающая цифра урона над головой: «-20», летит вверх и тает.
@@ -527,21 +529,74 @@ func _build_ui() -> void:
 	row.add_theme_constant_override("separation", 20)
 	column.add_child(row)
 	for f in _fighters:
-		var box := VBoxContainer.new()
-		box.custom_minimum_size.x = 240
-		box.add_child(_label(f.player.display_name, 22, f.player.color.lightened(0.3)))
-		var bar := ProgressBar.new()
-		bar.max_value = MAX_HP
-		bar.value = f.hp
-		bar.show_percentage = false
-		bar.custom_minimum_size.y = 22
-		var fill := StyleBoxFlat.new()
-		fill.bg_color = f.player.color
-		fill.set_corner_radius_all(6)
-		bar.add_theme_stylebox_override("fill", fill)
-		box.add_child(bar)
-		row.add_child(box)
+		var bar := _make_hp_card(f)
+		row.add_child(bar["card"])
 		_hp_bars[f.player.id] = bar
+
+
+## Карточка здоровья: имя и «230 / 250» сверху, под ними полоска цвета игрока. За ней —
+## «след урона» (светлая полоска, которая догоняет с задержкой, как в файтингах).
+func _make_hp_card(f: Fighter) -> Dictionary:
+	var card := PanelContainer.new()
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.08, 0.06, 0.05, 0.85)
+	style.border_color = f.player.color
+	style.set_border_width_all(3)
+	style.set_corner_radius_all(12)
+	style.set_content_margin_all(10)
+	card.add_theme_stylebox_override("panel", style)
+	card.custom_minimum_size.x = 270
+	var column := VBoxContainer.new()
+	column.add_theme_constant_override("separation", 4)
+	card.add_child(column)
+	var header := HBoxContainer.new()
+	column.add_child(header)
+	var name_label := _label(f.player.display_name, 22, f.player.color.lightened(0.3))
+	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	header.add_child(name_label)
+	var text := _label("%d / %d" % [f.hp, MAX_HP], 22, Color.WHITE)
+	header.add_child(text)
+	var holder := Control.new()
+	holder.custom_minimum_size.y = 20
+	column.add_child(holder)
+	var ghost := _hp_progress(Color(1.0, 0.85, 0.6), Color(0.15, 0.12, 0.1))
+	holder.add_child(ghost)
+	var main := _hp_progress(f.player.color.lightened(0.1), Color(0, 0, 0, 0))
+	holder.add_child(main)
+	return {"main": main, "ghost": ghost, "text": text, "card": card}
+
+
+func _hp_progress(fill_color: Color, back_color: Color) -> ProgressBar:
+	var bar := ProgressBar.new()
+	bar.set_anchors_preset(Control.PRESET_FULL_RECT)
+	bar.max_value = MAX_HP
+	bar.value = MAX_HP
+	bar.show_percentage = false
+	var fill := StyleBoxFlat.new()
+	fill.bg_color = fill_color
+	fill.set_corner_radius_all(7)
+	fill.border_color = fill_color.lightened(0.35) # светлый блик сверху
+	fill.border_width_top = 3
+	bar.add_theme_stylebox_override("fill", fill)
+	var back := StyleBoxFlat.new()
+	back.bg_color = back_color
+	back.set_corner_radius_all(7)
+	bar.add_theme_stylebox_override("background", back)
+	return bar
+
+
+func _set_hp_bar(bar: Dictionary, hp: int, alive: bool) -> void:
+	var main: ProgressBar = bar["main"]
+	var ghost: ProgressBar = bar["ghost"]
+	(bar["text"] as Label).text = ("%d / %d" % [hp, MAX_HP]) if alive else "ВЫБЫЛ"
+	create_tween().tween_property(main, "value", float(hp), 0.15)
+	if hp < ghost.value:
+		create_tween().tween_property(ghost, "value", float(hp), 0.5).set_delay(0.4)
+	else:
+		ghost.value = hp
+	if not alive:
+		(bar["card"] as Control).modulate = Color(0.55, 0.55, 0.55)
 
 
 func _label(text: String, font_size: int, color: Color) -> Label:

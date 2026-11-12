@@ -232,11 +232,11 @@ func _process(delta: float) -> void:
 			continue
 		var at_tv := _is_near(p, Apartment.TV_ZONE, TV_ZONE_RADIUS)
 		var seat := _free_seat_near(p)
-		if p.input.is_just_pressed("confirm") and _is_near(p, Apartment.WARDROBE_ZONE, WARDROBE_RADIUS):
+		if p.input.is_just_pressed("confirm") and _at_wardrobe(p):
 			_open_wardrobe(p)
 		elif p.input.is_just_pressed("confirm") and _near_rubgame(p):
 			_open_rubgame(p)
-		elif p.input.is_just_pressed("confirm") and at_tv:
+		elif p.input.is_just_pressed("confirm") and at_tv and _looks_at(p, Apartment.TV_POS):
 			_set_ready(p, not _ready_marks.has(p.id))
 		elif p.input.is_just_pressed("confirm") and seat >= 0:
 			_sit(p, seat)
@@ -281,6 +281,16 @@ func _set_ready(p: PlayerData, on: bool) -> void:
 			mark.queue_free()
 		_ready_marks.erase(p.id)
 		_cancel_countdown()
+
+
+## Смотрит ли игрок на точку (кнопка действия — только когда смотришь на предмет).
+func _looks_at(p: PlayerData, point: Vector3) -> bool:
+	return _characters.has(p.id) and LobbyGadgets.facing(_characters[p.id], point, 60.0)
+
+
+func _at_wardrobe(p: PlayerData) -> bool:
+	return _is_near(p, Apartment.WARDROBE_ZONE, WARDROBE_RADIUS) \
+		and _looks_at(p, Apartment.WARDROBE_POS)
 
 
 func _is_near(p: PlayerData, point: Vector3, radius: float) -> bool:
@@ -366,7 +376,8 @@ func _free_seat_near(p: PlayerData) -> int:
 	for i in _apartment.seats.size():
 		if _seated.values().has(i):
 			continue
-		if _is_near(p, _apartment.seats[i]["approach"], SEAT_RADIUS):
+		if _is_near(p, _apartment.seats[i]["approach"], SEAT_RADIUS) \
+				and _looks_at(p, _apartment.seats[i]["pos"]):
 			return i
 	return -1
 
@@ -422,11 +433,13 @@ func _open_rubgame(p: PlayerData) -> void:
 
 ## Рядом со столом рулетки: в круге перед столом или вплотную к столу с любой стороны.
 func _near_rubgame(p: PlayerData) -> bool:
+	var table := _apartment.rubgame_table
+	if not _looks_at(p, table.global_position + table.global_basis.x * 0.6):
+		return false # стол должен быть перед глазами
 	if _is_near(p, Apartment.RUBGAME_ZONE, RUBGAME_RADIUS):
 		return true
 	if not _characters.has(p.id):
 		return false
-	var table := _apartment.rubgame_table
 	var local := table.to_local((_characters[p.id] as Node3D).global_position)
 	return absf(local.x) < 2.4 and absf(local.z) < 1.3
 
@@ -658,11 +671,11 @@ func _prompt_for(p: PlayerData, character: PlayerCharacter) -> Array[Dictionary]
 	var action := ""
 	if character.sitting:
 		action = "Встать"
-	elif _is_near(p, Apartment.WARDROBE_ZONE, WARDROBE_RADIUS):
+	elif _at_wardrobe(p):
 		action = "Шкаф: переодеться"
 	elif _near_rubgame(p):
 		action = "Игра на рубли"
-	elif _is_near(p, Apartment.TV_ZONE, TV_ZONE_RADIUS):
+	elif _is_near(p, Apartment.TV_ZONE, TV_ZONE_RADIUS) and _looks_at(p, Apartment.TV_POS):
 		action = "Отменить «Готов» (ждём остальных)" if _ready_marks.has(p.id) else "Готов к игре"
 	elif _free_seat_near(p) >= 0:
 		action = "Сесть на диван"

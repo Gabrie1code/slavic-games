@@ -9,6 +9,8 @@ const PHONE_RADIUS := 1.2
 ## С трубкой в руке диск можно крутить, только стоя у телефона.
 const DIAL_RADIUS := 1.7
 const CAT_RADIUS := 1.3
+## Насколько точно надо смотреть на предмет, чтобы появилась кнопка (градусы от взгляда).
+const LOOK_ANGLE := 50.0
 const GRAMOPHONE_RADIUS := 1.4
 const LAMP_RADIUS := 1.2
 ## Сколько играет граммофон (три ноты) — пока играет, второй раз не заведёшь.
@@ -30,6 +32,18 @@ func _init(apt: Apartment, chars: Dictionary) -> void:
 ## Одна строка подсказки: кнопка, действие, недоступно ли (серым).
 static func entry(key: String, text: String, off: bool = false) -> Dictionary:
 	return {"key": key, "text": text, "off": off}
+
+
+## Смотрит ли персонаж на точку (по горизонтали, не дальше max_degrees от взгляда).
+## Действие и подсказка появляются, только когда игрок рядом И смотрит на предмет.
+static func facing(character: Node3D, point: Vector3, max_degrees: float = LOOK_ANGLE) -> bool:
+	var to := point - character.global_position
+	to.y = 0.0
+	if to.length() < 0.3:
+		return true # вплотную — считаем, что смотрит
+	var forward := -character.global_basis.z
+	forward.y = 0.0
+	return forward.normalized().angle_to(to.normalized()) < deg_to_rad(max_degrees)
 
 
 static func confirm_key(p: PlayerData) -> String:
@@ -76,8 +90,8 @@ func try_interact(p: PlayerData) -> bool:
 	if _near_tippable(p, apartment.gramophone, GRAMOPHONE_RADIUS) and _gramophone_ready():
 		_play_gramophone()
 		return true
-	if _near_tippable(p, apartment.floor_lamp, LAMP_RADIUS):
-		apartment.lamp_on = not apartment.lamp_on
+	if _near_tippable(p, apartment.floor_lamp, LAMP_RADIUS) and apartment.lamp_lit():
+		apartment.turn_off_lamp()
 		return true
 	if _near_cat(p) and apartment.cat.pet():
 		# Персонаж тянет руку к коту.
@@ -111,9 +125,9 @@ func hint(p: PlayerData) -> Array[Dictionary]:
 func _furniture_hint(p: PlayerData) -> Array[Dictionary]:
 	if _near_tippable(p, apartment.gramophone, GRAMOPHONE_RADIUS):
 		return [entry(confirm_key(p), "Завести граммофон", not _gramophone_ready())]
-	if _near_tippable(p, apartment.floor_lamp, LAMP_RADIUS):
-		var action := "Выключить торшер" if apartment.lamp_on else "Включить торшер"
-		return [entry(confirm_key(p), action)]
+	# Выключенный торшер «чинится» сам — кнопки нет, пока снова не загорится.
+	if _near_tippable(p, apartment.floor_lamp, LAMP_RADIUS) and apartment.lamp_lit():
+		return [entry(confirm_key(p), "Выключить торшер")]
 	return []
 
 
@@ -178,5 +192,6 @@ func _near_cat(p: PlayerData) -> bool:
 func _near(p: PlayerData, point: Vector3, radius: float) -> bool:
 	if not characters.has(p.id):
 		return false
-	var pos: Vector3 = (characters[p.id] as Node3D).global_position
-	return Vector2(pos.x - point.x, pos.z - point.z).length() < radius
+	var character := characters[p.id] as Node3D
+	var pos := character.global_position
+	return Vector2(pos.x - point.x, pos.z - point.z).length() < radius and facing(character, point)

@@ -48,6 +48,9 @@ const RUBGAME_TABLE_POS := Vector3(-8.6, 0, 0.2)
 ## Где нажимать «сыграть» — перед столом (и вообще рядом со столом, см. лобби).
 const RUBGAME_ZONE := Vector3(-7.9, 0, 1.45)
 const PHONE_TABLE_POS := Vector3(-5.55, 0, 0.85)
+const LAMP_ENERGY := 1.3
+const LAMP_BACK := 8.0
+const LAMP_FADE := 1.5
 const SPAWNS: Array[Vector3] = [
 	Vector3(-0.3, 0.3, -1.2), Vector3(0.9, 0.3, -1.2),
 	Vector3(-0.3, 0.3, -2.4), Vector3(0.9, 0.3, -2.4),
@@ -65,7 +68,8 @@ var rubgame_table: RubgameTable
 ## Граммофон (играет три ноты) и торшер (включается; повалили — гаснет).
 var gramophone: Tippable
 var floor_lamp: Tippable
-## Торшер включён (горит, только пока стоит на месте).
+## Торшер включён (горит, только пока стоит на месте). Выключили кнопкой — через LAMP_BACK сек
+## сам включается и плавно разгорается (как восстанавливается разбитая посуда).
 var lamp_on := true
 ## Дисковый телефон (гостиная, у двери в игровую) и кот.
 var phone: RotaryPhone
@@ -73,6 +77,14 @@ var cat: LobbyCat
 
 var _lamp_light: OmniLight3D
 var _lamp_glow: MeshInstance3D
+var _lamp_glow_mat: StandardMaterial3D
+var _lamp_level := 1.0 # 0 — не горит, 1 — горит в полную силу
+var _lamp_back_at := 0.0
+## «Работающий» экран телевизора: фон, кнопка «ИГРАТЬ», бегущая полоса развёртки.
+var _tv_bg_mat: StandardMaterial3D
+var _tv_button: MeshInstance3D
+var _tv_scan: MeshInstance3D
+var _time := 0.0
 
 
 func _ready() -> void:
@@ -158,6 +170,7 @@ func _build_living_room() -> void:
 			_breakable(item, Vector3(x, shelf_heights[row], sideboard_pos.z - 0.05), [CRYSTAL], 0.6, 0.05)
 	var tv := TV_SCENE.instantiate() as Node3D
 	tv.scale = Vector3.ONE * 1.3
+	_build_tv_screen(tv)
 	_solid(tv, Vector3(1.3, 1.5, 1.0), 0.75, TV_POS)
 	var shelf_pos := Vector3(-0.7, 0, -3.75)
 	_solid(_model("bookshelf"), Vector3(1.3, 2.3, 0.45), 1.15, shelf_pos)
@@ -250,17 +263,85 @@ func _build_bedroom() -> void:
 	_place(_model("chandelier"), Vector3(6.2, 0, -1.4))
 
 
-func _process(_delta: float) -> void:
-	var lit := lamp_on and floor_lamp.is_at_home()
-	_lamp_light.visible = lit
-	_lamp_glow.visible = lit
+func _process(delta: float) -> void:
+	_time += delta
+	_animate_tv()
+	if not lamp_on and _time >= _lamp_back_at:
+		lamp_on = true
+	# Гаснет сразу, разгорается плавно.
+	var target := 1.0 if lamp_on and floor_lamp.is_at_home() else 0.0
+	if target < _lamp_level:
+		_lamp_level = target
+	else:
+		_lamp_level = move_toward(_lamp_level, target, delta / LAMP_FADE)
+	_lamp_light.light_energy = LAMP_ENERGY * _lamp_level
+	_lamp_light.visible = _lamp_level > 0.01
+	_lamp_glow_mat.albedo_color = Color(0.3, 0.27, 0.22).lerp(Color(1.0, 0.92, 0.7), _lamp_level)
+
+
+## Торшер горит в полную силу (только тогда его можно выключить).
+func lamp_lit() -> bool:
+	return _lamp_level > 0.99
+
+
+## Выключить торшер кнопкой: гаснет и через LAMP_BACK сек плавно загорается снова.
+func turn_off_lamp() -> void:
+	lamp_on = false
+	_lamp_back_at = _time + LAMP_BACK
+
+
+## Экран кинескопа: картинка поверх экрана модели (координаты — в модели телевизора).
+func _build_tv_screen(tv: Node3D) -> void:
+	var center := Vector3(-0.12, 0.78, 0.465)
+	var bg := _screen_quad("res://assets/textures/tv/tv_screen_bg.png", Vector2(0.54, 0.44), center)
+	_tv_bg_mat = bg.material_override as StandardMaterial3D
+	tv.add_child(bg)
+	_tv_button = _screen_quad("res://assets/textures/tv/tv_play_button.png", Vector2(0.44, 0.17),
+		center + Vector3(0, 0, 0.003))
+	tv.add_child(_tv_button)
+	_tv_scan = MeshInstance3D.new()
+	var scan_mesh := QuadMesh.new()
+	scan_mesh.size = Vector2(0.54, 0.035)
+	_tv_scan.mesh = scan_mesh
+	var scan_mat := StandardMaterial3D.new()
+	scan_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	scan_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	scan_mat.albedo_color = Color(0.7, 1.0, 0.9, 0.08)
+	_tv_scan.material_override = scan_mat
+	_tv_scan.position = center + Vector3(0, 0, 0.005)
+	tv.add_child(_tv_scan)
+
+
+func _screen_quad(texture_path: String, size: Vector2, pos: Vector3) -> MeshInstance3D:
+	var quad := MeshInstance3D.new()
+	var mesh := QuadMesh.new()
+	mesh.size = size
+	quad.mesh = mesh
+	var mat := StandardMaterial3D.new()
+	mat.albedo_texture = load(texture_path)
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	quad.material_override = mat
+	quad.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	quad.position = pos
+	return quad
+
+
+## Телевизор «работает»: кнопка дышит и чуть дрожит, яркость мерцает, бежит полоса.
+func _animate_tv() -> void:
+	var pulse := 1.0 + sin(_time * 3.0) * 0.04
+	_tv_button.scale = Vector3(pulse, pulse, 1.0)
+	_tv_button.position.x = -0.12 + (randf() - 0.5) * 0.002
+	var flicker := 0.93 + randf() * 0.07
+	_tv_bg_mat.albedo_color = Color(flicker, flicker, flicker)
+	_tv_scan.position.y = 0.78 + 0.2 - fmod(_time * 0.12, 0.4)
 
 
 ## Лампочка под абажуром торшера: тёплый свет и светящийся шарик.
 func _build_lamp_light() -> void:
 	_lamp_light = OmniLight3D.new()
 	_lamp_light.light_color = Color(1.0, 0.82, 0.55)
-	_lamp_light.light_energy = 1.3
+	_lamp_light.light_energy = LAMP_ENERGY
 	_lamp_light.omni_range = 4.0
 	_lamp_light.shadow_enabled = true
 	_lamp_light.position = Vector3(0, 1.4, 0)
@@ -270,10 +351,10 @@ func _build_lamp_light() -> void:
 	bulb.radius = 0.07
 	bulb.height = 0.14
 	_lamp_glow.mesh = bulb
-	var glow_mat := StandardMaterial3D.new()
-	glow_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	glow_mat.albedo_color = Color(1.0, 0.92, 0.7)
-	_lamp_glow.material_override = glow_mat
+	_lamp_glow_mat = StandardMaterial3D.new()
+	_lamp_glow_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_lamp_glow_mat.albedo_color = Color(1.0, 0.92, 0.7)
+	_lamp_glow.material_override = _lamp_glow_mat
 	_lamp_glow.position = Vector3(0, 1.45, 0)
 	floor_lamp.add_child(_lamp_glow)
 
