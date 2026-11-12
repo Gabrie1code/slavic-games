@@ -25,10 +25,13 @@ func setup(p: PlayerData, size_px: float) -> PlayerPortrait:
 	_character = CHARACTER_SCENE.instantiate()
 	_character.setup(p, Vector3.ZERO)
 	world.add_child(_character)
-	_character.set_physics_process(false)
 	_character.input_enabled = false
-	# Имя над головой не нужно; надпись появляется в _ready персонажа — прячем после него.
-	_character.ready.connect(func() -> void: _character.show_name(false))
+	# После _ready персонажа: Godot сам включает физику, если у скрипта есть _physics_process —
+	# выключенная до этого физика включалась обратно, и персонаж падал (без пола) и
+	# появлялся снова снизу вверх. Имя над головой прячем тут же (надпись есть только после _ready).
+	_character.ready.connect(func() -> void:
+		_character.set_physics_process(false)
+		_character.show_name(false))
 	_character.rotation.y = PI # лицом к камере
 	var camera := Camera3D.new()
 	camera.fov = 21.0 # голова (1.05–1.62 м) и плечи (~1.08 м)

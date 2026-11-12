@@ -111,6 +111,9 @@ func _spawn(world: Node3D, p: PlayerData, place: int) -> void:
 		pos = Vector3(STEP_X[place], STEP_HEIGHT[place], 0)
 	character.setup(p, pos)
 	world.add_child(character)
+	# Физику выключаем после _ready персонажа (иначе Godot включит её обратно и он упадёт:
+	# ступени — только картинка, без столкновений).
+	character.ready.connect(character.set_physics_process.bind(false))
 	character.set_physics_process(false)
 	character.input_enabled = false
 	character.rotation.y = PI # лицом к камере
