@@ -156,6 +156,14 @@ func _spawn_seller() -> void:
 	_characters_root.add_child(_seller)
 	_seller.set_physics_process(false)
 
+	# Тёплая лампочка внутри ларька — продавщицу и колбасы видно, а не тёмная дыра.
+	var lamp := OmniLight3D.new()
+	lamp.light_color = Color(1.0, 0.86, 0.62)
+	lamp.light_energy = 1.4
+	lamp.omni_range = 3.2
+	lamp.position = Vector3(0, 2.1, -2.8)
+	add_child(lamp)
+
 	_sausage = SAUSAGE_SCENE.instantiate()
 	_sausage.scale = Vector3.ONE * 1.4
 	_seller.hold_item(_sausage)

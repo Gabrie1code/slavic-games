@@ -1437,68 +1437,95 @@ ITEMS = {
 # ======================= Продавщица «Тётя Валя» =======================
 
 def build_saleswoman():
-    """Продавщица из «Очереди за колбасой», как на картинке режима: пышная, румяная, каре,
-    белый колпак и халат, сердитые брови, рот открыт («Колбаса кончилась!»).
-    Части те же, что у персонажа, — работают анимация и предмет в руке."""
-    SKIN = mat("SaleSkin", (0.95, 0.72, 0.58), 0.6)
-    CHEEK = mat("SaleCheek", (0.95, 0.45, 0.45), 0.6)
-    HAIR = mat("SaleHair", (0.42, 0.22, 0.1), 0.8)
-    COAT = mat("SaleCoat", (0.95, 0.95, 0.93), 0.7)
-    SHADE = mat("SaleCoatShade", (0.82, 0.84, 0.86), 0.7)
+    """Продавщица «Тётя Валя» как на картинке режима: полная, с пышной грудью, объёмные волнистые
+    каштановые волосы до плеч с косой чёлкой, пышный поварской колпак со складками, белый халат
+    с отложным воротником, румяная, брови сдвинуты, глаза прищурены, рот открыт в крике.
+    Части те же, что у персонажа, — работают анимация и колбаса в руке."""
+    SKIN = mat("SaleSkin", (0.96, 0.74, 0.6), 0.6)
+    CHEEK = mat("SaleCheek", (0.95, 0.42, 0.42), 0.6)
+    HAIR = mat("SaleHair", (0.45, 0.23, 0.1), 0.75)
+    HAIR_D = mat("SaleHairDark", (0.33, 0.16, 0.07), 0.8)
+    COAT = mat("SaleCoat", (0.96, 0.96, 0.94), 0.7)
+    SHADE = mat("SaleCoatShade", (0.84, 0.86, 0.88), 0.7)
     DARK = mat("SaleDark", (0.06, 0.04, 0.04), 0.4)
     WHITE = mat("SaleEyeWhite", (0.97, 0.97, 0.97), 0.4)
-    MOUTH = mat("SaleMouth", (0.35, 0.05, 0.06), 0.6)
-    TONGUE = mat("SaleTongue", (0.9, 0.4, 0.4), 0.6)
+    MOUTH = mat("SaleMouth", (0.3, 0.04, 0.05), 0.6)
+    TONGUE = mat("SaleTongue", (0.9, 0.4, 0.42), 0.6)
+    BROW = mat("SaleBrow", (0.25, 0.12, 0.05), 0.7)
     SHOE = mat("SaleShoe", (0.15, 0.1, 0.08), 0.5)
-    BROW = mat("SaleBrow", (0.2, 0.1, 0.05), 0.7)
     parts = []
-    # Туловище: халат пошире, чем у игроков, с животиком и грудью.
-    torso = [cyl(0.29, 0.6, (0, 0, 0.75), COAT, verts=14, r2=0.3, scale=(1, 0.85, 1))]
-    torso.append(sphere(0.3, (0, 0, 1.03), COAT, scale=(1, 0.85, 0.38), segs=14, rings=6))
-    torso.append(sphere(0.27, (0, 0.07, 0.68), COAT, scale=(1, 0.95, 0.75), segs=14, rings=8))     # животик
-    torso.append(cyl(0.33, 0.12, (0, 0, 0.5), COAT, verts=14, r2=0.3, scale=(1, 0.88, 1)))        # подол
-    torso.append(box((0.14, 0.03, 0.12), (0, 0.255, 1.0), SKIN, rot=(math.radians(-20), 0, 0)))   # вырез
-    for z in (0.92, 0.78, 0.64):                                                                  # пуговицы
-        torso.append(sphere(0.022, (0.06, 0.31 if z > 0.7 else 0.32, z), SHADE, segs=8, rings=4))
-    torso.append(box((0.16, 0.02, 0.1), (-0.15, 0.27, 0.62), SHADE))                               # карман
+    # ---- Туловище: полная фигура, грудь, животик, халат с отложным воротником и карманом.
+    torso = [cyl(0.32, 0.6, (0, 0, 0.74), COAT, verts=16, r2=0.33, scale=(1, 0.9, 1))]
+    torso.append(sphere(0.335, (0, 0, 1.03), COAT, scale=(1.02, 0.9, 0.42), segs=16, rings=7))     # плечи
+    torso.append(sphere(0.25, (0, 0.11, 0.88), COAT, scale=(1.15, 0.75, 0.62), segs=16, rings=8))  # грудь
+    torso.append(sphere(0.29, (0, 0.06, 0.62), COAT, scale=(1.05, 0.9, 0.8), segs=16, rings=8))    # животик
+    torso.append(cyl(0.36, 0.14, (0, 0, 0.49), COAT, verts=16, r2=0.32, scale=(1, 0.92, 1)))      # подол
+    for s in (-1, 1):                                                                             # воротник
+        torso.append(box((0.15, 0.03, 0.12), (s * 0.09, 0.25, 1.06), SHADE, bevel=0.02,
+                         rot=(math.radians(-35), s * math.radians(-28), s * math.radians(-12))))
+    torso.append(box((0.1, 0.04, 0.09), (0, 0.27, 1.03), SKIN, rot=(math.radians(-30), 0, 0)))  # вырез
+    for z, y in ((0.78, 0.315), (0.66, 0.335), (0.54, 0.31)):                                     # пуговицы
+        torso.append(sphere(0.022, (0.03, y, z), SHADE, segs=8, rings=4))
+    torso.append(box((0.15, 0.03, 0.12), (-0.17, 0.27, 0.6), SHADE, bevel=0.01))                 # карман
+    torso.append(box((0.025, 0.02, 0.07), (-0.13, 0.29, 0.64), mat("SalePen", (0.15, 0.3, 0.7), 0.4)))
     parts.append(part("Torso", torso))
-    # Голова: лицо, румянец, сердитые брови, открытый рот, каре и белый колпак.
-    head = [sphere(0.3, (0, 0, 1.33), SKIN, scale=(1.03, 0.95, 0.95), segs=16, rings=10)]
+    # ---- Голова: круглая, щёки, сердитое лицо, крик.
+    head = [sphere(0.3, (0, 0, 1.33), SKIN, scale=(1.08, 0.97, 0.97), segs=18, rings=12)]
     for s in (-1, 1):
-        head.append(sphere(0.065, (s * 0.16, 0.235, 1.26), CHEEK, scale=(1, 0.45, 0.8), segs=10, rings=6))
-        head.append(sphere(0.06, (s * 0.1, 0.262, 1.37), WHITE, scale=(1, 0.5, 1.1), segs=10, rings=6))
-        head.append(sphere(0.032, (s * 0.1, 0.29, 1.365), DARK, scale=(1, 0.5, 1.2), segs=8, rings=5))
-        # Сердитые брови: внутренние концы ниже наружных.
-        head.append(box((0.12, 0.03, 0.032), (s * 0.1, 0.272, 1.45), BROW, rot=(0, s * math.radians(-22), 0)))
-    head.append(sphere(0.035, (0, 0.3, 1.3), SKIN, scale=(1, 0.8, 0.9), segs=8, rings=5))       # нос
-    head.append(sphere(0.07, (0, 0.262, 1.19), MOUTH, scale=(1.1, 0.4, 0.8), segs=12, rings=6))  # рот
-    head.append(sphere(0.04, (0, 0.27, 1.165), TONGUE, scale=(1.1, 0.4, 0.5), segs=8, rings=5))
-    # Каре: шапка волос с вырезом под лицо.
-    hair = sphere(0.33, (0, -0.02, 1.36), HAIR, scale=(1.05, 1.0, 1.0), segs=18, rings=12)
+        head.append(sphere(0.075, (s * 0.17, 0.225, 1.24), CHEEK, scale=(1, 0.45, 0.8), segs=10, rings=6))
+        # Прищуренные глаза: белок, зрачок и верхнее веко, срезающее глаз наискосок.
+        head.append(sphere(0.055, (s * 0.1, 0.262, 1.36), WHITE, scale=(1.1, 0.5, 0.85), segs=10, rings=6))
+        head.append(sphere(0.03, (s * 0.1, 0.29, 1.355), DARK, scale=(1, 0.5, 1.1), segs=8, rings=5))
+        head.append(box((0.13, 0.05, 0.05), (s * 0.1, 0.275, 1.395), SKIN,
+                        rot=(0, s * math.radians(-18), 0)))                                       # веко
+        head.append(box((0.13, 0.035, 0.035), (s * 0.1, 0.285, 1.435), BROW,
+                        rot=(0, s * math.radians(-24), 0)))                                       # бровь
+    head.append(sphere(0.04, (0, 0.305, 1.29), SKIN, scale=(1.1, 0.8, 0.9), segs=8, rings=5))     # нос
+    head.append(sphere(0.095, (0, 0.255, 1.17), MOUTH, scale=(1.2, 0.45, 0.85), segs=14, rings=8))  # рот
+    head.append(box((0.13, 0.03, 0.03), (0, 0.29, 1.225), WHITE, bevel=0.01))                    # зубы
+    head.append(sphere(0.05, (0, 0.27, 1.13), TONGUE, scale=(1.3, 0.45, 0.6), segs=10, rings=5))
+    # Волосы: пышная масса до плеч с вырезом под лицо + волнистые локоны по бокам и сзади.
+    hair = sphere(0.345, (0, -0.04, 1.35), HAIR, scale=(1.14, 1.05, 1.02), segs=20, rings=12)
     bm = bmesh.new()
     bm.from_mesh(hair.data)
-    face = [v for v in bm.verts if (v.co.y > 0.1 and v.co.z < 1.5) or v.co.z < 1.13]
+    face = [v for v in bm.verts if (v.co.y > 0.05 and v.co.z < 1.5) or v.co.z < 1.1]
     bmesh.ops.delete(bm, geom=face, context="VERTS")
     bm.to_mesh(hair.data)
     bm.free()
     head.append(hair)
-    head.append(box((0.42, 0.08, 0.07), (0, 0.24, 1.5), HAIR, bevel=0.02))                        # чёлка
-    # Белый колпак (шапочка продавщицы) сверху, чуть набок.
-    head.append(cyl(0.22, 0.16, (0.03, -0.02, 1.68), COAT, verts=14, r2=0.24,
-                    rot=(0, math.radians(-8), 0)))
-    head.append(cyl(0.245, 0.04, (0.03, -0.02, 1.61), SHADE, verts=14, rot=(0, math.radians(-8), 0)))
+    for s in (-1, 1):
+        for k, (y, z) in enumerate(((0.06, 1.2), (-0.06, 1.14), (-0.18, 1.16), (0.02, 1.3))):
+            head.append(sphere(0.1 - k * 0.008, (s * (0.33 - k * 0.01), y, z),
+                               HAIR if k % 2 == 0 else HAIR_D, scale=(0.9, 1, 1.1), segs=10, rings=6))
+    for x in (-0.14, 0.0, 0.14):                                                                  # сзади
+        head.append(sphere(0.11, (x, -0.28, 1.17), HAIR_D if x == 0 else HAIR, segs=10, rings=6))
+    # Косая чёлка: волна от левого виска к правой брови.
+    head.append(sphere(0.11, (-0.12, 0.2, 1.5), HAIR, scale=(1.6, 0.6, 0.55), segs=12, rings=6,
+                       rot=(0, math.radians(-18), 0)))
+    head.append(sphere(0.07, (0.12, 0.21, 1.49), HAIR_D, scale=(1.4, 0.6, 0.5), segs=10, rings=5,
+                       rot=(0, math.radians(15), 0)))
+    # Пышный поварской колпак: ободок, «шапка» шире ободка, складки.
+    tilt = (math.radians(-10), math.radians(6), 0)
+    head.append(cyl(0.23, 0.08, (0, -0.05, 1.615), COAT, verts=18, rot=tilt))
+    head.append(cyl(0.24, 0.17, (0, -0.07, 1.735), COAT, verts=18, r2=0.27, rot=tilt))
+    head.append(sphere(0.27, (0, -0.085, 1.825), COAT, scale=(1, 1, 0.35), segs=18, rings=7))
+    for k in range(9):                                                                            # складки
+        a = k * 2 * math.pi / 9
+        head.append(box((0.022, 0.02, 0.11), (math.cos(a) * 0.252, -0.07 + math.sin(a) * 0.252, 1.72),
+                        SHADE, rot=tilt))
+    head.append(cyl(0.235, 0.025, (0, -0.05, 1.58), SHADE, verts=18, rot=tilt))                 # шов
     parts.append(part("Head", head))
-    # Руки: рукава халата и кисти.
-    for side, x in (("ArmL", -0.33), ("ArmR", 0.33)):
-        arm = [cyl(0.095, 0.32, (x, 0, 0.84), COAT, verts=10)]
-        arm.append(sphere(0.095, (x, 0, 1.0), COAT, segs=10, rings=6))
-        arm.append(cyl(0.1, 0.05, (x, 0, 0.68), SHADE, verts=10))                                 # манжет
-        arm.append(sphere(0.085, (x, 0, 0.6), SKIN, segs=10, rings=6))
+    # ---- Руки: полные, рукава халата с манжетами, крупные кисти.
+    for side, x in (("ArmL", -0.35), ("ArmR", 0.35)):
+        arm = [cyl(0.105, 0.3, (x, 0, 0.85), COAT, verts=12, r2=0.11)]
+        arm.append(sphere(0.115, (x, 0, 1.0), COAT, segs=12, rings=6))
+        arm.append(cyl(0.11, 0.06, (x, 0, 0.69), SHADE, verts=12))
+        arm.append(sphere(0.095, (x, 0, 0.6), SKIN, segs=10, rings=6))
         parts.append(part(side, arm))
-    # Ноги: телесные чулки и тёмные туфли.
-    for side, x in (("LegL", -0.13), ("LegR", 0.13)):
-        leg = [cyl(0.085, 0.43, (x, 0, 0.3), SKIN, verts=10)]
-        leg.append(box((0.16, 0.25, 0.09), (x, 0.04, 0.05), SHOE, bevel=0.03))
+    # ---- Ноги: плотные, чулки телесного цвета, туфли.
+    for side, x in (("LegL", -0.14), ("LegR", 0.14)):
+        leg = [cyl(0.095, 0.43, (x, 0, 0.3), SKIN, verts=12)]
+        leg.append(box((0.17, 0.26, 0.09), (x, 0.04, 0.05), SHOE, bevel=0.03))
         parts.append(part(side, leg))
     return parts
 
