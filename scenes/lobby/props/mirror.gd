@@ -11,11 +11,14 @@ const PIXELS_PER_METER := 640
 const VIEW_DISTANCE := 4.5
 ## Камеры игроков, которые «смотрят» в зеркала (лобби добавляет камеры от первого лица).
 const VIEWER_GROUP := "fp_camera"
+const NEAR := 0.05
 
 var size := Vector2(0.42, 0.54)
 
 var _viewport: SubViewport
 var _camera: Camera3D
+## В прошлом кадре кто-то смотрел (true в начале — чтобы зеркало один раз нарисовалось сразу).
+var _had_viewer := true
 
 
 func setup(mirror_size: Vector2) -> Mirror:
@@ -31,8 +34,10 @@ func _ready() -> void:
 	add_child(_viewport)
 	_camera = Camera3D.new()
 	# Видно всех персонажей (и себя), без «кулаков в кадре», значков и картинок для вида сверху.
+	# Стена, на которой висит зеркало (и рамка), — на слоях стены туалета: камера зеркала стоит
+	# «за стеной» и её не рисует (иначе вместо отражения — тёмная стена).
 	_camera.cull_mask = 0xFFFFF & ~(0b1111 << 10) & ~ZoneBadge.OVERHEAD_LAYER \
-		& ~Apartment.OVERVIEW_ONLY_LAYER
+		& ~Apartment.OVERVIEW_ONLY_LAYER & ~ToiletRoom.WALL_LAYER & ~ToiletRoom.WALL_HIGH_LAYER
 	_viewport.add_child(_camera)
 	_camera.current = true
 	var quad := MeshInstance3D.new()
@@ -51,20 +56,25 @@ func _ready() -> void:
 
 
 func _process(_delta: float) -> void:
-	var viewer := _nearest_viewer()
-	if viewer == null:
-		_viewport.render_target_update_mode = SubViewport.UPDATE_DISABLED
-		return
-	_viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
 	var normal := global_basis.z.normalized()
-	var eye := viewer.global_position
+	var viewer := _nearest_viewer()
+	# Никого рядом — отражение «как будто стоят в метре от зеркала», обновляется редко.
+	var eye := global_position + normal * 1.2 + Vector3.DOWN * 0.1
+	if viewer:
+		eye = viewer.global_position
+		_viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+	elif _had_viewer:
+		_viewport.render_target_update_mode = SubViewport.UPDATE_ONCE # отошли — дорисовать раз
+	_had_viewer = viewer != null
 	var dist := (eye - global_position).dot(normal)
 	var reflected := eye - normal * dist * 2.0
 	# Камера «за зеркалом» смотрит сквозь него в комнату.
 	_camera.global_transform = Transform3D(Basis.looking_at(normal, Vector3.UP), reflected)
 	var center := _camera.global_transform.affine_inverse() * global_position
-	# Ближняя плоскость — сама поверхность зеркала: стена позади зеркала не рисуется.
-	_camera.set_frustum(size.y, Vector2(center.x, center.y), dist + 0.005, 80.0)
+	# Пирамида видимости точно по рамке зеркала: размер и сдвиг на ближней плоскости (NEAR)
+	# пропорционально уменьшены от плоскости зеркала (до неё dist).
+	var k := NEAR / maxf(dist, 0.05)
+	_camera.set_frustum(size.y * k, Vector2(center.x, center.y) * k, NEAR, 80.0)
 
 
 ## Ближайшие глаза перед зеркалом (null — никого рядом).

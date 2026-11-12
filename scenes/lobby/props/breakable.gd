@@ -6,6 +6,10 @@ extends Node3D
 ## появляется снова. Зона задевания — цилиндр от пола до вещи, чтобы можно было
 ## разбить и то, что стоит на полке: достаточно подойти вплотную.
 
+## Разбили / появилась снова (радио по ним выключает и включает музыку).
+signal broken
+signal restored
+
 const RESPAWN_TIME := 12.0
 const SHARD_LIFETIME := 3.0
 const SHARD_COUNT := 9
@@ -14,6 +18,9 @@ const TOUCH_GAP := 0.6
 ## Задевая вещи телом, игрок разбивает не больше одной за TOUCH_GAP сек
 ## (иначе, проходя вдоль серванта, бил всю полку разом): id тела -> время последнего раза.
 static var _last_touch: Dictionary = {}
+
+## Через сколько секунд вещь появляется снова (у радио — быстрее).
+var respawn_time := RESPAWN_TIME
 
 var _model: Node3D
 var _colors: Array[Color] = []
@@ -66,7 +73,8 @@ func shatter(from: Vector3) -> void:
 	away = away.normalized() if away.length() > 0.05 else Vector3.BACK
 	for i in SHARD_COUNT:
 		_spawn_shard(away)
-	await get_tree().create_timer(RESPAWN_TIME).timeout
+	broken.emit()
+	await get_tree().create_timer(respawn_time).timeout
 	if not is_inside_tree():
 		return
 	_model.visible = true
@@ -74,6 +82,7 @@ func shatter(from: Vector3) -> void:
 	create_tween().tween_property(_model, "scale", Vector3.ONE, 0.35) \
 		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	_broken = false
+	restored.emit()
 
 
 func _spawn_shard(away: Vector3) -> void:

@@ -22,6 +22,7 @@ const DOOR_TOP := 2.1
 const PAINT_HEIGHT := 1.2
 const HEIGHT := 3.0
 const TILES := preload("res://assets/textures/toilet/floor_tiles.png")
+const NEWSPAPER := preload("res://assets/textures/toilet/newspaper.png")
 
 var toilet: Toilet
 
@@ -101,11 +102,19 @@ func _build_walls() -> void:
 		Vector3(X1 + 0.06, PAINT_HEIGHT + (HEIGHT - PAINT_HEIGHT) / 2.0, (Z0 + Z1) / 2.0), _whitewash)
 	right_high.layers = WALL_HIGH_LAYER
 	right_high.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	var stripe := _box(Vector3(0.008, 0.03, depth), Vector3(X1 - 0.002, PAINT_HEIGHT, (Z0 + Z1) / 2.0),
+		_mat(Color("3d6670"))) # тёмная полоса по краю краски — как на других стенах
+	stripe.layers = WALL_LAYER
 	_collider(Vector3(0.2, HEIGHT, depth + 0.4), Vector3(X1 + 0.1, HEIGHT / 2.0, (Z0 + Z1) / 2.0))
 	# Передняя — как у всей квартиры: невидимая стенка и стена только от первого лица.
 	_collider(Vector3(width + 0.2, HEIGHT, 0.4), Vector3((X0 + X1) / 2.0, HEIGHT / 2.0, Z1 + 0.2))
 	_fp_only(Vector3(width, HEIGHT, 0.2), Vector3((X0 + X1) / 2.0, HEIGHT / 2.0, Z1 + 0.1),
 		_whitewash)
+	# Изнутри у передней стены тоже краска до PAINT_HEIGHT и полоска (видно от первого лица).
+	_fp_only(Vector3(width, PAINT_HEIGHT, 0.01),
+		Vector3((X0 + X1) / 2.0, PAINT_HEIGHT / 2.0, Z1 - 0.106), _paint) # грань стены — Z1 − 0.1
+	_fp_only(Vector3(width, 0.03, 0.014), Vector3((X0 + X1) / 2.0, PAINT_HEIGHT, Z1 - 0.108),
+		_mat(Color("3d6670")))
 
 
 ## Внутренняя отделка стены: краска до PAINT_HEIGHT (+ тёмная полоска по краю), выше побелка.
@@ -135,18 +144,20 @@ func _build_details() -> void:
 	wire.layers = Apartment.FP_ONLY_LAYER
 	_build_paper_holder()
 	_build_sink()
-	# Газета «Правда» на гвозде — на стене с дверью.
-	var paper := _box(Vector3(0.01, 0.32, 0.24), Vector3(X0 + 0.09, 0.95, Z0 + 0.35),
-		_mat(Color("d9d4c4")))
-	paper.rotation.x = 0.06
-	var title := Label3D.new()
-	title.text = "ПРАВДА"
-	title.font_size = 18
-	title.outline_size = 0
-	title.modulate = Color("1a1a1a")
-	title.position = Vector3(X0 + 0.1, 1.06, Z0 + 0.35)
-	title.rotation.y = PI / 2.0
-	add_child(title)
+	# Газета «Кривда» на гвозде — на стене с дверью (tools/textures/newspaper.py).
+	var paper := MeshInstance3D.new()
+	var sheet := QuadMesh.new()
+	sheet.size = Vector2(0.24, 0.32)
+	paper.mesh = sheet
+	var paper_mat := StandardMaterial3D.new()
+	paper_mat.albedo_texture = NEWSPAPER
+	paper_mat.roughness = 0.9
+	paper_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	paper.material_override = paper_mat
+	paper.position = Vector3(X0 + 0.075, 0.95, Z0 + 0.35)
+	paper.rotation = Vector3(0.0, PI / 2.0, 0.05) # лицом в туалет, чуть криво висит
+	add_child(paper)
+	_box(Vector3(0.02, 0.012, 0.012), Vector3(X0 + 0.075, 1.115, Z0 + 0.35), _mat(Color("444444")))
 
 
 ## Держатель туалетной бумаги на задней стене справа от унитаза: кронштейн, палочка, рулон.
@@ -178,7 +189,8 @@ func _build_paper_holder() -> void:
 	roll.rotation.z = PI / 2.0 # ось вдоль стены
 	roll.position = pos + Vector3(0, 0, 0.12)
 	add_child(roll)
-	_box(Vector3(0.1, 0.12, 0.004), pos + Vector3(0, -0.1, 0.177), _mat(Color("f4f1ea"))) # свисает
+	# Свисающий кусок — касается рулона спереди (раньше висел в воздухе ниже рулона).
+	_box(Vector3(0.1, 0.12, 0.004), pos + Vector3(0, -0.06, 0.176), _mat(Color("f4f1ea")))
 
 
 ## Рукомойник с краном на правой стене у двери, над ним зеркало.
@@ -202,7 +214,9 @@ func _build_sink() -> void:
 			_mat(Color("d93a2a") if side < 0 else Color("3a6fd9")))
 		knob.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 	# Зеркало в деревянной рамке.
-	_box(Vector3(0.03, 0.62, 0.5), Vector3(X1 - 0.015, 1.55, z), _mat(Color("6b4423")))
+	# Рамка — на слое стены: камера зеркала (она «за стеной») её не рисует.
+	var frame := _box(Vector3(0.03, 0.62, 0.5), Vector3(X1 - 0.015, 1.55, z), _mat(Color("6b4423")))
+	frame.layers = WALL_LAYER
 	# Настоящее отражение (Mirror): видно себя и других. Зеркало смотрит в комнату (−X).
 	var mirror := Mirror.new().setup(Vector2(0.42, 0.54))
 	mirror.position = Vector3(X1 - 0.032, 1.55, z)

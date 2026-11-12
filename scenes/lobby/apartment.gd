@@ -206,8 +206,9 @@ func _build_living_room() -> void:
 	var shelf_pos := Vector3(-0.7, 0, -3.75)
 	_solid(_model("bookshelf"), Vector3(1.3, 2.3, 0.45), 1.15, shelf_pos)
 	# Радио и ряды книг бьются, как хрусталь, и через время появляются снова.
-	_breakable("radio", shelf_pos + Vector3(-0.3, 0.935, 0.02),
+	var radio := _breakable("radio", shelf_pos + Vector3(-0.3, 0.935, 0.02),
 		[Color("2e1a0f"), Color("bfb8a6"), Color("d9b44a")], 0.55)
+	_radio_music(radio)
 	var book_colors := [Color("992018"), Color("1a4080"), Color("2a6a2a"), Color("cc9918"),
 		Color("6a2a6a")]
 	_breakable("book_row_a", shelf_pos + Vector3(0, 1.43, 0), book_colors, 0.6, 0.06)
@@ -492,6 +493,26 @@ func _build_decor() -> void:
 	_place(_model("floor_runner"), Vector3(1.55, 0.004, -1.0))
 
 
+## Радио играет спокойную фоновую музыку (своя, без слов — tools/audio/radio_music.py).
+## Разбили — замолкает; через 5 сек радио появляется снова и опять играет.
+func _radio_music(radio: Breakable) -> void:
+	radio.respawn_time = 5.0
+	var stream := load("res://assets/audio/radio_music.wav") as AudioStreamWAV
+	stream.loop_mode = AudioStreamWAV.LOOP_FORWARD
+	stream.loop_begin = 0
+	stream.loop_end = int(stream.get_length() * stream.mix_rate)
+	var player := AudioStreamPlayer3D.new()
+	player.stream = stream
+	player.volume_db = -8.0
+	player.unit_size = 3.0
+	player.max_distance = 14.0
+	player.position = Vector3(0, 0.12, 0)
+	radio.add_child(player)
+	player.play()
+	radio.broken.connect(player.stop)
+	radio.restored.connect(func() -> void: player.play())
+
+
 ## Ковёр-картина на стене: тонкая основа и картинка спереди, снизу — бахрома.
 func _tapestry(center: Vector3, size: Vector2) -> void:
 	_box(Vector3(size.x, size.y, 0.02), center, _mat(Color("5a1612"), 0.95))
@@ -531,7 +552,7 @@ func _build_living_extras() -> void:
 	add_child(phone)
 	# Часы с кукушкой — на задней стене между книжной секцией и окном.
 	var clock := CuckooClock.new()
-	clock.position = Vector3(0.2, 1.95, BACK_Z)
+	clock.position = Vector3(0.3, 1.95, BACK_Z) # по центру между книжной секцией и шторой
 	add_child(clock)
 	# Кот бродит по всей квартире, лежанка — в спальне.
 	cat = LobbyCat.new()
@@ -558,6 +579,12 @@ func _build_rubgame() -> void:
 	# Со стороны гостиной стена у двери — своими обоями (игровая — тёмная).
 	_box(Vector3(0.02, WALL_HEIGHT, RUBGAME_DOOR_FROM_Z - RUBGAME_BACK_Z),
 		Vector3(LEFT_X - 0.21, WALL_HEIGHT / 2, (RUBGAME_BACK_Z + RUBGAME_DOOR_FROM_Z) / 2), wallpaper)
+	# И справа от двери, и над ней — тоже тёмные (там просвечивали светлые обои гостиной).
+	_box(Vector3(0.02, WALL_HEIGHT, LIVING_FRONT_Z - RUBGAME_DOOR_TO_Z),
+		Vector3(LEFT_X - 0.21, WALL_HEIGHT / 2, (RUBGAME_DOOR_TO_Z + LIVING_FRONT_Z) / 2), wallpaper)
+	_box(Vector3(0.02, WALL_HEIGHT - 2.4, RUBGAME_DOOR_TO_Z - RUBGAME_DOOR_FROM_Z),
+		Vector3(LEFT_X - 0.21, 2.4 + (WALL_HEIGHT - 2.4) / 2,
+		(RUBGAME_DOOR_FROM_Z + RUBGAME_DOOR_TO_Z) / 2), wallpaper)
 	_invisible_wall(Vector3(width, 3, 0.4), Vector3(center_x, 1.5, LIVING_FRONT_Z + 0.2))
 	_fp_only(_box(Vector3(width, WALL_HEIGHT, 0.2),
 		Vector3(center_x, WALL_HEIGHT / 2, LIVING_FRONT_Z + 0.1), wallpaper))
