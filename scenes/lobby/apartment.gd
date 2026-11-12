@@ -46,6 +46,7 @@ const SOFA_YAW := PI # диван смотрит на телевизор (на �
 const CASINO_TABLE_POS := Vector3(-8.6, 0, 0.2)
 ## Где нажимать «сыграть» — перед столом (и вообще рядом со столом, см. лобби).
 const CASINO_ZONE := Vector3(-7.9, 0, 1.45)
+const PHONE_TABLE_POS := Vector3(-5.55, 0, 0.85)
 const SPAWNS: Array[Vector3] = [
 	Vector3(-0.3, 0.3, -1.2), Vector3(0.9, 0.3, -1.2),
 	Vector3(-0.3, 0.3, -2.4), Vector3(0.9, 0.3, -2.4),
@@ -60,6 +61,9 @@ const GLASS := Color(0.8, 0.95, 0.9, 0.6)
 var seats: Array[Dictionary] = []
 ## Стол рулетки (крутится сам каждые 20 секунд).
 var casino_table: CasinoTable
+## Дисковый телефон (гостиная, у двери в казино) и кот.
+var phone: RotaryPhone
+var cat: LobbyCat
 
 
 func _ready() -> void:
@@ -67,6 +71,7 @@ func _ready() -> void:
 	_build_living_room()
 	_build_bedroom()
 	_build_casino()
+	_build_living_extras()
 
 
 # ---------------- Стены и пол ----------------
@@ -187,7 +192,7 @@ func _build_living_room() -> void:
 	_tippable("chair", Vector3(0.45, 0.95, 0.45), 0.47, dining + Vector3(0, 0, -0.75), 3.0, 0.0)
 	_tippable("stool", Vector3(0.36, 0.47, 0.36), 0.24, dining + Vector3(0.95, 0, 0), 2.0)
 	_breakable("jar_jam", dining + Vector3(-0.35, 0.78, 0.1), [Color("801010"), GLASS], 0.4)
-	_breakable("crystal_vase", dining + Vector3(0.1, 0.78, -0.1), [CRYSTAL], 0.4, 0.05)
+	_place(_model("gramophone"), dining + Vector3(0.05, 0.78, -0.05)).rotation.y = 0.3
 	var books_b := [Color("cc9918"), Color("6a2a6a"), Color("1a4080")]
 	_breakable("book_stack", dining + Vector3(0.45, 0.78, 0.15), books_b, 0.4)
 
@@ -213,6 +218,23 @@ func _build_bedroom() -> void:
 	_tippable("stool", Vector3(0.36, 0.47, 0.36), 0.24, Vector3(8.4, 0, -0.4), 2.0)
 	_breakable("book_stack", Vector3(8.6, 0.47, -0.4), [Color("992018"), Color("cc9918")], 0.4)
 	_place(_model("chandelier"), Vector3(6.2, 0, -1.4))
+
+
+# ---------------- Телефон, часы, кот ----------------
+
+func _build_living_extras() -> void:
+	_solid(_model("phone_table"), Vector3(0.45, 0.6, 0.4), 0.3, PHONE_TABLE_POS, PI / 2)
+	phone = RotaryPhone.new()
+	phone.position = PHONE_TABLE_POS + Vector3(0, 0.6, 0)
+	phone.rotation.y = PI / 2 # лицом в комнату (+X)
+	add_child(phone)
+	# Часы с кукушкой — на задней стене между книжной секцией и окном.
+	var clock := CuckooClock.new()
+	clock.position = Vector3(0.2, 1.95, BACK_Z)
+	add_child(clock)
+	# Кот бродит по всей квартире, лежанка — в спальне.
+	cat = LobbyCat.new()
+	add_child(cat)
 
 
 # ---------------- Казино ----------------

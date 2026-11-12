@@ -301,6 +301,13 @@ func set_render_layer(layer: int) -> void:
 	_apply_layer(self)
 
 
+## Прикрепить предмет к части тела (Torso/Head/ArmL/ArmR/LegL/LegR), например трубку к уху.
+## Предмет получает слой видимости персонажа (от первого лица своя трубка не мешает обзору).
+func attach_to_part(part_name: String, node: Node3D) -> void:
+	_part(part_name).add_child(node)
+	_apply_layer(node)
+
+
 func _apply_layer(node: Node) -> void:
 	if node is VisualInstance3D:
 		(node as VisualInstance3D).layers = _render_layer

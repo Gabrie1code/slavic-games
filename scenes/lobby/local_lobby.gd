@@ -25,6 +25,8 @@ const ROUNDS := 5
 const WARDROBE_RADIUS := 1.2
 const TV_ZONE_RADIUS := 1.3
 const CASINO_RADIUS := 1.3
+const PHONE_RADIUS := 1.2
+const CAT_RADIUS := 1.3
 const SEAT_RADIUS := 0.9
 const COUNTDOWN := 5.0
 ## Вид от первого лица: чувствительность мыши и скорость обзора правым стиком.
@@ -203,8 +205,13 @@ func _process(delta: float) -> void:
 			if since > 0.35 and pressed:
 				_stand(p)
 			continue
+		if _apartment.phone.user == p:
+			_process_phone(p)
+			continue
 		if p.input.is_just_pressed("attack"):
 			_punch(p)
+		if p.input.is_just_pressed("confirm") and _try_phone_or_cat(p):
+			continue
 		var at_tv := _is_near(p, Apartment.TV_ZONE, TV_ZONE_RADIUS)
 		var seat := _free_seat_near(p)
 		if p.input.is_just_pressed("confirm") and _is_near(p, Apartment.WARDROBE_ZONE, WARDROBE_RADIUS):
@@ -381,6 +388,75 @@ func _open_wardrobe(p: PlayerData) -> void:
 	_rooms_root.add_child(room)
 	_rooms[p.id] = room
 	_layout_rooms()
+
+
+# ---------------- Телефон и кот ----------------
+
+## С трубкой у уха: удар (ЛКМ/F) — крутить диск, подтвердить/отмена — положить трубку.
+func _process_phone(p: PlayerData) -> void:
+	(_characters[p.id] as PlayerCharacter).input_enabled = false # говорит — стоит на месте
+	if p.input.is_just_pressed("attack"):
+		_apartment.phone.dial()
+	elif p.input.is_just_pressed("confirm") or p.input.is_just_pressed("cancel"):
+		_apartment.phone.hang_up()
+		(_characters[p.id] as PlayerCharacter).input_enabled = true
+
+
+## Подтвердить рядом с телефоном или котом. true — нажатие использовано.
+func _try_phone_or_cat(p: PlayerData) -> bool:
+	var character: PlayerCharacter = _characters[p.id]
+	if _near_phone(p) and _apartment.phone.can_use(p):
+		character.input_enabled = false
+		character.velocity = Vector3.ZERO
+		_apartment.phone.pick_up(p, character)
+		return true
+	if _near_cat(p) and _apartment.cat.pet():
+		# Персонаж тянет руку к коту.
+		character.set_arm_pose(0.25, 0.9, 0.15)
+		get_tree().create_timer(0.7).timeout.connect(func() -> void:
+			if is_instance_valid(character) and _apartment.phone.user != p:
+				character.set_arm_angle(PlayerCharacter.ARM_DOWN, 0.2))
+		return true
+	return false
+
+
+func _near_phone(p: PlayerData) -> bool:
+	return _is_near(p, Apartment.PHONE_TABLE_POS, PHONE_RADIUS)
+
+
+func _near_cat(p: PlayerData) -> bool:
+	return _is_near(p, _apartment.cat.position, CAT_RADIUS)
+
+
+## Подсказка у телефона и кота. «~» в начале — действие сейчас недоступно (серым).
+func _phone_cat_hint(p: PlayerData) -> String:
+	var phone := _apartment.phone
+	if phone.user == p:
+		return "%s — крутить диск   %s — положить трубку" % [_attack_key(p), _confirm_key(p)]
+	if _near_phone(p):
+		if phone.can_use(p):
+			return "%s — снять трубку" % _confirm_key(p)
+		return "~%s — снять трубку (телефон занят: %s)" % [_confirm_key(p), phone.user.display_name]
+	return _cat_hint(p) if _near_cat(p) else ""
+
+
+func _cat_hint(p: PlayerData) -> String:
+	var cat := _apartment.cat
+	if cat.is_sleepy():
+		return "~Кот спит — не будить"
+	if not cat.can_pet():
+		return "~Кота только что погладили (%d с)" % ceili(cat.cooldown_left())
+	return "%s — погладить кота" % _confirm_key(p)
+
+
+func _attack_key(p: PlayerData) -> String:
+	match p.device_kind:
+		PlayerData.DeviceKind.KEYBOARD_WASD:
+			return "ЛКМ / F"
+		PlayerData.DeviceKind.KEYBOARD_ARROWS:
+			return "/"
+		_:
+			return "X"
 
 
 func _open_casino(p: PlayerData) -> void:
@@ -584,7 +660,11 @@ func _update_first_person(delta: float) -> void:
 		var eye := character.global_position + Vector3.UP * eye_height
 		camera.global_transform = Transform3D(
 			Basis.from_euler(Vector3(character.fp_pitch, character.rotation.y, 0.0)), eye)
-		(_views[id]["prompt"] as Label).text = _prompt_for(p, character)
+		# «~» в начале подсказки — действие сейчас недоступно: показываем серым.
+		var prompt_text := _prompt_for(p, character)
+		var prompt: Label = _views[id]["prompt"]
+		prompt.modulate = Color(0.6, 0.6, 0.6, 0.8) if prompt_text.begins_with("~") else Color.WHITE
+		prompt.text = prompt_text.trim_prefix("~")
 	# Мышь ловим, только если есть игрок на WASD и не открыто окно/примерочная.
 	var want_capture := _view == View.FIRST_PERSON and _rooms.is_empty() and not _bot_dialog.visible \
 		and PlayerManager.is_device_taken(PlayerData.DeviceKind.KEYBOARD_WASD)
@@ -596,6 +676,9 @@ func _update_first_person(delta: float) -> void:
 ## Подсказка внизу экрана игрока: что можно сделать здесь.
 func _prompt_for(p: PlayerData, character: PlayerCharacter) -> String:
 	var key := _confirm_key(p)
+	var hint := _phone_cat_hint(p)
+	if hint != "":
+		return hint
 	var action := ""
 	if character.sitting:
 		action = "встать"
@@ -697,6 +780,7 @@ func _on_player_joined(p: PlayerData) -> void:
 	var spawn := Apartment.SPAWNS[p.slot % Apartment.SPAWNS.size()]
 	character.setup(p, spawn)
 	_players_root.add_child(character)
+	character.add_to_group("lobby_character") # часы с кукушкой чувствуют, кто рядом
 	_characters[p.id] = character
 	character.set_render_layer(_player_layer(p))
 	if _view == View.FIRST_PERSON and not p.is_bot():
@@ -710,6 +794,8 @@ func _on_player_joined(p: PlayerData) -> void:
 
 func _on_player_left(p: PlayerData) -> void:
 	_seated.erase(p.id)
+	if _apartment.phone.user == p:
+		_apartment.phone.hang_up()
 	_remove_view(p)
 	_ready_marks.erase(p.id)
 	if not p.is_bot():

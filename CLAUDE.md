@@ -47,6 +47,8 @@ Party-игра на Godot 4.7 (GDScript), стилизованный low-poly, �
 - Казино слева от гостиной: `CasinoTable` (круг 20 сек, правила в `Roulette`), экран у стола
   `CasinoScreen`. Окна игроков в лобби (примерочная, стол) наследуют `LobbyRoom`.
   Фишки в профиле: `PlayerManager.chips / add_chips`, номиналы `CHIP_VALUES`.
+- Живые вещи: `RotaryPhone`, `CuckooClock`, `LobbyCat` (scenes/lobby/props/). Подсказка лобби с «~»
+  в начале показывается серой (действие недоступно).
 
 ## Модели
 Генерируются скриптами в `tools/blender/` (модуль `bpy` 4.2, Python 3.11), экспорт в `assets/models/`.
