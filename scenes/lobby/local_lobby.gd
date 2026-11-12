@@ -285,11 +285,9 @@ func _process_bot_dialog() -> void:
 		if p.input == null or p.is_bot():
 			continue
 		if p.input.is_just_pressed("move_left") or p.input.is_just_pressed("move_down"):
-			_bot_count = maxi(0, _bot_count - 1)
-			_update_bot_dialog()
+			_change_bot_count(-1)
 		elif p.input.is_just_pressed("move_right") or p.input.is_just_pressed("move_up"):
-			_bot_count = mini(PlayerManager.free_slots(), _bot_count + 1)
-			_update_bot_dialog()
+			_change_bot_count(1)
 		elif p.input.is_just_pressed("confirm"):
 			_confirm_bots()
 			return
@@ -298,8 +296,14 @@ func _process_bot_dialog() -> void:
 			return
 
 
+## Листать число ботов по кругу: ... 2 → 3 → «Без ботов» → 1 → 2 ...
+func _change_bot_count(step: int) -> void:
+	_bot_count = posmod(_bot_count + step, PlayerManager.free_slots() + 1)
+	_update_bot_dialog()
+
+
 func _update_bot_dialog() -> void:
-	_bot_count_label.text = "◀   %d   ▶" % _bot_count
+	_bot_count_label.text = "Без ботов" if _bot_count == 0 else str(_bot_count)
 
 
 func _set_characters_input(enabled: bool) -> void:
@@ -437,15 +441,57 @@ func _build_bot_dialog() -> void:
 		label.add_theme_color_override("font_color", line[2])
 		column.add_child(label)
 
+	# Число ботов со стрелками (стрелки можно нажимать мышью).
+	var picker := HBoxContainer.new()
+	picker.alignment = BoxContainer.ALIGNMENT_CENTER
+	picker.add_theme_constant_override("separation", 24)
+	column.add_child(picker)
+	var left := _dialog_button("◀", 48)
+	left.pressed.connect(_change_bot_count.bind(-1))
+	picker.add_child(left)
 	_bot_count_label = Label.new()
 	_bot_count_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_bot_count_label.custom_minimum_size.x = 260
 	_bot_count_label.add_theme_font_size_override("font_size", 64)
-	column.add_child(_bot_count_label)
+	picker.add_child(_bot_count_label)
+	var right := _dialog_button("▶", 48)
+	right.pressed.connect(_change_bot_count.bind(1))
+	picker.add_child(right)
+
+	var buttons := HBoxContainer.new()
+	buttons.alignment = BoxContainer.ALIGNMENT_CENTER
+	buttons.add_theme_constant_override("separation", 20)
+	column.add_child(buttons)
+	var start := _dialog_button("Начать", 30)
+	start.pressed.connect(_confirm_bots)
+	buttons.add_child(start)
+	var back := _dialog_button("Назад", 30)
+	back.pressed.connect(_close_bot_dialog)
+	buttons.add_child(back)
 
 	var hint := Label.new()
-	hint.text = ("Влево/вправо — меньше/больше\n"
+	hint.text = ("Влево/вправо — меньше/больше (по кругу)\n"
 		+ "Пробел / Enter / A или Tab — начать · Q / Backspace / B или Esc — назад")
 	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	hint.add_theme_font_size_override("font_size", 20)
 	hint.modulate.a = 0.75
 	column.add_child(hint)
+
+
+func _dialog_button(text: String, font_size: int) -> Button:
+	var button := Button.new()
+	button.text = text
+	button.focus_mode = Control.FOCUS_NONE
+	button.custom_minimum_size = Vector2(90, 64)
+	button.add_theme_font_size_override("font_size", font_size)
+	for state in ["normal", "hover", "pressed"]:
+		var style := StyleBoxFlat.new()
+		style.bg_color = Color("6a4318") if state == "hover" else Color("4a3020")
+		style.border_color = Color("f6c343")
+		style.set_border_width_all(2 if state == "normal" else 3)
+		style.set_corner_radius_all(12)
+		style.set_content_margin_all(12)
+		button.add_theme_stylebox_override(state, style)
+	button.add_theme_color_override("font_color", Color("f6c343"))
+	button.add_theme_color_override("font_hover_color", Color.WHITE)
+	return button
