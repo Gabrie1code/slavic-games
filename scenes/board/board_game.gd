@@ -188,6 +188,7 @@ func _play_turn(p: PlayerData) -> void:
 		if target.index == MatchState.deficit_space:
 			await _offer_deficit(p)
 
+	await _face_camera(pawn)
 	await _apply_space(p, _spaces[stats.space_index])
 	_update_ui()
 
@@ -397,6 +398,24 @@ func _hop(pawn: Node3D, to: Vector3) -> void:
 	tween.tween_method(func(t: float) -> void:
 		pawn.global_position = from.lerp(to, t) + Vector3.UP * sin(t * PI) * 0.8,
 		0.0, 1.0, HOP_TIME)
+	await tween.finished
+
+
+## Пришёл спиной к нам — подпрыгивает и в прыжке разворачивается лицом к камере.
+func _face_camera(pawn: Node3D) -> void:
+	var forward := -pawn.global_basis.z
+	var to_camera := Vector3(CAMERA_OFFSET.x, 0.0, CAMERA_OFFSET.z).normalized()
+	if Vector3(forward.x, 0.0, forward.z).normalized().dot(to_camera) >= 0.0:
+		return # и так видно лицо (или бок)
+	var start_y := pawn.position.y
+	var start_yaw := pawn.rotation.y
+	var target_yaw := atan2(-to_camera.x, -to_camera.z) # как в _hop: лицом по направлению to_camera
+	var turn := wrapf(target_yaw - start_yaw, -PI, PI)
+	var tween := create_tween()
+	tween.tween_method(func(t: float) -> void:
+		pawn.position.y = start_y + sin(t * PI) * 0.45
+		pawn.rotation.y = start_yaw + turn * t,
+		0.0, 1.0, 0.35)
 	await tween.finished
 
 

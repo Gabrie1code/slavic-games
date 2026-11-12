@@ -281,6 +281,11 @@ func _update_chaser(delta: float) -> void:
 		c.zone_time += delta
 	else:
 		c.zone_time = maxf(0.0, c.zone_time - delta)
+	# Круг «караула» видит только водящий и только пока сам стоит в нём (слой тумана —
+	# его рисует лишь камера водящего).
+	for r in _runners():
+		if r.zone:
+			r.zone.visible = r == nearest_frozen and nearest_dist < ZONE_RADIUS
 
 	if c.zone_time >= ZONE_LIMIT and nearest_frozen:
 		var away := pos - nearest_frozen.character.global_position
@@ -349,6 +354,8 @@ func _freeze(r: Racer) -> void:
 	zone_mesh.radial_segments = 24
 	r.zone.mesh = zone_mesh
 	r.zone.material_override = _zone_material
+	r.zone.layers = FOG_LAYER
+	r.zone.visible = false
 	add_child(r.zone)
 	r.zone.global_position = r.character.global_position * Vector3(1, 0, 1) + Vector3.UP * 0.03
 
