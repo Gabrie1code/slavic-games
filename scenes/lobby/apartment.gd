@@ -64,7 +64,8 @@ const CLAY := Color(0.65, 0.3, 0.15)
 const PLANT := Color(0.15, 0.45, 0.15)
 const GLASS := Color(0.8, 0.95, 0.9, 0.6)
 
-## Места на диване: [{"pos": точка посадки, "yaw": куда смотрит сидящий, "approach": где подойти}].
+## Места на диване и в кресле: [{"pos": точка посадки, "yaw": куда смотрит сидящий,
+## "approach": где подойти, "name": текст кнопки}].
 var seats: Array[Dictionary] = []
 ## Стол рулетки (крутится сам каждые 20 секунд).
 var rubgame_table: RubgameTable
@@ -237,13 +238,18 @@ func _build_living_room() -> void:
 		var front := Vector3(0, 0, 1).rotated(Vector3.UP, SOFA_YAW)
 		# Высота: верх подушки (~0.59) минус высота таза персонажа (0.55) + запас.
 		var seat_pos := SOFA_POS + Vector3(local_x, 0.1, 0.12).rotated(Vector3.UP, SOFA_YAW)
-		seats.append({"pos": seat_pos, "yaw": SOFA_YAW + PI, "approach": seat_pos + front * 0.9})
+		seats.append({"pos": seat_pos, "yaw": SOFA_YAW + PI, "approach": seat_pos + front * 0.9,
+			"name": "Сесть на диван"})
 	var table_pos := Vector3(-2.6, 0, -0.25)
 	_solid(_model("coffee_table"), Vector3(1.0, 0.5, 0.55), 0.25, table_pos)
 	_breakable("crystal_vase", table_pos + Vector3(-0.25, 0.47, 0.0), [CRYSTAL], 0.4, 0.05)
 	var books_a := [Color("992018"), Color("1a4080"), Color("2a6a2a")]
 	_breakable("book_stack", table_pos + Vector3(0.25, 0.47, 0.0), books_a, 0.4)
 	_solid(_model("armchair"), Vector3(0.9, 0.6, 0.9), 0.3, Vector3(-5.2, 0, -0.3), PI / 2)
+	# В кресло тоже можно сесть (лицом в комнату, +X); третий бот садится сюда.
+	var chair_pos := Vector3(-5.14, 0.08, -0.3)
+	seats.append({"pos": chair_pos, "yaw": PI / 2 + PI, "approach": chair_pos + Vector3(0.9, 0, 0),
+		"name": "Сесть в кресло"})
 	_place(_model("wall_carpet"), Vector3(LEFT_X + 0.08, 0.85, -0.3)).rotation_degrees.y = 90.0
 	floor_lamp = _tippable("floor_lamp", Vector3(0.5, 1.75, 0.5), 0.88, Vector3(-1.0, 0, 1.45), 6.0)
 	_build_lamp_light()

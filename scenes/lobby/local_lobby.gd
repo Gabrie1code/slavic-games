@@ -753,7 +753,7 @@ func _prompt_for(p: PlayerData, character: PlayerCharacter) -> Array[Dictionary]
 	elif _is_near(p, Apartment.TV_ZONE, TV_ZONE_RADIUS) and _looks_at(p, Apartment.TV_POS):
 		action = "Отменить «Готов» (ждём остальных)" if _ready_marks.has(p.id) else "Готов к игре"
 	elif _free_seat_near(p) >= 0:
-		action = "Сесть на диван"
+		action = _apartment.seats[_free_seat_near(p)]["name"]
 	var result: Array[Dictionary] = []
 	if action != "":
 		result.append(LobbyGadgets.entry(key, action))
@@ -858,8 +858,8 @@ func _on_player_joined(p: PlayerData) -> void:
 	_refresh_slots()
 
 
-## Бот перед игрой садится на свободное место дивана (каждый на своё — не застревают друг
-## в друге). Мест нет — стоит за диваном лицом к телевизору (у каждого слота своя точка).
+## Бот перед игрой садится на свободное место — диван, потом кресло (каждый на своё —
+## не застревают друг в друге). Мест нет — стоит за диваном лицом к телевизору.
 func _place_bot(p: PlayerData, character: PlayerCharacter) -> void:
 	for i in _apartment.seats.size():
 		if not _seated.values().has(i):
