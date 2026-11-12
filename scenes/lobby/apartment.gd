@@ -248,8 +248,11 @@ func _build_rubgame() -> void:
 	var center_x := (RUBGAME_LEFT_X + LEFT_X) / 2
 	var center_z := (RUBGAME_BACK_Z + LIVING_FRONT_Z) / 2
 	_solid_box(Vector3(width, 0.2, depth), Vector3(center_x, -0.1, center_z), carpet)
-	_solid_box(Vector3(width, WALL_HEIGHT, 0.2),
-		Vector3(center_x, WALL_HEIGHT / 2, RUBGAME_BACK_Z - 0.1), wallpaper)
+	# Задняя стена кончается внутри стены гостиной (x до −6.2), а не вплотную к её поверхности:
+	# иначе торец совпадает с обоями гостиной и мерцает тёмной полосой.
+	var back_w := (LEFT_X - 0.2) - RUBGAME_LEFT_X
+	_solid_box(Vector3(back_w, WALL_HEIGHT, 0.2),
+		Vector3(RUBGAME_LEFT_X + back_w / 2, WALL_HEIGHT / 2, RUBGAME_BACK_Z - 0.1), wallpaper)
 	_solid_box(Vector3(0.2, WALL_HEIGHT, depth),
 		Vector3(RUBGAME_LEFT_X - 0.1, WALL_HEIGHT / 2, center_z), wallpaper)
 	# Со стороны гостиной стена у двери — своими обоями (игровая — тёмная).

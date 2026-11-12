@@ -137,6 +137,13 @@ func camera_transform() -> Transform3D:
 	return Transform3D.IDENTITY.translated(eye).looking_at(target, Vector3.UP)
 
 
+## Камера над колесом: смотрит почти прямо вниз (пока колесо крутится и показывает итог).
+func wheel_camera_transform() -> Transform3D:
+	var center := WHEEL_CENTER + Vector3(0, WHEEL_DISC_Y, 0)
+	var eye := to_global(center + Vector3(0, 1.45, 0.35))
+	return Transform3D.IDENTITY.translated(eye).looking_at(to_global(center), Vector3.UP)
+
+
 # ---------------- Круг игры ----------------
 
 func _next_phase() -> void:

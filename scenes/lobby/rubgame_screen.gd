@@ -12,6 +12,8 @@ extends LobbyRoom
 
 const VIEWMODEL_LAYERS := 0b1111 << 10
 const GOLD := Color("f6c343")
+## Скорость перелёта камеры между столом и колесом.
+const CAMERA_SPEED := 3.0
 const GREEN := Color("8fd694")
 const RED := Color("ff7a6b")
 const CREAM := Color("c9b98f")
@@ -73,13 +75,20 @@ func _ready() -> void:
 		lobby_character.global_position = table.stand_point(player.slot)
 		lobby_character.rotation.y = table.stand_yaw()
 		lobby_character.velocity = Vector3.ZERO
+	_camera.global_transform = table.camera_transform() # дальше камера двигается плавно
 	_wallet.set_amount(PlayerManager.wallet(player), false)
 	_refresh()
 
 
 func _process(delta: float) -> void:
 	_time += delta
-	_camera.global_transform = table.camera_transform()
+	# Пока колесо крутится и показывает итог — плавно летим к колесу (вид сверху),
+	# на время ставок — обратно ко всему столу.
+	var target := table.camera_transform()
+	if table.phase != RubgameTable.Phase.BETTING:
+		target = table.wheel_camera_transform()
+	_camera.global_transform = _camera.global_transform.interpolate_with(target,
+		minf(1.0, delta * CAMERA_SPEED))
 	if _message_time > 0.0:
 		_message_time -= delta
 		if _message_time <= 0.0:
