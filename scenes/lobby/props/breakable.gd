@@ -9,6 +9,11 @@ extends Node3D
 const RESPAWN_TIME := 12.0
 const SHARD_LIFETIME := 3.0
 const SHARD_COUNT := 9
+const TOUCH_GAP := 0.6
+
+## Задевая вещи телом, игрок разбивает не больше одной за TOUCH_GAP сек
+## (иначе, проходя вдоль серванта, бил всю полку разом): id тела -> время последнего раза.
+static var _last_touch: Dictionary = {}
 
 var _model: Node3D
 var _colors: Array[Color] = []
@@ -45,6 +50,10 @@ func is_broken() -> bool:
 func _on_body_entered(body: Node3D) -> void:
 	if _broken or not body is PlayerCharacter:
 		return
+	var now := Time.get_ticks_msec() / 1000.0
+	if now - float(_last_touch.get(body.get_instance_id(), -10.0)) < TOUCH_GAP:
+		return
+	_last_touch[body.get_instance_id()] = now
 	shatter(body.global_position)
 
 

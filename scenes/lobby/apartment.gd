@@ -151,6 +151,10 @@ func _build_rooms() -> void:
 		Vector3((PARTITION_X + RIGHT_X) / 2, 1.5, BEDROOM_FRONT_Z + 0.2))
 	# Потолок и передние стены — только для вида от первого лица.
 	var ceiling := _mat(Color("e8e2d2"), 0.9)
+	# Потолок твёрдый для всех видов (сам он виден только от первого лица): с дивана
+	# допрыгивали выше потолка, и камера оказывалась над квартирой.
+	_invisible_wall(Vector3(RIGHT_X - RUBGAME_LEFT_X, 0.3, LIVING_FRONT_Z - BACK_Z),
+		Vector3((RUBGAME_LEFT_X + RIGHT_X) / 2, WALL_HEIGHT + 0.15, (BACK_Z + LIVING_FRONT_Z) / 2))
 	_fp_only(_box(Vector3(RIGHT_X - RUBGAME_LEFT_X, 0.1, LIVING_FRONT_Z - BACK_Z),
 		Vector3((RUBGAME_LEFT_X + RIGHT_X) / 2, WALL_HEIGHT + 0.05, (BACK_Z + LIVING_FRONT_Z) / 2),
 		ceiling))

@@ -37,7 +37,9 @@ const RUN_BONUS := 0.15
 ## На сколько опускается камера, когда персонаж присел.
 const CROUCH_EYE_DROP := 0.45
 ## Удар рукой: дальность, перезарядка, сила толчка.
-const PUNCH_REACH := 1.4
+const PUNCH_REACH := 1.3
+## Конус удара по вещам (градусы от направления взгляда): бьётся одна вещь — самая «в прицеле».
+const PUNCH_CONE := 22.0
 const PUNCH_COOLDOWN := 0.35
 const PUNCH_PUSH := 3.0
 
@@ -357,20 +359,54 @@ func _punch(p: PlayerData) -> void:
 
 	var origin := character.global_position
 	var forward := -character.global_basis.z
-	for node in get_tree().get_nodes_in_group("breakable"):
-		var item := node as Breakable
-		if item and not item.is_broken() and _in_front(origin, forward, item.global_position, 2.2):
-			item.shatter(origin)
-	for node in get_tree().get_nodes_in_group("tippable"):
-		var body := node as Tippable
-		if body and _in_front(origin, forward, body.global_position, 1.5):
-			body.apply_impulse((forward + Vector3.UP * 0.3) * PUNCH_PUSH * body.mass * 0.4,
-				Vector3.UP * 0.4)
+	# Удар задевает одну вещь — ту, что ближе всего к направлению взгляда (раньше бились
+	# все вещи в широком конусе: целая полка хрусталя от одного удара).
+	var target := _punch_target(p, character)
+	if target is Breakable:
+		(target as Breakable).shatter(origin)
+	elif target is Tippable:
+		var body := target as Tippable
+		body.apply_impulse((forward + Vector3.UP * 0.3) * PUNCH_PUSH * body.mass * 0.4,
+			Vector3.UP * 0.4)
 	for other_id: int in _characters:
 		var other: PlayerCharacter = _characters[other_id]
 		if other != character and not other.sitting \
 				and _in_front(origin, forward, other.global_position, 1.0):
 			other.apply_knockback(forward * 7.0 + Vector3.UP * 3.0)
+
+
+## Вещь под ударом: целая Breakable или Tippable в пределах PUNCH_REACH, ближе всего к лучу
+## взгляда (от первого лица — с наклоном камеры), в узком конусе PUNCH_CONE. null — мимо.
+func _punch_target(p: PlayerData, character: PlayerCharacter) -> Node3D:
+	var eye := character.global_position + Vector3.UP * 1.2
+	var aim := -character.global_basis.z
+	if _views.has(p.id):
+		var camera: Camera3D = _views[p.id]["camera"]
+		eye = camera.global_position
+		aim = -camera.global_basis.z
+	var best: Node3D = null
+	var best_angle := deg_to_rad(PUNCH_CONE)
+	var candidates: Array[Node] = get_tree().get_nodes_in_group("breakable")
+	candidates.append_array(get_tree().get_nodes_in_group("tippable"))
+	for node in candidates:
+		var item := node as Node3D
+		if item is Breakable and (item as Breakable).is_broken():
+			continue
+		# Центр вещи чуть выше её основания (у Breakable/Tippable точка — внизу).
+		var to := item.global_position + Vector3.UP * 0.15 - eye
+		var flat := Vector2(to.x, to.z).length()
+		if flat > PUNCH_REACH or to.length() < 0.05:
+			continue
+		var angle := aim.angle_to(to)
+		if not _views.has(p.id): # общий вид сверху: наклона камеры нет — только по полу
+			angle = Vector2(aim.x, aim.z).angle_to(Vector2(to.x, to.z))
+			angle = absf(angle) * 0.75
+		if flat < 0.45:
+			angle *= 0.5 # вплотную — попасть легче
+		if angle < best_angle:
+			best_angle = angle
+			best = item
+	return best
 
 
 ## Цель перед персонажем: ближе PUNCH_REACH по полу, в конусе ~60° и не выше max_height.
@@ -668,6 +704,7 @@ func _update_first_person(delta: float) -> void:
 		var eye_height := EYE_HEIGHT - (0.1 if character.sitting else 0.0) \
 			- CROUCH_EYE_DROP * character.crouch_amount # присел — камера ниже
 		var eye := character.global_position + Vector3.UP * eye_height
+		eye.y = minf(eye.y, Apartment.WALL_HEIGHT - 0.15) # камера не заглядывает за потолок
 		camera.global_transform = Transform3D(
 			Basis.from_euler(Vector3(character.fp_pitch, character.rotation.y, 0.0)), eye)
 		(_views[id]["prompt"] as KeyPrompt).set_entries(_prompt_for(p, character))
