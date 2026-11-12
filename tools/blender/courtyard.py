@@ -186,6 +186,21 @@ for (x, y, z, r) in [(0, 0, 4.4, 1.3), (0.6, -0.2, 3.6, 1.0), (-0.6, 0.3, 3.7, 1
     P.append(ico(r, (x, y, z), LEAF2, scale=(1, 1, 1.3)))
 export("tree_birch", [join("TreeBirch", P)])
 
+# ---------------- Кусты: два вида (шаровидный и раскидистый) ----------------
+BUSH = mat("Bush", (0.22, 0.45, 0.17), 0.9)
+BUSH2 = mat("Bush2", (0.3, 0.55, 0.2), 0.9)
+BERRY = mat("Berry", (0.75, 0.12, 0.12), 0.6)
+P = []
+for (x, y, z, r) in [(0, 0, 0.45, 0.55), (0.4, 0.15, 0.35, 0.4), (-0.38, -0.1, 0.35, 0.42), (0.1, -0.3, 0.3, 0.35)]:
+    P.append(ico(r, (x, y, z), BUSH if r > 0.4 else BUSH2, scale=(1, 1, 0.8)))
+export("bush_round", [join("BushRound", P)])
+P = []
+for (x, y, z, r) in [(-0.5, 0, 0.3, 0.38), (0, 0.05, 0.38, 0.45), (0.5, -0.05, 0.3, 0.38), (0.25, 0.3, 0.25, 0.3)]:
+    P.append(ico(r, (x, y, z), BUSH2 if x > 0 else BUSH, scale=(1, 0.8, 0.75)))
+for (x, y, z) in [(0.1, -0.38, 0.45), (-0.3, -0.3, 0.4), (0.45, -0.3, 0.35)]:
+    P.append(sphere(0.035, (x, y, z), BERRY, segs=6, rings=4))                    # ягоды
+export("bush_wide", [join("BushWide", P)])
+
 # ---------------- Фонарь ----------------
 P = [cyl(0.09, 6.0, (0, 0, 3.0), mat("PoleGrey", (0.45, 0.47, 0.45), 0.6), verts=8, r2=0.06)]
 P.append(rod((0, 0, 5.9), (0, -1.2, 6.1), 0.05, METAL))
@@ -360,7 +375,7 @@ if RENDER:
              "lamp_post": (-9, -1, 0), "gelik": (3, -3, 0), "gelik_lights": (3, -3, 0),
              "kopeyka": (-3.5, -3, 0), "barrel": (7, -2, 0), "crate": (7.8, -2.5, 0),
              "ladder": (9, 0, 0), "trash_bin": (-7.5, -3, 0), "padlock": (6, -5, 0.5),
-             "pigeon": (0.5, -6, 0), "dog": (-0.5, -6, 0)}
+             "pigeon": (0.5, -6, 0), "dog": (-0.5, -6, 0), "bush_round": (-10, 0, 0), "bush_wide": (10, 0, 0)}
     for name, objs in KEEP:
         for o in objs:
             o.location += Vector(place[name])

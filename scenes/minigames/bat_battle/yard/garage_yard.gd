@@ -149,6 +149,16 @@ func _build_buildings() -> void:
 		var model := "tree_poplar" if int(spot.x) % 2 == 0 else "tree_birch"
 		_place(model, spot + Vector3(0, GROUND_Y, 0), randf() * TAU)
 	_place("tree_birch", Vector3(-14.5, GROUND_Y, 9.0))
+	# Кусты на траве вокруг гаражей и у деревьев.
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 21
+	for spot: Vector3 in [Vector3(-10.2, 0, 0.8), Vector3(-11.6, 0, 3.4), Vector3(-13.8, 0, 0.3),
+			Vector3(-14.4, 0, -4.2), Vector3(-9.8, 0, -3.8), Vector3(-15.6, 0, 2.6),
+			Vector3(11.3, 0, -1.2), Vector3(12.1, 0, 3.6), Vector3(14.6, 0, -3.1),
+			Vector3(15.4, 0, 4.0), Vector3(11.8, 0, -4.4), Vector3(-12.0, 0, -7.4)]:
+		var bush := _place("bush_round" if rng.randf() < 0.5 else "bush_wide",
+			spot + Vector3(0, GROUND_Y, 0), rng.randf() * TAU)
+		bush.scale = Vector3.ONE * rng.randf_range(0.8, 1.3)
 	for x in [-10.5, 10.5]:
 		_place("lamp_post", Vector3(x, GROUND_Y, 9.5), PI) # плафон смотрит к гаражам
 

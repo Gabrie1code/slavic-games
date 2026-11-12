@@ -54,6 +54,8 @@ var _ready_marks: Dictionary = {}
 ## Отсчёт до старта (сек). Меньше нуля — отсчёта нет.
 var _countdown := -1.0
 var _countdown_label: Label
+## Кадр, в котором нажали «Начать» в окне ботов (это нажатие больше никуда не идёт).
+var _dialog_closed_frame := -1
 
 ## Кто где сидит на диване: PlayerData.id -> номер места.
 var _seated: Dictionary = {}
@@ -191,9 +193,13 @@ func _launch() -> void:
 func _process(delta: float) -> void:
 	if _view == View.FIRST_PERSON:
 		_update_first_person(delta)
+	if _bot_dialog.visible and _countdown >= 0.0:
+		_bot_dialog.visible = false # на всякий случай: во время отсчёта окна нет
 	if _bot_dialog.visible:
 		_process_bot_dialog()
 		return
+	if Engine.get_process_frames() == _dialog_closed_frame:
+		return # кадр, в котором закрыли окно ботов: это нажатие уже использовано
 	# Копия списка (игрок может выйти посреди цикла) — обязательно в типизированную переменную,
 	# иначе Godot не знает тип p и не загружает скрипт (см. «Уроки» в PROJECT_LOG).
 	var players: Array[PlayerData] = PlayerManager.players.duplicate()
@@ -681,6 +687,8 @@ func _overlay_label(text: String, font_size: int) -> Label:
 # ---------------- Окно ботов ----------------
 
 func _open_bot_dialog() -> void:
+	if _countdown >= 0.0:
+		return # отсчёт уже идёт — окно не нужно
 	_close_all_wardrobes()
 	_bot_count = PlayerManager.free_slots()
 	_update_bot_dialog()
@@ -697,7 +705,11 @@ func _close_bot_dialog() -> void:
 
 
 func _confirm_bots() -> void:
+	if not _bot_dialog.visible:
+		return
 	_bot_dialog.visible = false
+	# Нажатие «Начать» не должно в этом же кадре снять «Готов» у телевизора.
+	_dialog_closed_frame = Engine.get_process_frames()
 	_set_characters_input(true)
 	for i in _bot_count:
 		PlayerManager.add_bot()
@@ -723,6 +735,8 @@ func _process_bot_dialog() -> void:
 
 ## Листать число ботов по кругу: ... 2 → 3 → «Без ботов» → 1 → 2 ...
 func _change_bot_count(step: int) -> void:
+	if _countdown >= 0.0 or not _bot_dialog.visible:
+		return # после «Начать» ботов уже не меняем
 	_bot_count = posmod(_bot_count + step, PlayerManager.free_slots() + 1)
 	_update_bot_dialog()
 

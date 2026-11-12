@@ -153,7 +153,7 @@ func _spawn_racers() -> void:
 		if not r.is_chaser:
 			spawn_index += 1
 		r.character.setup(p, spawn)
-		r.character.can_jump = false # кнопка подтверждения = разморозка
+		r.character.can_jump = true # прыгать можно; рядом с замороженным/горкой/качелями — нет
 		r.character.input_enabled = false # включим после отсчёта
 		r.character.speed = CHASER_SPEED if r.is_chaser else RUNNER_SPEED
 		_racers_root.add_child(r.character)
@@ -364,7 +364,6 @@ func _build_ice() -> Node3D:
 	block.material_override = _ice_material
 	block.position.y = ICE_HEIGHT / 2.0
 	root.add_child(block)
-	# Матовая крышка сверху.
 	var cap := MeshInstance3D.new()
 	var cap_mesh := CylinderMesh.new()
 	cap_mesh.top_radius = ICE_RADIUS * 0.97
@@ -428,8 +427,6 @@ func _snowflakes() -> CPUParticles3D:
 	flakes.gravity = Vector3(0, 0.12, 0)
 	flakes.initial_velocity_min = 0.05
 	flakes.initial_velocity_max = 0.2
-	flakes.angle_min = -180.0
-	flakes.angle_max = 180.0
 	flakes.scale_amount_min = 0.6
 	flakes.scale_amount_max = 1.3
 	var fade := Gradient.new()
@@ -721,6 +718,9 @@ func _update_playground(delta: float) -> void:
 	_yard.swing.update_swing(delta, characters)
 	_yard.carousel.update_spin(delta, characters)
 	for r in _racers:
+		# Пробел — прыжок, но не там, где он нужен для дела (разморозить, горка, качели).
+		r.character.can_jump = not _frozen_near(r) and not _yard.slide.can_ride(r.character) \
+			and (r.is_chaser or _yard.swing.free_seat_near(r.character) < 0)
 		if r.frozen or r.busy or r.player.input == null or not r.character.input_enabled:
 			continue
 		if not r.player.input.is_just_pressed("confirm") or _frozen_near(r):

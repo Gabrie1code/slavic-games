@@ -171,7 +171,10 @@ func _physics_process(delta: float) -> void:
 		if f.player.is_bot():
 			_bot_think(f)
 		# Кнопку можно не только нажимать, но и держать: удары идут сами по перезарядке.
-		if f.player.input and f.player.input.is_pressed("confirm") and f.cooldown == 0.0:
+		# Зажал Пробел (или кнопку удара — ЛКМ/F, «/», X) — бьёт сам раз в перезарядку, без «спама».
+		var held := f.player.input != null \
+			and (f.player.input.is_pressed("confirm") or f.player.input.is_pressed("attack"))
+		if held and f.cooldown == 0.0 and not f.spinning:
 			_spin(f)
 
 		if _fell_off(f.character.global_position):
