@@ -408,53 +408,15 @@ func _wall_with_hole(x0: float, x1: float, hole: Rect2, material: Material) -> v
 		Vector3((hx0 + hx1) / 2, hole.end.y + top / 2, z), material)
 
 
-## «Объёмный» вид из окна: плоские картинки на разной глубине за проёмом (деревья у дома,
-## дома напротив с двором, небо). Ближние при движении сдвигаются сильнее — получается объём.
-## Всё это видят только камеры от первого лица; сверху в проёме — плоская картинка.
+## «Объёмный» вид из окна: настоящий двор за проёмом (WindowView). Его видят только камеры
+## от первого лица; сверху в проёме — плоская картинка.
 func _build_window_view(window_pos: Vector3) -> void:
 	_hide_window_sky(_last_window)
 	var center_x := window_pos.x
-	var layers := [
-		# [картинка, ширина, высота, низ по Y, глубина за стеной]
-		["window_houses", 120.0, 18.0, -6.0, 28.0],
-		# Небо огромное: под любым углом из окна за ним не видно пустоты (была коричневая кайма).
-		["window_sky", 600.0, 320.0, -60.0, 60.0],
-	]
-	for layer: Array in layers:
-		var quad := MeshInstance3D.new()
-		var mesh := QuadMesh.new()
-		mesh.size = Vector2(layer[1], layer[2])
-		quad.mesh = mesh
-		var mat := StandardMaterial3D.new()
-		mat.albedo_texture = load("res://assets/textures/window/%s.png" % layer[0])
-		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-		if layer[0] != "window_sky":
-			mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR
-		quad.material_override = mat
-		quad.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		quad.layers = FP_ONLY_LAYER
-		quad.position = Vector3(center_x, float(layer[3]) + float(layer[2]) / 2.0,
-			BACK_Z - 0.2 - float(layer[4]))
-		add_child(quad)
-	# Земля двора под окнами (между стеной и деревьями видно, если смотреть вниз).
-	var ground := _box(Vector3(400, 0.1, 60), Vector3(center_x, -6.05, BACK_Z - 30.2),
-		_mat(Color(0.37, 0.5, 0.28), 1.0))
-	ground.layers = FP_ONLY_LAYER
-	# Деревья у дома — настоящие 3D-модели на разной глубине (при ходьбе видно, что они объёмные).
-	var trees: Array[Vector3] = [
-		Vector3(-6.0, 0, 6.0), Vector3(-2.5, 0, 9.5), Vector3(2.0, 0, 6.5), Vector3(5.5, 0, 10.5),
-		Vector3(8.5, 0, 7.0), Vector3(-9.5, 0, 12.0), Vector3(0.5, 0, 15.0), Vector3(-4.0, 0, 18.0),
-	]
-	for i in trees.size():
-		var model := "tree_poplar" if i % 2 == 0 else "tree_birch"
-		var tree := (load("res://assets/models/courtyard/%s.glb" % model) as PackedScene) \
-			.instantiate() as Node3D
-		tree.position = Vector3(center_x + trees[i].x, -6.0, BACK_Z - 0.2 - trees[i].z)
-		tree.rotation.y = i * 1.7
-		tree.scale = Vector3.ONE * (1.6 + (i % 3) * 0.15)
-		add_child(tree)
-		_set_layers(tree, FP_ONLY_LAYER)
-		_no_shadow(tree)
+	# Двор за окном: небо, газон, тропинка, 3D-хрущёвки, деревья, кусты, голуби (WindowView).
+	var outside := WindowView.new()
+	outside.position = Vector3(center_x, 0, BACK_Z - 0.2)
+	add_child(outside)
 	# Сверху (общая камера) — прежняя плоская картинка прямо за проёмом.
 	var flat := MeshInstance3D.new()
 	var flat_mesh := QuadMesh.new()
@@ -491,7 +453,8 @@ func _build_decor() -> void:
 	var plant_size := Vector3(0.45, 1.0, 0.45)
 	# Фикус — у левой стены рядом с креслом (между телевизором и шкафом он влезал в мебель).
 	_solid(_model("plant_ficus"), plant_size, 0.5, Vector3(-5.5, 0, -1.55))
-	_solid(_model("plant_palm"), plant_size, 0.5, Vector3(2.62, 0, -3.6))
+	# Пальма — чуть вперёд от угла (в углу листья влезали в штору).
+	_solid(_model("plant_palm"), plant_size, 0.5, Vector3(2.55, 0, -3.05))
 	_solid(_model("plant_snake"), plant_size, 0.5, Vector3(-5.6, 0, 3.15))
 	_solid(_model("plant_snake"), plant_size, 0.5, Vector3(3.5, 0, -3.7), 0.8)
 	_solid(_model("plant_ficus"), plant_size, 0.5, Vector3(8.65, 0, 1.15), 1.3)
