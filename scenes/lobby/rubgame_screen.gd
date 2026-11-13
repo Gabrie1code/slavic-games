@@ -15,9 +15,13 @@ const VIEWMODEL_LAYERS := 0b1111 << 10
 const GOLD := Color("f6c343")
 ## Скорость перелёта камеры между столом и колесом.
 const CAMERA_SPEED := 3.0
-## Плавное появление/исчезновение окна стола и высота глаз (как у камеры в лобби).
+## Вход и выход — как «пролёт камеры»: вид не затухает, камера сама летит от глаз персонажа к
+## столу (и обратно), как при переходе на вид сверху; плавно проявляются только кнопки и надписи.
 const FADE_TIME := 0.35
 const EYE_HEIGHT := 1.42
+## Угол обзора: у глаз персонажа в лобби — 75, у стола — 50 (меняется плавно вместе с полётом).
+const EYE_FOV := 75.0
+const TABLE_FOV := 50.0
 const GREEN := Color("8fd694")
 const RED := Color("ff7a6b")
 const CREAM := Color("c9b98f")
@@ -52,6 +56,11 @@ var _top_view := false
 ## Где персонаж стоял до стола — туда же он вернётся, когда отойдёт.
 var _return_pos := Vector3.ZERO
 var _return_yaw := 0.0
+var _return_pitch := 0.0
+## Сколько уже летим обратно к глазам (на случай, если камера долго не «долетает»).
+var _closing_time := 0.0
+var _closed := false
+var _view: SubViewportContainer
 ## Уходим от стола (идёт плавное закрытие — кнопки не слушаем).
 var _closing := false
 
@@ -89,14 +98,15 @@ func _ready() -> void:
 	if lobby_character:
 		_return_pos = lobby_character.global_position
 		_return_yaw = lobby_character.rotation.y
-		# Плавный вход: камера стола стартует из глаз персонажа и сама долетает до стола,
-		# а окно проявляется поверх вида от первого лица (без резкого скачка).
-		_camera.global_transform = _eye(_return_pos, _return_yaw, lobby_character.fp_pitch)
+		_return_pitch = lobby_character.fp_pitch
+		# Вход: камера стола стартует ровно из глаз персонажа (тот же вид и угол обзора,
+		# что от первого лица) и сама долетает до стола — без затухания.
+		_camera.global_transform = _eye(_return_pos, _return_yaw, _return_pitch)
+		_camera.fov = EYE_FOV
 		lobby_character.global_position = table.stand_point(player.slot)
 		lobby_character.rotation.y = table.stand_yaw()
 		lobby_character.velocity = Vector3.ZERO
-	modulate.a = 0.0
-	create_tween().tween_property(self, "modulate:a", 1.0, FADE_TIME)
+	_fade_overlay(true)
 	_wallet.set_amount(PlayerManager.wallet(player), false)
 	_refresh()
 
@@ -107,7 +117,7 @@ func _process(delta: float) -> void:
 	# на время ставок — обратно ко всему столу.
 	var target := table.camera_transform()
 	if _closing:
-		target = _eye(_return_pos, _return_yaw, 0.0) # уходим: камера летит обратно к глазам
+		target = _eye(_return_pos, _return_yaw, _return_pitch) # уходим: летим обратно к глазам
 	elif table.phase != RubgameTable.Phase.BETTING:
 		target = table.wheel_camera_transform()
 	elif _top_view:
@@ -118,8 +128,20 @@ func _process(delta: float) -> void:
 	_show_panels(table.phase == RubgameTable.Phase.BETTING)
 	# Рамка цвета игрока вокруг выбранной ставки на сукне.
 	table.set_selection(player, _bet(), _number)
-	_camera.global_transform = _camera.global_transform.interpolate_with(target,
-		minf(1.0, delta * CAMERA_SPEED))
+	var step := minf(1.0, delta * CAMERA_SPEED * (1.6 if _closing else 1.0))
+	# Подлетая к глазам своего персонажа, камера не рисует его самого (не видно «изнутри головы»);
+	# у стола свой персонаж виден, как и остальные.
+	var near_eye := _camera.global_position.distance_to(_eye(_return_pos, 0.0, 0.0).origin) < 0.8
+	_camera.set_cull_mask_value(player.slot + 2, not (_closing and near_eye))
+	_camera.global_transform = _camera.global_transform.interpolate_with(target, step)
+	_camera.fov = lerpf(_camera.fov, EYE_FOV if _closing else TABLE_FOV, step)
+	if _closing:
+		_closing_time += delta
+		# Долетели до глаз — окно закрывается, и дальше тот же вид уже от первого лица.
+		if _closing_time > 1.6 or (_camera.global_position.distance_to(target.origin) < 0.03
+				and absf(_camera.fov - EYE_FOV) < 1.0):
+			_finish_close()
+		return
 	if _message_time > 0.0:
 		_message_time -= delta
 		if _message_time <= 0.0:
@@ -140,13 +162,26 @@ func close() -> void:
 		lobby_character.rotation.y = _return_yaw
 		lobby_character.velocity = Vector3.ZERO
 	table.clear_selection(player)
-	var tween := create_tween()
-	tween.tween_property(self, "modulate:a", 0.0, FADE_TIME * 1.3).set_delay(0.1)
-	tween.tween_callback(_finish_close)
+	_fade_overlay(false)
 
 
 func _finish_close() -> void:
+	if _closed:
+		return
+	_closed = true
 	super.close()
+
+
+## Кнопки и надписи стола проявляются / тают; сам вид (камера) не затухает никогда.
+func _fade_overlay(show: bool) -> void:
+	for child in get_children():
+		var control := child as Control
+		if control == null or control == _view or control == _confirm:
+			continue
+		if show:
+			control.modulate.a = 0.0
+		var tween := control.create_tween()
+		tween.tween_property(control, "modulate:a", 1.0 if show else 0.0, FADE_TIME)
 
 
 ## Где глаза персонажа (как камера от первого лица в лобби).
@@ -391,6 +426,7 @@ func _style_row(control: Control, focused: bool) -> void:
 
 func _build() -> void:
 	var view := SubViewportContainer.new()
+	_view = view
 	view.stretch = true
 	view.set_anchors_preset(Control.PRESET_FULL_RECT)
 	view.mouse_filter = Control.MOUSE_FILTER_STOP # клик по столу — вид сверху
@@ -402,7 +438,8 @@ func _build() -> void:
 	_camera = Camera3D.new()
 	_camera.fov = 50.0
 	# Без «кулаков в кадре» и без значков/табло над столом (они закрывают стол и колесо).
-	_camera.cull_mask = 0xFFFFF & ~VIEWMODEL_LAYERS & ~ZoneBadge.OVERHEAD_LAYER
+	_camera.cull_mask = 0xFFFFF & ~VIEWMODEL_LAYERS & ~ZoneBadge.OVERHEAD_LAYER \
+		& ~Apartment.OVERVIEW_ONLY_LAYER # копии «для вида сверху» (люстры) — не для глаз
 	viewport.add_child(_camera)
 	_camera.current = true
 
