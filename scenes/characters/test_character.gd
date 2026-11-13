@@ -91,6 +91,13 @@ var fp_strafe := false
 var run_up := 0.0
 ## Наклон взгляда вверх/вниз (для камеры от первого лица).
 var fp_pitch := 0.0
+## Голова запрокинута (>0, пьёт из бутылки) и корпус наклонён вперёд (>0, тошнит) — доп. к позе.
+var head_tilt := 0.0
+var lean := 0.0
+## Опьянение 0..1 (плавно): шатает модель и камеру, ведёт в сторону при ходьбе.
+var drunk := 0.0
+## Сколько ещё секунд пьян (потом плавно трезвеет); 0 — протрезветь (после рвоты).
+var drunk_left := 0.0
 
 var _knockback := Vector3.ZERO
 ## Направление и скорость бега до столкновения (для разгона и толчка вещей).
@@ -192,6 +199,8 @@ func _physics_process(delta: float) -> void:
 
 	# Камера смотрит спереди, поэтому «вверх» на экране — это -Z в мире.
 	var dir := Vector3(move.x, 0.0, move.y)
+	if drunk > 0.01:
+		dir = _drunk_steer(dir)
 	if first_person:
 		# От первого лица — относительно взгляда: basis.z смотрит назад, basis.x — вправо.
 		if fp_strafe:
@@ -251,7 +260,8 @@ func _process(delta: float) -> void:
 		_part("ArmR").rotation.x = swing * 0.8
 	else:
 		_part("ArmR").rotation.x = arm_pose_x
-	_part("Torso").rotation.x = -CROUCH_LEAN * crouch_amount
+	_part("Torso").rotation.x = -CROUCH_LEAN * crouch_amount - lean
+	_update_drunk(delta)
 	# Подпрыгивание при шаге и лёгкое «дыхание» в стойке.
 	_model.position.y = SIT_DROP if sitting else absf(sin(_walk_phase)) * 0.06 * amount
 	if crouch_amount > 0.0 and not sitting:
@@ -262,8 +272,24 @@ func _process(delta: float) -> void:
 	# Не до конца (70% наклона взгляда), иначе голова «ломается» на шее.
 	_head_pitch = lerpf(_head_pitch, clampf(fp_pitch, -0.9, 0.9) * 0.7, minf(1.0, delta * 12.0))
 	_part("Head").rotation.x = sin(_idle_time * 2.0) * 0.04 + CROUCH_LEAN * crouch_amount * 0.8 \
-		+ _head_pitch
+		+ _head_pitch + head_tilt
 	_animate_jump(delta)
+
+
+## Пьяный: всё тело покачивается из стороны в сторону, медленно «плывёт».
+func _update_drunk(delta: float) -> void:
+	drunk_left = maxf(0.0, drunk_left - delta)
+	var sober := drunk_left <= 0.0 # трезвеет медленнее, чем пьянеет
+	drunk = move_toward(drunk, 0.0 if sober else 1.0, delta / (4.0 if sober else 1.5))
+	_model.rotation.z = sin(_idle_time * 1.3) * 0.13 * drunk
+	_model.rotation.x = sin(_idle_time * 0.9 + 1.0) * 0.06 * drunk
+
+
+## Пьяная походка: направление «гуляет», и даже стоя его слегка водит в сторону.
+func _drunk_steer(dir: Vector3) -> Vector3:
+	var wobble := sin(_idle_time * 1.7) * 0.6 + sin(_idle_time * 0.63) * 0.35
+	var steered := dir.rotated(Vector3.UP, wobble * drunk)
+	return steered + Vector3(sin(_idle_time * 0.8), 0.0, cos(_idle_time * 1.1)) * 0.18 * drunk
 
 
 ## Сесть: персонаж ставится в точку (под сиденьем) и поворачивается на yaw.

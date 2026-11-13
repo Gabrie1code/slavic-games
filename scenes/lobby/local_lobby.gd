@@ -706,8 +706,9 @@ func _update_first_person(delta: float) -> void:
 			- CROUCH_EYE_DROP * character.crouch_amount # присел — камера ниже
 		var eye := character.global_position + Vector3.UP * eye_height
 		eye.y = minf(eye.y, Apartment.WALL_HEIGHT - 0.15) # камера не заглядывает за потолок
-		camera.global_transform = Transform3D(
-			Basis.from_euler(Vector3(character.fp_pitch, character.rotation.y, 0.0)), eye)
+		var wobble := _view_wobble(character) # пьёт / пьян / тошнит — камера качается
+		camera.global_transform = Transform3D(Basis.from_euler(Vector3(
+			character.fp_pitch + wobble.x, character.rotation.y, wobble.y)), eye)
 		var entries := _prompt_for(p, character)
 		entries.append_array(_gadgets.hand_hint(p))
 		if LobbyGadgets.is_running(p, character):
@@ -758,6 +759,15 @@ func _prompt_for(p: PlayerData, character: PlayerCharacter) -> Array[Dictionary]
 		result.append(LobbyGadgets.entry(key, action))
 	result.append_array(_gadgets.remote_hint(p)) # пульт на ЛКМ — вместе с «Сесть на диван»
 	return result
+
+
+## Покачивание камеры от первого лица: запрокинул голову (пьёт), наклонился (тошнит), пьян —
+## камера «плывёт» и кренится. x — наклон вверх/вниз, y — крен.
+static func _view_wobble(character: PlayerCharacter) -> Vector2:
+	var t := Time.get_ticks_msec() / 1000.0
+	var pitch := character.head_tilt * 0.6 - character.lean * 0.8 \
+		+ sin(t * 1.1) * 0.06 * character.drunk
+	return Vector2(pitch, sin(t * 1.3) * 0.12 * character.drunk)
 
 
 func _overlay_label(text: String, font_size: int) -> Label:

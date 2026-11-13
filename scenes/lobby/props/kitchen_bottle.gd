@@ -1,7 +1,8 @@
 class_name KitchenBottle
 extends RigidBody3D
-## Бутылка со стола на кухне: её можно взять в руку (ЛКМ рядом), «выпить» (ЛКМ в руке —
-## персонаж подносит бутылку ко рту и запрокидывает) и бросить (G). Брошенная бутылка через
+## Бутылка вина со стола на кухне: её можно взять в руку (ЛКМ рядом), «выпить» (ЛКМ в руке —
+## подносит ко рту, запрокидывает голову, глотает; раз в 4 сек, см. BottleHand)
+## и бросить (G). Брошенная бутылка через
 ## FLOOR_LIFE сек исчезает. Взяли со стола — через KitchenRoom.BOTTLE_BACK сек на столе новая.
 ## Модель — tools/blender/kitchen.py (kitchen_bottle): начало — на дне.
 
@@ -73,31 +74,59 @@ func hold(p: PlayerData, character: PlayerCharacter) -> void:
 	character.set_arm_pose(0.15, 0.9, 0.2)
 
 
-## «Выпить»: рука поднимается ко рту, бутылка запрокидывается (горлышком к лицу), пауза,
-## и обратно. view — бутылка «в кадре» у держащего (может быть null).
-func drink(character: PlayerCharacter, view: Node3D) -> void:
+## «Выпить»: рука подносит бутылку ко рту, голова запрокидывается, три глотка (голова кивает),
+## бутылка опускается. view — бутылка «в кадре» у держащего (может быть null); done — когда
+## допил (лобби считает выпитое: опьянение, рвота).
+func drink(character: PlayerCharacter, view: Node3D, done: Callable) -> void:
 	if drinking:
 		return
 	drinking = true
-	character.set_arm_pose(0.55, 2.3, 0.3)
+	character.set_arm_pose(0.5, 2.15, 0.3)
 	var tween := create_tween()
-	tween.tween_property(self, "_tilt", -1.9, 0.3).set_trans(Tween.TRANS_SINE)
-	tween.tween_interval(0.9)
-	tween.tween_property(self, "_tilt", 0.0, 0.3).set_trans(Tween.TRANS_SINE)
+	# Поднести ко рту, запрокинуть.
+	tween.tween_property(self, "_tilt", -1.3, 0.3).set_trans(Tween.TRANS_SINE)
+	tween.parallel().tween_property(character, "head_tilt", 0.2, 0.3)
+	tween.tween_property(self, "_tilt", -2.15, 0.25).set_trans(Tween.TRANS_SINE)
+	tween.parallel().tween_property(character, "head_tilt", 0.5, 0.25)
+	for k in 3: # глотки
+		tween.tween_property(character, "head_tilt", 0.4, 0.12)
+		tween.tween_property(character, "head_tilt", 0.5, 0.12)
+	# Опустить.
+	tween.tween_property(self, "_tilt", 0.0, 0.35).set_trans(Tween.TRANS_SINE)
+	tween.parallel().tween_property(character, "head_tilt", 0.0, 0.35)
 	tween.tween_callback(func() -> void:
 		drinking = false
 		if is_instance_valid(character) and state == State.HELD:
-			character.set_arm_pose(0.15, 0.9, 0.25))
+			character.set_arm_pose(0.15, 0.9, 0.25)
+		done.call())
 	if view:
-		# В кадре бутылка подъезжает к центру и запрокидывается — как будто пьёшь сам.
-		var start := view.position
-		var turn := view.rotation
-		var look := view.create_tween().set_parallel(true)
-		look.tween_property(view, "position", Vector3(0.02, -0.12, -0.3), 0.3)
-		look.tween_property(view, "rotation", Vector3(1.9, 0.0, 0.0), 0.3)
-		look.chain().tween_interval(0.9)
-		look.chain().tween_property(view, "position", start, 0.3)
-		look.parallel().tween_property(view, "rotation", turn, 0.3)
+		_drink_view(view)
+
+
+## От первого лица: бутылка подъезжает горлышком ко рту (к центру снизу) и запрокидывается,
+## на глотках чуть вздрагивает.
+func _drink_view(view: Node3D) -> void:
+	var start := view.position
+	var turn := view.rotation
+	var look := view.create_tween()
+	look.tween_property(view, "position", Vector3(0.04, -0.2, -0.32), 0.3)
+	look.parallel().tween_property(view, "rotation", Vector3(1.3, 0.0, 0.0), 0.3)
+	look.tween_property(view, "rotation:x", 2.1, 0.25)
+	look.parallel().tween_property(view, "position", Vector3(0.02, -0.14, -0.28), 0.25)
+	for k in 3:
+		look.tween_property(view, "position:y", -0.13, 0.12)
+		look.tween_property(view, "position:y", -0.14, 0.12)
+	look.tween_property(view, "position", start, 0.35)
+	look.parallel().tween_property(view, "rotation", turn, 0.35)
+
+
+## Перепил: бутылка пропадает из руки (сжимается) и исчезает.
+func vanish(character: PlayerCharacter) -> void:
+	state = State.LOOSE
+	character.set_arm_angle(PlayerCharacter.ARM_DOWN, 0.2)
+	var tween := create_tween()
+	tween.tween_property(_model, "scale", Vector3.ONE * 0.01, 0.25)
+	tween.tween_callback(queue_free)
 
 
 ## Бросить туда, куда смотрит игрок (dir); Vector3.ZERO — уронить под себя.
