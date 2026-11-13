@@ -217,8 +217,11 @@ func _build_living_room() -> void:
 	for row in shelf_heights.size():
 		for i in 4:
 			var x := sideboard_pos.x - 0.72 + i * 0.48
-			_breakable(china_rows[row][i], Vector3(x, shelf_heights[row], sideboard_pos.z - 0.05),
-				[PORCELAIN, COBALT], 0.6, 0.04)
+			var china := _breakable(china_rows[row][i],
+				Vector3(x, shelf_heights[row], sideboard_pos.z - 0.05), [PORCELAIN, COBALT], 0.6, 0.04)
+			# За целым стеклом посуду не разбить — ни рукой, ни молотком (сначала стекло).
+			var pane := 0 if i < 2 else 1
+			china.guard = func() -> bool: return sideboard.pane_broken(pane)
 	# На серванте: плюшевый мишка в левом углу и часы с настоящим временем по центру.
 	var bear := _place(_model("teddy_bear"), Vector3(sideboard_pos.x - 0.75, 2.2, sideboard_pos.z))
 	bear.rotation.y = 0.35

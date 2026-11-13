@@ -24,6 +24,8 @@ static var _last_touch: Dictionary = {}
 
 ## Через сколько секунд вещь появляется снова (у радио — быстрее).
 var respawn_time := RESPAWN_TIME
+## Защита (например, сервиз за целым стеклом серванта): вернёт false — вещь сейчас не бьётся.
+var guard: Callable
 
 var _model: Node3D
 var _colors: Array[Color] = []
@@ -90,8 +92,13 @@ func is_broken() -> bool:
 	return _broken
 
 
+## Можно ли сейчас разбить (цела и ничем не защищена).
+func can_break() -> bool:
+	return not _broken and (not guard.is_valid() or bool(guard.call()))
+
+
 func _on_body_entered(body: Node3D) -> void:
-	if _broken or not body is PlayerCharacter:
+	if not can_break() or not body is PlayerCharacter:
 		return
 	if (body as PlayerCharacter).run_up < _run_up_needed:
 		return # подошёл аккуратно, без разгона

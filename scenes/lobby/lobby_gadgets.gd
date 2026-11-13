@@ -16,6 +16,7 @@ const LAMP_RADIUS := 1.2
 const SWITCH_RADIUS := 1.0
 const RADIO_RADIUS := 1.4
 const SIDEBOARD_RADIUS := 1.1
+const SIDEBOARD_GLASS_RADIUS := 1.3
 const ARCADE_RADIUS := 1.1
 const TOILET_RADIUS := 1.2
 const SINK_RADIUS := 1.0
@@ -139,8 +140,8 @@ func punch_target(character: PlayerCharacter, camera: Camera3D) -> Node3D:
 	candidates.append_array(character.get_tree().get_nodes_in_group("tippable"))
 	for node in candidates:
 		var item := node as Node3D
-		if item is Breakable and (item as Breakable).is_broken():
-			continue
+		if item is Breakable and not (item as Breakable).can_break():
+			continue # разбита или за целым стеклом серванта
 		# Центр вещи чуть выше её основания (у Breakable/Tippable точка — внизу).
 		var to := item.global_position + Vector3.UP * 0.15 - eye
 		var flat := Vector2(to.x, to.z).length()
@@ -447,7 +448,8 @@ func holds_hammer(p: PlayerData) -> bool:
 
 ## Взмах молотком (удар — как кулаком, это делает лобби); автомат перед игроком —
 ## разбивается стекло экрана. Молоток «в кадре» резко клюёт вперёд.
-func swing_hammer(p: PlayerData) -> void:
+## true — удар пришёлся по стеклу серванта (тогда больше ничего не бьётся).
+func swing_hammer(p: PlayerData) -> bool:
 	var hammer: Hammer = _held_hammers[p.id]
 	hammer.swing(characters[p.id])
 	if _has_view(_view_hammers, p.id):
@@ -457,9 +459,14 @@ func swing_hammer(p: PlayerData) -> void:
 		hit.tween_property(view, "rotation:x", 0.55, 0.09).set_ease(Tween.EASE_OUT)
 		hit.tween_property(view, "rotation:x", -1.1, 0.07).set_ease(Tween.EASE_IN)
 		hit.tween_property(view, "rotation:x", 0.0, 0.2).set_ease(Tween.EASE_OUT)
+	var cabinet := apartment.sideboard
+	for i in 2:
+		if not cabinet.pane_broken(i) and _near(p, cabinet.pane_center(i), SIDEBOARD_GLASS_RADIUS):
+			return cabinet.break_pane(i)
 	var arcade := _near_arcade(p)
 	if arcade:
 		arcade.smash()
+	return false
 
 
 ## Молоток в руке: G — бросить туда, куда смотришь.
