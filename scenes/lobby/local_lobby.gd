@@ -705,6 +705,8 @@ func _update_first_person(delta: float) -> void:
 		# Во время отсчёта кнопка «Отменить «Готов»» — по центру под надписью «Начинаем через…».
 		var under_timer := _countdown >= 0.0 and _ready_marks.has(p.id)
 		var shift := Vector2(-prompt.size.x / 2.0, 64.0) if under_timer else Vector2(36.0, 20.0)
+		if not under_timer and _gadgets.hand_busy(p):
+			shift.x = -prompt.size.x - 36.0 # вещь в руке справа — подсказки слева от прицела
 		prompt.position = prompt.get_parent_control().size / 2.0 + shift # размер не меняется
 		var on_phone := _gadgets.holds_phone(p)
 		var holds_can := _gadgets.holds_can(p)

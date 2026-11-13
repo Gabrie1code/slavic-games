@@ -448,8 +448,10 @@ func swing_hammer(p: PlayerData) -> void:
 	if _has_view(_view_hammers, p.id):
 		var view: Node3D = _view_hammers[p.id]
 		var hit := view.create_tween()
-		hit.tween_property(view, "rotation:x", -1.1, 0.08).set_ease(Tween.EASE_OUT)
-		hit.tween_property(view, "rotation:x", 0.0, 0.18).set_ease(Tween.EASE_IN)
+		# Замах назад-вверх, потом резкий удар вперёд-вниз и возврат.
+		hit.tween_property(view, "rotation:x", 0.55, 0.09).set_ease(Tween.EASE_OUT)
+		hit.tween_property(view, "rotation:x", -1.1, 0.07).set_ease(Tween.EASE_IN)
+		hit.tween_property(view, "rotation:x", 0.0, 0.2).set_ease(Tween.EASE_OUT)
 	var arcade := _near_arcade(p)
 	if arcade:
 		arcade.smash()
@@ -467,7 +469,7 @@ func _process_hammer(p: PlayerData, camera: Camera3D) -> void:
 ## поворот всего кулака с молотком (точка поворота — кулак).
 func _make_view_hammer(p: PlayerData) -> Node3D:
 	var root := Node3D.new()
-	root.position = Vector3(0.3, -0.33, -0.62) # кулак справа внизу, подальше от камеры
+	root.position = Vector3(0.36, -0.42, -0.62) # кулак справа внизу (подсказки — слева от прицела)
 	var fist := MeshInstance3D.new()
 	var fist_mesh := SphereMesh.new()
 	fist_mesh.radius = 0.06

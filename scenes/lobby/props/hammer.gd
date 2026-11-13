@@ -102,12 +102,17 @@ func drop(character: PlayerCharacter, world: Node3D, dir: Vector3 = Vector3.ZERO
 
 
 ## Взмах молотком (рука с молотком резко вперёд-вниз и обратно).
+## Замах: рука и молоток сначала назад-вверх, потом резко вперёд-вниз, потом наготове.
 func swing(character: PlayerCharacter) -> void:
-	character.set_arm_pose(0.15, 1.75, 0.07)
+	character.set_arm_pose(0.15, 2.3, 0.09) # рука вверх — замах
 	var strike := create_tween()
-	strike.tween_property(self, "_tilt", 1.5, 0.07)
+	strike.tween_property(self, "_tilt", -0.5, 0.09) # молоток откинут назад
+	strike.tween_property(self, "_tilt", 1.5, 0.07) # удар
 	strike.tween_property(self, "_tilt", 0.4, 0.2)
-	await get_tree().create_timer(0.14).timeout
+	await get_tree().create_timer(0.09).timeout
+	if is_instance_valid(character) and state == State.HELD:
+		character.set_arm_pose(0.15, 1.2, 0.07) # рука резко вниз-вперёд
+	await get_tree().create_timer(0.12).timeout
 	if is_instance_valid(character) and state == State.HELD:
 		character.set_arm_pose(0.15, 0.9, 0.18)
 
