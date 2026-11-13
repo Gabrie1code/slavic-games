@@ -22,6 +22,10 @@ const HANDSET_END := Vector3(-0.1, -0.02, 0.0)
 const CORD_LENGTH := 2.6
 const CORD_SEGMENTS := 28
 const CORD_COILS := 14.0
+## Корпус телефона (полуразмеры по X и Z, в координатах телефона): провод огибает его, а не
+## проходит насквозь. Кусочки провода по корпусу — до CORD_EXTRA штук сверх CORD_SEGMENTS.
+const BODY_HALF := Vector2(0.11, 0.12)
+const CORD_EXTRA := 3
 const RESTORE_TIME := 10.0
 const BUBBLE_TIME := 4.0
 const PHRASES: Array[String] = [
@@ -245,7 +249,7 @@ func _build_cord() -> Array[MeshInstance3D]:
 	cord_mat.albedo_color = Color(0.03, 0.03, 0.035)
 	cord_mat.roughness = 0.4
 	var pieces: Array[MeshInstance3D] = []
-	for i in CORD_SEGMENTS:
+	for i in CORD_SEGMENTS + CORD_EXTRA:
 		var piece := MeshInstance3D.new()
 		piece.mesh = mesh
 		piece.material_override = cord_mat
@@ -267,10 +271,21 @@ func _show_cord(pieces: Array[MeshInstance3D], on: bool) -> void:
 func _update_cord(pieces: Array[MeshInstance3D], to: Vector3) -> void:
 	_show_cord(pieces, true)
 	var anchor := to_global(CORD_ANCHOR)
-	var out := to - anchor
+	# Сначала провод выходит из бока корпуса наружу и, если трубка с другой стороны, огибает
+	# корпус сзади или спереди (раньше шёл к трубке напрямую — прямо сквозь телефон).
+	var points: Array[Vector3] = [anchor]
+	var gap := 0.05
+	var stub := Vector3(-BODY_HALF.x - gap, CORD_ANCHOR.y - 0.01, 0.0)
+	points.append(to_global(stub))
+	var target := to_local(to)
+	if target.x > -BODY_HALF.x:
+		var around := signf(target.z) if absf(target.z) > 0.01 else 1.0
+		points.append(to_global(Vector3(stub.x, stub.y, around * (BODY_HALF.y + gap))))
+	var last := points[points.size() - 1]
+	var out := to - last
 	out.y = 0.0
 	out = out.normalized() if out.length() > 0.01 else global_basis.x
-	var from := anchor + out * CORD_EXIT # за краем тумбочки
+	var from := last + out * CORD_EXIT # за краем тумбочки
 	var span := from.distance_to(to)
 	var sag := clampf(CORD_LENGTH - span, 0.0, CORD_LENGTH) * 0.3
 	var floor_y := (get_parent() as Node3D).global_position.y + 0.03
@@ -278,7 +293,6 @@ func _update_cord(pieces: Array[MeshInstance3D], to: Vector3) -> void:
 	if side.length() < 0.1:
 		side = Vector3.RIGHT
 	var up := side.cross(to - from).normalized()
-	var points: Array[Vector3] = [anchor]
 	for i in CORD_SEGMENTS:
 		var t := float(i) / (CORD_SEGMENTS - 1)
 		var p := from.lerp(to, t) + Vector3.DOWN * sin(t * PI) * sag
@@ -287,10 +301,13 @@ func _update_cord(pieces: Array[MeshInstance3D], to: Vector3) -> void:
 		p += (side * cos(a) + up * sin(a)) * 0.022 * sin(t * PI)
 		p.y = maxf(p.y, floor_y)
 		points.append(p)
-	for i in CORD_SEGMENTS:
+	for i in pieces.size():
+		var piece := pieces[i]
+		if i >= points.size() - 1:
+			piece.visible = false # лишние кусочки (провод не огибал корпус)
+			continue
 		var a := points[i]
 		var b := points[i + 1]
-		var piece := pieces[i]
 		var length := maxf(a.distance_to(b), 0.001)
 		var dir := (b - a) / length
 		var helper := Vector3.UP if absf(dir.y) < 0.95 else Vector3.RIGHT
