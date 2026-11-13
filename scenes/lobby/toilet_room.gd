@@ -23,6 +23,7 @@ const PAINT_HEIGHT := 1.2
 const HEIGHT := 3.0
 const TILES := preload("res://assets/textures/toilet/floor_tiles.png")
 const NEWSPAPER := preload("res://assets/textures/toilet/newspaper.png")
+const SIGN := preload("res://assets/textures/toilet/sign.png")
 
 var toilet: Toilet
 var sink: Sink
@@ -75,18 +76,25 @@ func _build_door_wall() -> void:
 	_collider(Vector3(0.12, HEIGHT - 2.4, door_len), Vector3(X0, 2.4 + (HEIGHT - 2.4) / 2.0, door_mid))
 	_fp_only(Vector3(0.12, HEIGHT - 2.4, door_len),
 		Vector3(X0, 2.4 + (HEIGHT - 2.4) / 2.0, door_mid), wallpaper)
-	# Табличка над дверью со стороны гостиной.
-	var plate := _box(Vector3(0.02, 0.16, 0.36), Vector3(X0 - 0.07, DOOR_TOP + 0.15, door_mid),
-		_mat(Color("f2efe6")))
+	# Табличка над дверью со стороны гостиной: синяя жестянка с человечками и «ТУАЛЕТ»
+	# (tools/textures/toilet_sign.py).
+	var plate := MeshInstance3D.new()
+	var plate_mesh := QuadMesh.new()
+	plate_mesh.size = Vector2(0.2, 0.267)
+	plate.mesh = plate_mesh
+	var plate_mat := StandardMaterial3D.new()
+	plate_mat.albedo_texture = SIGN
+	plate_mat.roughness = 0.5
+	plate.material_override = plate_mat
 	plate.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	var sign_text := Label3D.new()
-	sign_text.text = "ТУАЛЕТ"
-	sign_text.font_size = 40
-	sign_text.outline_size = 0
-	sign_text.modulate = Color("2a5a8a")
-	sign_text.position = Vector3(X0 - 0.085, DOOR_TOP + 0.15, door_mid)
-	sign_text.rotation.y = -PI / 2.0
-	add_child(sign_text)
+	plate.position = Vector3(X0 - 0.062, DOOR_TOP + 0.15, door_mid)
+	plate.rotation.y = -PI / 2.0 # лицом в гостиную
+	add_child(plate)
+	# Изнутри над дверью — тоже побелка (было видно обои гостиной).
+	_box(Vector3(0.02, 2.4 - DOOR_TOP, door_len), Vector3(X0 + 0.07, (2.4 + DOOR_TOP) / 2.0, door_mid),
+		_whitewash)
+	_fp_only(Vector3(0.02, HEIGHT - 2.4, door_len),
+		Vector3(X0 + 0.07, 2.4 + (HEIGHT - 2.4) / 2.0, door_mid), _whitewash)
 
 
 ## Задняя, правая и передняя стены.

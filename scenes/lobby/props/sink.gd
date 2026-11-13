@@ -11,8 +11,11 @@ const COOLDOWN := 15.0
 const NOZZLE := Vector3(0, 0.985, 0.175)
 const WATER_LOW := 0.769
 const WATER_HIGH := 0.85
-## Вода в воронке шире, чем выше уровень (дно — 0.07 м, у края — 0.2 м).
-const WATER_WIDE := 2.4
+## Воронка чаши: дно (высота, радиус) и верх — вода расширяется по ней (tools/blender/sink.py).
+const BOWL_BOTTOM := 0.76
+const BOWL_R_BOTTOM := 0.07
+const WATER_RIM_Y := 0.88
+const BOWL_R_TOP := 0.2
 ## Где встаёт моющий руки (перед раковиной).
 const STAND := Vector3(0, 0, 0.75)
 ## Губка лежит на краю раковины; взяли и не вернули — новая появится через SPONGE_BACK сек.
@@ -69,6 +72,12 @@ func _ready() -> void:
 
 
 func _process(_delta: float) -> void:
+	if _water.visible:
+		# Ширина воды — по стенкам воронки на этой высоте (+чуть-чуть, чтобы не было белой
+		# каймы: иначе на дне вода выглядела «шайбой»).
+		var k := clampf((_water.position.y - BOWL_BOTTOM) / (WATER_RIM_Y - BOWL_BOTTOM), 0.0, 1.0)
+		var wide := (BOWL_R_BOTTOM + (BOWL_R_TOP - BOWL_R_BOTTOM) * k) / BOWL_R_BOTTOM + 0.12
+		_water.scale = Vector3(wide, 1.0, wide)
 	if _stream.visible:
 		# Струя — от носика до воды (вода поднимается — струя короче).
 		var bottom := _water.position.y if _water.visible else WATER_LOW
@@ -139,7 +148,6 @@ func use(p: PlayerData, character: PlayerCharacter) -> void:
 	tween.tween_callback(func() -> void: _stream.visible = true)
 	# Чаша наполняется; с персонажа смывается краска.
 	tween.tween_property(_water, "position:y", WATER_HIGH, 2.6)
-	tween.parallel().tween_property(_water, "scale", Vector3(WATER_WIDE, 1, WATER_WIDE), 2.6)
 	tween.parallel().tween_callback(func() -> void:
 		if is_instance_valid(character):
 			SprayCan.clear_paint(character)).set_delay(1.2)
@@ -148,7 +156,6 @@ func use(p: PlayerData, character: PlayerCharacter) -> void:
 	tween.tween_property(_tap_hot, "rotation:y", 0.0, 0.7)
 	tween.parallel().tween_property(_tap_cold, "rotation:y", 0.0, 0.7)
 	tween.parallel().tween_property(_water, "position:y", WATER_LOW, 1.4)
-	tween.parallel().tween_property(_water, "scale", Vector3.ONE, 1.4)
 	tween.tween_callback(func() -> void:
 		_water.visible = false
 		busy = false
