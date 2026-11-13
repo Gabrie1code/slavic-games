@@ -104,10 +104,12 @@ func update(delta: float, busy_ids: Array[int]) -> void:
 		if control:
 			if not view.get("control", true):
 				character.rotation.y = yaw # снова управляет: тело — туда, куда смотрела камера
-			# Тело поворачивается за взглядом (на стрелках тело поворачивается само).
-			yaw = character.rotation.y - look.x
-			character.rotation.y = yaw
+			# Тело поворачивается за взглядом (на стрелках тело поворачивается само);
+			# с зажатым Alt мышь крутит только голову (FreeLook), камера — тело + голова.
+			character.rotation.y -= FreeLook.step(character, p, look.x, delta)
+			yaw = character.rotation.y
 		else:
+			character.head_yaw = 0.0
 			yaw -= look.x # стоит во льду / на качелях: крутится только камера
 		view["control"] = control
 		var pitch := clampf(float(view["pitch"]) - look.y, -PITCH_LIMIT, PITCH_LIMIT)
@@ -116,7 +118,7 @@ func update(delta: float, busy_ids: Array[int]) -> void:
 		view["yaw"] = yaw
 		view["pitch"] = pitch
 		view["blend"] = blend
-		_place_camera(view, character, yaw, pitch, blend)
+		_place_camera(view, character, yaw + (character.head_yaw if control else 0.0), pitch, blend)
 	var mode := Input.MOUSE_MODE_CAPTURED if wants_mouse else Input.MOUSE_MODE_VISIBLE
 	if Input.mouse_mode != mode:
 		Input.mouse_mode = mode

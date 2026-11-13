@@ -91,6 +91,8 @@ var fp_strafe := false
 var run_up := 0.0
 ## Наклон взгляда вверх/вниз (для камеры от первого лица).
 var fp_pitch := 0.0
+## Поворот головы влево/вправо относительно тела (свободный взгляд на Alt, FreeLook).
+var head_yaw := 0.0
 ## Голова запрокинута (>0, пьёт из бутылки) и корпус наклонён вперёд (>0, тошнит) — доп. к позе.
 var head_tilt := 0.0
 var lean := 0.0
@@ -276,6 +278,8 @@ func _process(delta: float) -> void:
 	_head_pitch = lerpf(_head_pitch, clampf(fp_pitch, -0.9, 0.9) * 0.7, minf(1.0, delta * 12.0))
 	_part("Head").rotation.x = sin(_idle_time * 2.0) * 0.04 + CROUCH_LEAN * crouch_amount * 0.8 \
 		+ _head_pitch + head_tilt
+	# Свободный взгляд: голова поворачивается за камерой (не до конца — шея не ломается).
+	_part("Head").rotation.y = clampf(head_yaw, -1.3, 1.3)
 	_animate_jump(delta)
 
 
