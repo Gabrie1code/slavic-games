@@ -3,8 +3,7 @@ extends CenterContainer
 ## Меню игроков в лобби: появляется, пока зажат Tab (или Back/Select на геймпаде).
 ## Вместо постоянной полоски слотов внизу экрана. В каждой строке: цвет, имя, чем управляет,
 ## кошелёк и «готов» у телевизора; пустые места — подсказка, как войти.
-## Сам узел растянут на весь экран и ставит панель ровно по центру (CenterContainer):
-## у панели с якорем «по центру» размер считался позже, и она уезжала в левый верхний угол.
+## Сам узел растянут на весь экран и ставит панель ровно по центру (CenterContainer).
 
 const ROW_HEIGHT := 58
 const FADE_SPEED := 10.0
@@ -18,7 +17,9 @@ var _refresh_left := 0.0
 
 
 func _ready() -> void:
-	set_anchors_preset(Control.PRESET_FULL_RECT)
+	# Именно «якоря И отступы»: set_anchors_preset внутри дерева сохраняет старый размер (0×0),
+	# и меню оставалось в левом верхнем углу.
+	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var panel := PanelContainer.new()
 	panel.custom_minimum_size = Vector2(620, 0)
