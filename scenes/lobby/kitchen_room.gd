@@ -28,10 +28,12 @@ const TILE_H := 1.5
 const BOTTLE_BACK := 20.0
 const BOTTLE_POS := Vector3(X1 - 0.41, 0.75, 5.12)
 ## Окно над мойкой в дальней стене: центр по X, низ и верх, ширина.
-const WINDOW_X := -3.1
+## Края проёма (x −3.6 и −2.55) — ровно по швам кафеля (плитка 15 см): иначе у откоса шов
+## стены и шов откоса шли рядом и клетка «двоилась».
+const WINDOW_X := -3.075
 const WINDOW_Y0 := 1.15
 const WINDOW_Y1 := 2.25
-const WINDOW_W := 1.0
+const WINDOW_W := 1.05
 const LINOLEUM := preload("res://assets/textures/kitchen/linoleum.png")
 const TILES := preload("res://assets/textures/kitchen/tiles.png")
 const WEEKDAYS: Array[String] = ["ВОСКРЕСЕНЬЕ", "ПОНЕДЕЛЬНИК", "ВТОРНИК", "СРЕДА", "ЧЕТВЕРГ",
@@ -176,6 +178,7 @@ func _far_piece(span: Vector2, y0: float, y1: float) -> void:
 func _build_window() -> void:
 	var frame := _model("kitchen_window")
 	frame.position = Vector3(WINDOW_X, WINDOW_Y0, Z1 + 0.1)
+	frame.scale.x = WINDOW_W # модель рамы — под проём 1.0 м
 	frame.rotation.y = PI # подоконник — в кухню
 	_make_fp_only(frame)
 	add_child(frame)
@@ -186,8 +189,10 @@ func _build_window() -> void:
 		_mat(Color("f2f0ea"), 0.5))
 	window_glass = WindowGlass.new()
 	window_glass.panes = [
-		Vector4(-0.25, WINDOW_Y0 + 0.4175, 0.44, 0.715), Vector4(0.25, WINDOW_Y0 + 0.4175, 0.44, 0.715),
-		Vector4(-0.25, WINDOW_Y0 + 0.9325, 0.44, 0.215), Vector4(0.25, WINDOW_Y0 + 0.9325, 0.44, 0.215),
+		Vector4(-0.2625, WINDOW_Y0 + 0.4175, 0.462, 0.715),
+		Vector4(0.2625, WINDOW_Y0 + 0.4175, 0.462, 0.715),
+		Vector4(-0.2625, WINDOW_Y0 + 0.9325, 0.462, 0.215),
+		Vector4(0.2625, WINDOW_Y0 + 0.9325, 0.462, 0.215),
 	]
 	window_glass.position = Vector3(WINDOW_X, 0, Z1 + 0.1)
 	window_glass.rotation.y = PI # осколки летят в кухню
@@ -264,7 +269,7 @@ func _build_furniture() -> void:
 	# Пачка соды на столешнице справа от мойки.
 	var soda := _breakable(DIR + "kitchen_soda.glb", sink.to_global(Vector3(0.3, 0.86, -0.16)),
 		[Color("c81e16"), Color("ffe628"), Color("fafaf5")], 0.3, 0.035)
-	soda.rotation.y = PI * 1.5 + 0.15 - PI / 4 # этикеткой к стоящему у мойки, чуть левее
+	soda.rotation.y = PI - 0.25 # этикеткой к тому, кто стоит перед мойкой
 
 
 ## Мебель на полу: модель, коробка столкновений по размеру (size — ширина, высота, глубина в

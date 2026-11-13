@@ -305,22 +305,31 @@ export("shelf_rocket", P)
 # ---------------- Школьный глобус ----------------
 # Шар (синие океаны, зелёные «материки» — пятна), наклонная латунная дуга-меридиан, ножка,
 # тёмная подставка.
-OCEAN = mat("GlobeOcean", (0.1, 0.3, 0.65), 0.35)
-LAND = mat("GlobeLand", (0.35, 0.55, 0.2), 0.5)
+GLOBE_MAP = mat("GlobeMap", (1, 1, 1), 0.35, image="assets/textures/shelf/globe_map.png")
 GLOBE_GOLD = mat("GlobeArc", (0.8, 0.6, 0.2), 0.3, 0.8)
-P = [lathe([(0.0, 0.0), (0.04, 0.0), (0.04, 0.012), (0.026, 0.02), (0.0, 0.02)], DARK)]
-P.append(cyl(0.006, 0.04, (0, 0, 0.04), GLOBE_GOLD, verts=10))
-GC = (0, 0, 0.115)
-P.append(ball(0.052, GC, OCEAN, segs=28, rings=16))
-rnd = __import__("random").Random(3)
-for k in range(9):                                                                     # материки
-    a = rnd.uniform(0, 2 * math.pi)
-    e = rnd.uniform(-0.9, 0.9)
-    d = Vector((math.cos(a) * math.cos(e), math.sin(a) * math.cos(e), math.sin(e)))
-    P.append(ball(rnd.uniform(0.012, 0.02), tuple(Vector(GC) + d * 0.047), LAND,
-                  scale=(1.0, 1.0, 0.55)))
-arc = ring(0.06, 0.0025, GC, GLOBE_GOLD, rot=(math.radians(90), math.radians(23), 0))
-P.append(arc)
+TILT = math.radians(23.5)                                                              # наклон оси
+P = [lathe([(0.0, 0.0), (0.042, 0.0), (0.042, 0.01), (0.03, 0.018), (0.012, 0.022), (0.0, 0.022)],
+           DARK)]
+P.append(cyl(0.005, 0.03, (0, 0, 0.034), GLOBE_GOLD, verts=12))
+GC = Vector((0, 0, 0.11))
+# Шар с картой Земли (UV-сфера: развёртка — равнопромежуточная, как у globe_map.png).
+bpy.ops.mesh.primitive_uv_sphere_add(segments=48, ring_count=24, radius=0.052, location=GC)
+globe = bpy.context.object
+globe.rotation_euler = (0, TILT, math.radians(-30))
+bpy.ops.object.transform_apply(rotation=True, location=False)
+P.append(finish(globe, GLOBE_MAP))
+# Полукруглый меридиан-держатель по оси наклона, от ножки до верхнего полюса, и шпиль сверху.
+arc_pts = []
+for k in range(25):
+    a = math.radians(-100 + 200 * k / 24)
+    p_local = Vector((math.cos(a) * 0.06, 0, math.sin(a) * 0.06))
+    p_local.rotate(__import__("mathutils").Euler((0, TILT, 0)))
+    arc_pts.append(tuple(GC + p_local))
+P.append(tube(arc_pts, 0.0028, GLOBE_GOLD))
+for sign in (-1, 1):                                                                   # шпильки оси
+    tip = Vector((0, 0, sign * 0.06))
+    tip.rotate(__import__("mathutils").Euler((0, TILT, 0)))
+    P.append(ball(0.004, tuple(GC + tip), GLOBE_GOLD))
 export("shelf_globe", P)
 
 # ---------------- Фото в рамке ----------------
