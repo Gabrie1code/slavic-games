@@ -226,7 +226,7 @@ func _build_trash_bin() -> void:
 	shape.shape = cylinder
 	shape.position.y = 0.155
 	bin.add_child(shape)
-	bin.position = Vector3(X0 + WALL_T / 2.0 + 0.17, 0, Z0 + 0.17)
+	bin.position = Vector3(X0 + WALL_T / 2.0 + 0.3, 0, Z0 + 0.17)
 	add_child(bin)
 
 

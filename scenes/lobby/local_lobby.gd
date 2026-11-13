@@ -389,7 +389,7 @@ func _punch(p: PlayerData, hammer: bool = false) -> void:
 	var target := _gadgets.punch_target(character, _views.get(p.id, {}).get("camera"))
 	if target is Breakable:
 		(target as Breakable).shatter(origin)
-	elif target is Tippable:
+	elif target is Tippable and (hammer or not (target as Tippable).hammer_only):
 		var body := target as Tippable
 		# Молоток бьёт сильнее и выше (торшер, стул валятся, как от столкновения с разбега).
 		var force := PUNCH_PUSH * body.mass * (1.0 if hammer else 0.4)

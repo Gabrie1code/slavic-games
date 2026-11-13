@@ -13,6 +13,8 @@ var run_up_needed := 0.4
 var support: Tippable
 ## Высота вещи (для прицела удара: попасть можно по всей высоте, а не только у основания).
 var height := 0.5
+## Кулаком не сдвинуть — только молотком (торшер у дивана).
+var hammer_only := false
 
 var _home: Transform3D
 var _model: Node3D
