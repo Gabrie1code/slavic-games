@@ -572,9 +572,9 @@ func _build_decor() -> void:
 	_wall_shelf(Vector3(PARTITION_X + 0.08, 1.6, -3.0), PI / 2, [plant,
 		["shelf_vase", 0.0, 0.1, [Color("f0f0ec"), Color("1a3c99")]],
 		["shelf_rocket", 0.24, 0.1, [Color("c8ccd4"), Color("c41810")]]])
-	# Передняя стена гостиной слева от прохода на кухню: книги, будильник, кактус.
+	# Передняя стена гостиной слева от прохода на кухню: книги, школьный глобус, кактус.
 	var front_shelf := [books,
-		["shelf_clock", 0.02, 0.1, [Color("c41810"), Color("f2efe2"), Color("b5b5b8")]], cactus]
+		["shelf_globe", 0.02, 0.1, [Color("1a4da6"), Color("598c33"), Color("c8902e")]], cactus]
 	_wall_shelf(Vector3(-3.25, 1.55, LIVING_FRONT_Z), PI, front_shelf, FP_ONLY_LAYER)
 	# Плакаты.
 	var size := Vector2(0.5, 0.7)

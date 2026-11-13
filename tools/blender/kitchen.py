@@ -551,8 +551,8 @@ P.append(cyl(0.0172, 0.055, (0, 0, 0.295), FOIL, verts=20, smooth=True))        
 export("kitchen_bottle", P)
 
 
-def tumbler(name, fill):
-    """Гранёный стакан: 16 граней, гладкий ободок сверху, толстое дно; fill — налито (или None)."""
+def tumbler(name, fill, depth=0.05):
+    """Гранёный стакан: 16 граней, гладкий ободок сверху, толстое дно; fill — налито (depth м)."""
     parts = [lathe(name + "Body", [(0.001, 0.0), (0.029, 0.0), (0.031, 0.004), (0.031, 0.012),
                                    (0.001, 0.012)], TUMBLER, segs=16)]
     bpy.ops.mesh.primitive_cone_add(vertices=16, radius1=0.03, radius2=0.036, depth=0.09,
@@ -565,11 +565,15 @@ def tumbler(name, fill):
     parts.append(wall)                                                              # грани
     parts.append(cyl(0.0365, 0.012, (0, 0, 0.108), TUMBLER, verts=32, smooth=True))  # ободок
     if fill:
-        parts.append(cyl(0.031, 0.05, (0, 0, 0.012 + 0.025), fill, verts=16, r2=0.033, smooth=True))
+        # Жидкость заметно уже стенки (раньше её край выходил на стекло — казалось, что снаружи),
+        # и стоит на дне стакана (дно — до 0.012).
+        r_top = 0.0255 + 0.006 * depth / 0.09
+        parts.append(cyl(0.0255, depth, (0, 0, 0.0125 + depth / 2), fill, verts=16, r2=r_top,
+                         smooth=True))
     export(name, parts)
 
 
-tumbler("kitchen_tumbler", None)
+tumbler("kitchen_tumbler", WINE, 0.006)                                           # на донышке
 tumbler("kitchen_tumbler_wine", WINE)
 
 # ---------------- Дырчатая мусорная корзина (для туалета) ----------------

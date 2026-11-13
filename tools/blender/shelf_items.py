@@ -8,6 +8,7 @@
   shelf_clock      — красный будильник с двумя звонками; стрелки ClockHour / ClockMinute —
                      отдельные объекты, в игре показывают время компьютера (ShelfClock);
   shelf_rocket     — сувенир «ракета» на подставке;
+  shelf_globe      — школьный глобус на подставке;
   shelf_frame      — фотография в деревянной рамке на подставке (сепия);
   shelf_vase       — ваза «гжель»: белая с синими поясками и горошинами.
 Растения и книги — в tools/blender/decor.py.
@@ -301,6 +302,27 @@ for z in (0.135, 0.105):                                                        
     P.append(ball(0.004, (0, -0.016, z), mat("RocketWindow", (0.2, 0.45, 0.8), 0.1), scale=(1, 0.4, 1)))
 export("shelf_rocket", P)
 
+# ---------------- Школьный глобус ----------------
+# Шар (синие океаны, зелёные «материки» — пятна), наклонная латунная дуга-меридиан, ножка,
+# тёмная подставка.
+OCEAN = mat("GlobeOcean", (0.1, 0.3, 0.65), 0.35)
+LAND = mat("GlobeLand", (0.35, 0.55, 0.2), 0.5)
+GLOBE_GOLD = mat("GlobeArc", (0.8, 0.6, 0.2), 0.3, 0.8)
+P = [lathe([(0.0, 0.0), (0.04, 0.0), (0.04, 0.012), (0.026, 0.02), (0.0, 0.02)], DARK)]
+P.append(cyl(0.006, 0.04, (0, 0, 0.04), GLOBE_GOLD, verts=10))
+GC = (0, 0, 0.115)
+P.append(ball(0.052, GC, OCEAN, segs=28, rings=16))
+rnd = __import__("random").Random(3)
+for k in range(9):                                                                     # материки
+    a = rnd.uniform(0, 2 * math.pi)
+    e = rnd.uniform(-0.9, 0.9)
+    d = Vector((math.cos(a) * math.cos(e), math.sin(a) * math.cos(e), math.sin(e)))
+    P.append(ball(rnd.uniform(0.012, 0.02), tuple(Vector(GC) + d * 0.047), LAND,
+                  scale=(1.0, 1.0, 0.55)))
+arc = ring(0.06, 0.0025, GC, GLOBE_GOLD, rot=(math.radians(90), math.radians(23), 0))
+P.append(arc)
+export("shelf_globe", P)
+
 # ---------------- Фото в рамке ----------------
 PHOTO = mat("OldPhoto", (1, 1, 1), 0.7, image="assets/textures/posters/shelf_photo.png")
 TILT = math.radians(-12)                                    # верх отклонён назад, к стене
@@ -335,7 +357,7 @@ export("shelf_vase", P)
 print("DONE")
 
 if RENDER:
-    names = ["shelf_matryoshka", "shelf_elephant", "shelf_jar", "shelf_clock", "shelf_rocket",
+    names = ["shelf_matryoshka", "shelf_elephant", "shelf_jar", "shelf_clock", "shelf_globe",
              "shelf_frame", "shelf_vase"]
     for i, n in enumerate(names):
         bpy.data.objects[n].location = (-0.66 + i * 0.22, 0, 0)
