@@ -140,7 +140,6 @@ def build_base():
     P = primary()
     WHITE = mat("EyeWhite", (0.95, 0.95, 0.95), 0.4)
     BLACK = mat("EyeBlack", (0.03, 0.03, 0.03), 0.3)
-    MOUTH = mat("Mouth", (0.25, 0.05, 0.05), 0.6)
     parts = []
     # Туловище: чуть шире к плечам.
     torso = [cyl(0.23, 0.55, (0, 0, 0.78), P, verts=10, r2=0.27, scale=(1, 0.72, 1))]
@@ -152,7 +151,7 @@ def build_base():
     for x in (-0.11, 0.11):
         head.append(sphere(0.075, (x, 0.255, 1.37), WHITE, scale=(1, 0.5, 1.15), segs=10, rings=6))
         head.append(sphere(0.042, (x, 0.29, 1.36), BLACK, scale=(1, 0.5, 1.2), segs=8, rings=5))
-    head.append(box((0.1, 0.03, 0.025), (0, 0.28, 1.22), MOUTH))
+    # Рта в базовой голове нет: он — отдельная вещь слота «Рот» (mouth_*, по умолчанию mouth_line).
     parts.append(part("Head", head))
     # Руки: плечо → кисть вниз по -Z.
     for side, x in (("ArmL", -0.31), ("ArmR", 0.31)):
@@ -1008,6 +1007,46 @@ def item_face_bruise():
                           sphere(0.06, (-0.15, 0.255, 1.29), BRUISE2, scale=(1, 0.3, 0.7), segs=8, rings=5)])]
 
 
+# ---------- Рот (слот «Рот»: всегда что-то надето, по умолчанию mouth_line) ----------
+
+MOUTH_Z = 1.22
+
+
+def face_y(x, z):
+    """Где поверхность головы (по Y) в точке лица (x, z): голова — сфера r=0.3, сжатая до 0.95."""
+    k = 1 - (x / 0.3) ** 2 - ((z - 1.33) / 0.285) ** 2
+    return 0.285 * math.sqrt(max(k, 0.0))
+
+
+def item_mouth_line():
+    """Обычный рот — чёрточка (как была у базовой головы)."""
+    return [part("Head", [box((0.1, 0.03, 0.025), (0, 0.28, MOUTH_Z), mat("Mouth", (0.25, 0.05, 0.05), 0.6))])]
+
+
+def item_mouth_o():
+    """Удивлённый рот «О»."""
+    lips = mat("Mouth", (0.25, 0.05, 0.05), 0.6)
+    inside = mat("MouthInside", (0.12, 0.02, 0.03), 0.7)
+    y = face_y(0, MOUTH_Z - 0.01)
+    return [part("Head", [sphere(0.04, (0, y, MOUTH_Z - 0.01), lips, scale=(0.85, 0.45, 1.1)),
+                          sphere(0.028, (0, y + 0.006, MOUTH_Z - 0.01), inside, scale=(0.85, 0.45, 1.1))])]
+
+
+def item_mouth_sad():
+    """Грустный рот — дуга уголками вниз (кусочки по поверхности головы)."""
+    lips = mat("Mouth", (0.25, 0.05, 0.05), 0.6)
+    width, depth, n, z0 = 0.12, -0.022, 7, MOUTH_Z - 0.01
+    pieces = []
+    for i in range(n):
+        t = i / (n - 1) * 2 - 1
+        x = t * width / 2
+        z = z0 + depth * t * t
+        slope = 2 * depth * t / (width / 2)
+        pieces.append(box((width / (n - 1) * 1.35, 0.025, 0.022), (x, face_y(x, z), z), lips,
+                          rot=(0, -math.atan(slope), -math.atan2(x, 0.3) * 0.9)))
+    return [part("Head", pieces)]
+
+
 def item_face_beard():
     """Борода-лопата."""
     HAIR = mat("BeardBrown", (0.18, 0.1, 0.05), 0.9)
@@ -1415,6 +1454,10 @@ ITEMS = {
     "face_beard": item_face_beard,
     "face_welder_mask": item_face_welder_mask,
     "face_gas_mask": item_face_gas_mask,
+    # Рот
+    "mouth_line": item_mouth_line,
+    "mouth_o": item_mouth_o,
+    "mouth_sad": item_mouth_sad,
     # Шея и спина
     "neck_gold_chain": item_neck_gold_chain,
     "back_bag": item_back_bag,

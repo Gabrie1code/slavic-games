@@ -32,7 +32,7 @@ Party-игра на Godot 4.7 (GDScript), стилизованный low-poly, �
   Torso/Head/ArmL/ArmR/LegL/LegR, точка поворота в суставе; анимация в `_process` кодом.
 - Одежда: `Cosmetics.ITEMS` (scripts/core/cosmetics.gd), модели `assets/models/character/cosmetics/<id>.glb`.
   Куски с именами частей тела кладутся внутрь частей. Материал `Primary` = цвет игрока.
-- Слоты: HAT, FACE, JACKET, PANTS, SHOES, NECK. Цена вещи `price` (0 = бесплатно), каталог и цены — docs/COSMETICS.md.
+- Слоты: HAT, FACE, JACKET, PANTS, SHOES, NECK, MOUTH (рот всегда надет — `Cosmetics.DEFAULTS`). Цена вещи `price` (0 = бесплатно), каталог и цены — docs/COSMETICS.md.
 - Профиль по `device_key()` в `user://profile.cfg`: наряд, кошелёк (рубли из партий), купленные вещи.
   API: `PlayerManager.wallet / add_to_wallet / owns / buy / save_outfit / load_outfit`.
 - Цвет: палитра `PlayerManager.COLORS`, у игрока `color_index`; один цвет — один игрок

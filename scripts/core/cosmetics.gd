@@ -12,7 +12,8 @@ extends RefCounted
 ##   (позже) "achievement": id — открывается за достижение.
 ## Чтобы добавить вещь: сделать её в Blender-скрипте и дописать сюда одну строку.
 
-enum Slot { HAT, FACE, JACKET, PANTS, SHOES, NECK }
+## MOUTH — в конце, чтобы номера старых слотов в сохранённых профилях не сдвинулись.
+enum Slot { HAT, FACE, JACKET, PANTS, SHOES, NECK, MOUTH }
 
 const SLOT_NAMES := {
 	Slot.HAT: "Шапка",
@@ -21,6 +22,12 @@ const SLOT_NAMES := {
 	Slot.PANTS: "Штаны",
 	Slot.SHOES: "Обувь",
 	Slot.NECK: "Шея / спина",
+	Slot.MOUTH: "Рот",
+}
+
+## Слоты, где всегда что-то надето (без «Ничего»): если в наряде пусто — эта вещь.
+const DEFAULTS := {
+	Slot.MOUTH: "mouth_line",
 }
 
 const DIR := "res://assets/models/character/cosmetics/"
@@ -45,6 +52,10 @@ const ITEMS := {
 	"face_beard": {"slot": Slot.FACE, "name": "Борода-лопата", "price": 150},
 	"face_welder_mask": {"slot": Slot.FACE, "name": "Маска сварщика", "price": 250},
 	"face_gas_mask": {"slot": Slot.FACE, "name": "Противогаз", "price": 200},
+	# Рот (рта у базовой головы нет — он всегда из этого слота, по умолчанию «Обычный»)
+	"mouth_line": {"slot": Slot.MOUTH, "name": "Обычный", "price": 0},
+	"mouth_o": {"slot": Slot.MOUTH, "name": "Удивлённый «О»", "price": 0},
+	"mouth_sad": {"slot": Slot.MOUTH, "name": "Грустный", "price": 0},
 	# Верх
 	"jacket_abibas": {"slot": Slot.JACKET, "name": "Олимпийка «Абибас»", "price": 0},
 	"jacket_alkogolichka": {"slot": Slot.JACKET, "name": "Майка-алкоголичка", "price": 0},
@@ -104,6 +115,17 @@ static func items_for_slot(slot: Slot) -> Array[String]:
 		if ITEMS[id]["slot"] == slot:
 			result.append(id)
 	return result
+
+
+## Вещь по умолчанию для слота («» — у слота можно ничего не надевать).
+static func default_item(slot: int) -> String:
+	return DEFAULTS.get(slot, "")
+
+
+## Что на самом деле надето в слоте (с учётом вещи по умолчанию).
+static func worn(outfit: Dictionary, slot: int) -> String:
+	var id: String = outfit.get(slot, "")
+	return id if id != "" else default_item(slot)
 
 
 static func item_name(id: String) -> String:

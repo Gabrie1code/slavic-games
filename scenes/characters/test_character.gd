@@ -441,6 +441,8 @@ func apply_outfit(outfit: Dictionary) -> void:
 ## Надеть вещь в слот (пустой id — снять). Платье снимает штаны и наоборот (Cosmetics.covers).
 func wear(slot: int, item_id: String) -> void:
 	_take_off(slot)
+	if item_id == "":
+		item_id = Cosmetics.default_item(slot) # рот снять нельзя — надевается обычный
 	if item_id == "" or not Cosmetics.ITEMS.has(item_id):
 		return
 	for covered: int in Cosmetics.covers(item_id):

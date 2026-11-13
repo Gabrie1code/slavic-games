@@ -18,8 +18,8 @@ CELL_X, CELL_Y = 1.35, 2.75
 # Категории и вещи — из cosmetics.gd (порядок как в игре).
 src = open(os.path.join(ROOT, "scripts", "core", "cosmetics.gd"), encoding="utf-8").read()
 items = re.findall(r'"(\w+)": \{\s*"slot": Slot\.(\w+), "name": "([^"]+)", "price": (\d+)', src)
-SLOTS = [("HAT", "Шапки"), ("FACE", "Лицо"), ("JACKET", "Верх"), ("PANTS", "Штаны"),
-         ("SHOES", "Обувь"), ("NECK", "Шея и спина")]
+SLOTS = [("HAT", "Шапки"), ("FACE", "Лицо"), ("MOUTH", "Рот"), ("JACKET", "Верх"),
+         ("PANTS", "Штаны"), ("SHOES", "Обувь"), ("NECK", "Шея и спина")]
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
 font = bpy.data.fonts.load(FONT)

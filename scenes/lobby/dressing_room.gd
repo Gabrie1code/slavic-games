@@ -17,16 +17,16 @@ signal color_changed(player: PlayerData)
 
 const CHARACTER_SCENE := preload("res://scenes/characters/test_character.tscn")
 const SLOTS: Array[int] = [
-	Cosmetics.Slot.HAT, Cosmetics.Slot.FACE, Cosmetics.Slot.JACKET,
+	Cosmetics.Slot.HAT, Cosmetics.Slot.FACE, Cosmetics.Slot.MOUTH, Cosmetics.Slot.JACKET,
 	Cosmetics.Slot.PANTS, Cosmetics.Slot.SHOES, Cosmetics.Slot.NECK,
 ]
 ## Для этих слотов камера показывает голову крупным планом.
-const CLOSEUP_SLOTS: Array[int] = [Cosmetics.Slot.HAT, Cosmetics.Slot.FACE]
+const CLOSEUP_SLOTS: Array[int] = [Cosmetics.Slot.HAT, Cosmetics.Slot.FACE, Cosmetics.Slot.MOUTH]
 const CAM_BODY := [Vector3(0, 1.0, 3.3), Vector3(0, 0.85, 0)]
 const CAM_HEAD := [Vector3(0, 1.36, 2.4), Vector3(0, 1.22, 0)]
 ## Строки: слоты одежды, затем «Цвет», затем строка кнопок («Купить и надеть», «Готово»).
-const COLOR_ROW := 6
-const BUTTONS_ROW := 7
+const COLOR_ROW := 7
+const BUTTONS_ROW := 8
 const GOLD := Color("f6c343")
 const GREEN := Color("8fd694")
 const RED := Color("ff7a6b")
@@ -188,7 +188,7 @@ func _slot_at(row: int) -> int:
 
 func _current_id() -> String:
 	var row := _row if _row < SLOTS.size() else _item_row
-	return player.outfit.get(SLOTS[row], "")
+	return Cosmetics.worn(player.outfit, SLOTS[row])
 
 
 func _select_row(row: int) -> void:
@@ -229,7 +229,9 @@ func _cycle_item(step: int) -> void:
 		_refresh()
 		return
 	var slot := _slot_at(_row)
-	var options: Array[String] = [""]
+	var options: Array[String] = []
+	if Cosmetics.default_item(slot) == "":
+		options.append("") # «Ничего» — у всех слотов, кроме рта
 	options.append_array(Cosmetics.items_for_slot(slot as Cosmetics.Slot))
 	var next_id := options[posmod(options.find(_current_id()) + step, options.size())]
 	# Платье занимает и штаны: надели платье — штаны снялись (и наоборот). Запоминаем,
@@ -358,7 +360,7 @@ func _refresh() -> void:
 			_row_icons[i].visible = false
 		else:
 			var slot := _slot_at(i)
-			var id: String = player.outfit.get(slot, "")
+			var id := Cosmetics.worn(player.outfit, slot)
 			var owned := PlayerManager.owns(player, id)
 			_row_names[i].text = Cosmetics.SLOT_NAMES[slot]
 			_row_items[i].text = Cosmetics.item_name(id)
