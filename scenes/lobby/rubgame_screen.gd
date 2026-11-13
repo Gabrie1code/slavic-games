@@ -15,6 +15,9 @@ const VIEWMODEL_LAYERS := 0b1111 << 10
 const GOLD := Color("f6c343")
 ## Скорость перелёта камеры между столом и колесом.
 const CAMERA_SPEED := 3.0
+## Плавное появление/исчезновение окна стола и высота глаз (как у камеры в лобби).
+const FADE_TIME := 0.35
+const EYE_HEIGHT := 1.42
 const GREEN := Color("8fd694")
 const RED := Color("ff7a6b")
 const CREAM := Color("c9b98f")
@@ -49,6 +52,8 @@ var _top_view := false
 ## Где персонаж стоял до стола — туда же он вернётся, когда отойдёт.
 var _return_pos := Vector3.ZERO
 var _return_yaw := 0.0
+## Уходим от стола (идёт плавное закрытие — кнопки не слушаем).
+var _closing := false
 
 var _camera: Camera3D
 var _wallet: MoneyLabel
@@ -80,13 +85,18 @@ func _ready() -> void:
 	_apply_font_sizes()
 	table.round_finished.connect(_on_round_finished)
 	# Персонаж встаёт за стол, лицом к нему (на своё место по слоту — четверо не толкаются).
+	_camera.global_transform = table.camera_transform()
 	if lobby_character:
 		_return_pos = lobby_character.global_position
 		_return_yaw = lobby_character.rotation.y
+		# Плавный вход: камера стола стартует из глаз персонажа и сама долетает до стола,
+		# а окно проявляется поверх вида от первого лица (без резкого скачка).
+		_camera.global_transform = _eye(_return_pos, _return_yaw, lobby_character.fp_pitch)
 		lobby_character.global_position = table.stand_point(player.slot)
 		lobby_character.rotation.y = table.stand_yaw()
 		lobby_character.velocity = Vector3.ZERO
-	_camera.global_transform = table.camera_transform() # дальше камера двигается плавно
+	modulate.a = 0.0
+	create_tween().tween_property(self, "modulate:a", 1.0, FADE_TIME)
 	_wallet.set_amount(PlayerManager.wallet(player), false)
 	_refresh()
 
@@ -96,7 +106,9 @@ func _process(delta: float) -> void:
 	# Пока колесо крутится и показывает итог — плавно летим к колесу (вид сверху),
 	# на время ставок — обратно ко всему столу.
 	var target := table.camera_transform()
-	if table.phase != RubgameTable.Phase.BETTING:
+	if _closing:
+		target = _eye(_return_pos, _return_yaw, 0.0) # уходим: камера летит обратно к глазам
+	elif table.phase != RubgameTable.Phase.BETTING:
 		target = table.wheel_camera_transform()
 	elif _top_view:
 		target = table.felt_camera_transform()
@@ -113,17 +125,33 @@ func _process(delta: float) -> void:
 		if _message_time <= 0.0:
 			_message = ""
 	_update_status()
-	_handle_input()
+	if not _closing:
+		_handle_input()
 
 
 ## Отойти от стола: персонаж возвращается туда, откуда подошёл (а не остаётся за столом).
+## Плавно: камера летит к глазам персонажа, окно тает, и только потом закрывается.
 func close() -> void:
+	if _closing:
+		return
+	_closing = true
 	if lobby_character:
 		lobby_character.global_position = _return_pos
 		lobby_character.rotation.y = _return_yaw
 		lobby_character.velocity = Vector3.ZERO
 	table.clear_selection(player)
+	var tween := create_tween()
+	tween.tween_property(self, "modulate:a", 0.0, FADE_TIME * 1.3).set_delay(0.1)
+	tween.tween_callback(_finish_close)
+
+
+func _finish_close() -> void:
 	super.close()
+
+
+## Где глаза персонажа (как камера от первого лица в лобби).
+func _eye(pos: Vector3, yaw: float, pitch: float) -> Transform3D:
+	return Transform3D(Basis.from_euler(Vector3(pitch, yaw, 0.0)), pos + Vector3.UP * EYE_HEIGHT)
 
 
 func _exit_tree() -> void:

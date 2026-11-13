@@ -229,6 +229,9 @@ func _process(delta: float) -> void:
 				pressed = pressed or p.input.is_just_pressed(move)
 			if since > 0.35 and pressed:
 				_stand(p)
+			if _gadgets.hand_busy(p): # сидя тоже можно красить и оттирать
+				var held_view: Dictionary = _views.get(p.id, {})
+				_gadgets.process_hand(p, held_view.get("camera"), held_view.get("can"))
 			continue
 		if _gadgets.holds_phone(p):
 			_gadgets.process_holder(p) # с трубкой ходят, но не дерутся и не садятся
