@@ -315,11 +315,8 @@ func _process_sponge(p: PlayerData, camera: Camera3D) -> void:
 func _show_view_sponge(p: PlayerData, camera: Camera3D) -> void:
 	if camera == null or _view_sponges.has(p.id):
 		return
-	var model := Sponge.make_model()
-	model.position = Vector3(0.24, -0.26, -0.42)
-	model.rotation = Vector3(0.4, 0.3, 0.0)
-	model.scale = Vector3.ONE * 1.3
-	_set_layers(model, 1 << (p.slot + 10)) # слой «в кадре» этого игрока
+	# Губка в кулаке «в кадре» (слой «в кадре» этого игрока).
+	var model := HandHold.make_view(p.color, Sponge.make_model(), 0.02, 1 << (p.slot + 10), 0.3)
 	camera.add_child(model)
 	_view_sponges[p.id] = model
 
@@ -416,17 +413,15 @@ func _use_remote(p: PlayerData) -> bool:
 func _process_remote(p: PlayerData, camera: Camera3D) -> void:
 	var character: PlayerCharacter = characters[p.id]
 	if camera and not _view_remotes.has(p.id):
-		var model := TvRemote.make_model()
-		model.position = Vector3(0.22, -0.24, -0.4)
-		model.rotation = Vector3(0.5, 0.25, 0.0)
-		model.scale = Vector3.ONE * 1.3
-		_set_layers(model, 1 << (p.slot + 10)) # слой «в кадре» этого игрока
+		var remote_model := TvRemote.make_model()
+		var model := HandHold.make_view(p.color, remote_model, 0.01, 1 << (p.slot + 10), 0.1)
+		remote_model.position.z = -0.03 # кнопки видны впереди кулака
 		camera.add_child(model)
 		_view_remotes[p.id] = model
 	if p.input.is_just_pressed("attack"): # ЛКМ — нажать красную кнопку (просто щёлкает)
 		apartment.tv_remote.press()
 		if _view_remotes.has(p.id):
-			TvRemote.press_button(_view_remotes[p.id])
+			TvRemote.press_button(_view_remotes[p.id]) # ищет кнопку внутри (кулак + пульт)
 	if not p.input.is_just_pressed("drop"):
 		return
 	_hide_view_remote(p)

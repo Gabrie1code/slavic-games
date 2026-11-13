@@ -587,14 +587,12 @@ func _create_view(p: PlayerData) -> void:
 	_set_layers(handset, _viewmodel_layer(p))
 	camera.add_child(handset)
 	# Баллончик «в кадре», пока игрок его держит (вместо кулака).
+	# Баллончик в кулаке (HandHold): сопло сверху; видимость — у кулака с баллончиком.
 	var view_can := (load("res://assets/models/apartment/spray_can.glb") as PackedScene) \
 		.instantiate() as Node3D
-	view_can.position = Vector3(0.24, -0.3, -0.42)
-	view_can.rotation = Vector3(0.15, 0.4, -0.1)
-	view_can.scale = Vector3.ONE * 1.3
-	view_can.visible = false
-	_set_layers(view_can, _viewmodel_layer(p))
-	camera.add_child(view_can)
+	var can_hand := HandHold.make_view(p.color, view_can, 0.09, _viewmodel_layer(p))
+	can_hand.visible = false
+	camera.add_child(can_hand)
 
 	var frame := ReferenceRect.new()
 	frame.border_color = p.color
@@ -711,7 +709,7 @@ func _update_first_person(delta: float) -> void:
 		var on_phone := _gadgets.holds_phone(p)
 		var holds_can := _gadgets.holds_can(p)
 		(_views[id]["fist"] as Node3D).visible = not on_phone and not _gadgets.hand_busy(p)
-		(_views[id]["can"] as Node3D).visible = holds_can
+		(_views[id]["can"] as Node3D).get_parent().visible = holds_can # кулак с баллончиком
 		(_views[id]["handset"] as Node3D).visible = on_phone
 		if on_phone: # провод «в кадре» — к своей трубке у камеры
 			_apartment.phone.set_view_handset(_views[id]["handset"], _viewmodel_layer(p),

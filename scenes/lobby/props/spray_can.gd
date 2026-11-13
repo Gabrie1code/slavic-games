@@ -15,8 +15,6 @@ enum State { STORED, HELD, LOOSE }
 const MODEL := preload("res://assets/models/apartment/spray_can.glb")
 const LOOSE_LIFE := 15.0
 ## В руке: конец руки (как точка Hand у персонажа) и поворот — баллончик стоит почти прямо.
-const HAND_POS := Vector3(0, -0.42, 0.02)
-const HAND_ROT := Vector3(-PI / 2.0, 0.0, 0.0)
 ## 8 цветов краски (7 ярких и белый; переключаются по кругу).
 const COLORS: Array[Color] = [
 	Color("ff2a2a"), Color("ff8c1a"), Color("ffe11a"), Color("2ecc40"),
@@ -112,8 +110,7 @@ func hold(p: PlayerData, character: PlayerCharacter) -> void:
 	character.attach_to_part("ArmR", self)
 	_stream.layers = 1 # струю видно всем (от первого лица — см. spray_at: своя струя из кадра)
 	_owner_layer = 1 << (p.slot + 1) # слой модели игрока (как в лобби)
-	position = HAND_POS
-	rotation = HAND_ROT
+	HandHold.place(self, 0.09) # ровно стоит в кулаке, сжат посередине
 	character.set_arm_pose(0.15, 0.9, 0.2)
 
 

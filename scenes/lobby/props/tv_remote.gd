@@ -8,7 +8,6 @@ enum State { HOME, HELD, LOOSE }
 
 const BACK_TIME := 5.0
 const SIZE := Vector3(0.06, 0.025, 0.2)
-const HAND_POS := Vector3(0, -0.45, 0.04)
 
 var state := State.HOME
 var holder: PlayerData
@@ -137,8 +136,7 @@ func hold(p: PlayerData, character: PlayerCharacter) -> void:
 	_set_loose_physics(false)
 	_move_to(null)
 	character.attach_to_part("ArmR", self)
-	position = HAND_POS
-	rotation = Vector3(PI / 2.0, 0, 0)
+	HandHold.place(self, 0.01) # кнопками вверх, глазком вперёд
 	character.set_arm_pose(0.15, 0.9, 0.2)
 
 

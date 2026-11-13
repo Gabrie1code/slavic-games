@@ -247,6 +247,9 @@ func _build_living_room() -> void:
 	_last_window = _place(_model("window"), window_pos)
 	_build_window_view(window_pos)
 	_place(_model("curtains"), window_pos + Vector3(0, 0, 0.12))
+	# Подоконник и батарея твёрдые: на подоконник можно запрыгнуть (раньше проваливались сквозь).
+	_invisible_wall(Vector3(1.7, 0.05, 0.32), window_pos + Vector3(0, 0.86, 0.14))
+	_invisible_wall(Vector3(1.0, 0.5, 0.1), window_pos + Vector3(0, 0.45, 0.05))
 	# На подоконнике один кактус (три горшка закрывали вид за окном).
 	_breakable("cactus_pot", Vector3(window_pos.x - 0.5, 0.885, window_pos.z + 0.14),
 		[CLAY, PLANT], 0.35)

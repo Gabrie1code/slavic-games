@@ -9,7 +9,6 @@ enum State { STORED, HELD, LOOSE }
 
 const LOOSE_LIFE := 15.0
 const SIZE := Vector3(0.1, 0.045, 0.065)
-const HAND_POS := Vector3(0, -0.45, 0.02)
 ## Радиус, в котором оттирается за раз.
 const SCRUB_RADIUS := 0.25
 
@@ -90,8 +89,7 @@ func hold(p: PlayerData, character: PlayerCharacter) -> void:
 	_move_to(null)
 	character.attach_to_part("ArmR", self)
 	_foam.layers = 1 # пену видно всем, и самому от первого лица
-	position = HAND_POS
-	rotation = Vector3(PI / 2.0, 0, 0)
+	HandHold.place(self, 0.02)
 	character.set_arm_pose(0.15, 0.9, 0.2)
 
 
