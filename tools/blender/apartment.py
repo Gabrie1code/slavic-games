@@ -200,9 +200,25 @@ def pot():
             cyl(0.118, 0.006, (0, 0, 0.187), SOIL, verts=10)]
 
 
-P = pot() + [cyl(0.06, 0.32, (0, 0, 0.34), GREEN, verts=8, r2=0.05),
-             sphere(0.055, (0, 0, 0.5), GREEN, segs=8, rings=5),
-             cyl(0.035, 0.14, (0.08, 0, 0.36), GREEN, verts=6), cyl(0.03, 0.12, (-0.07, 0, 0.3), GREEN, verts=6)]
+# Кактус-«шар» (эхинокактус): приплюснутый ребристый шар, рядом малыш-детка, сверху розовый
+# цветок. Раньше был высокий столбик с отростками — выглядел двусмысленно.
+P = pot()
+bpy.ops.mesh.primitive_uv_sphere_add(segments=24, ring_count=12, radius=1.0, location=(0, 0, 0))
+barrel = bpy.context.object
+for v in barrel.data.vertices:
+    a = math.atan2(v.co.y, v.co.x)
+    rib = 1.0 + 0.09 * math.cos(a * 12)                                  # 12 рёбер
+    v.co.x *= 0.1 * rib
+    v.co.y *= 0.1 * rib
+    v.co.z = v.co.z * 0.085 + 0.27
+P.append(flat(barrel, GREEN))
+P.append(sphere(0.04, (0.085, 0.05, 0.215), GREEN, segs=12, rings=6))       # детка
+FLOWER = mat("CactusFlower", (0.95, 0.3, 0.55), 0.5)
+for k in range(6):
+    a = 2 * math.pi * k / 6
+    P.append(sphere(0.018, (math.cos(a) * 0.02, math.sin(a) * 0.02, 0.36), FLOWER, scale=(1.2, 1.2, 0.5),
+                    segs=8, rings=5))
+P.append(sphere(0.012, (0, 0, 0.365), mat("CactusFlowerMid", (0.98, 0.85, 0.3), 0.5), segs=8, rings=5))
 made.append(export("cactus_pot", P))
 P = pot()
 for i in range(7):
