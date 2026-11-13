@@ -575,7 +575,8 @@ func _build_decor() -> void:
 		["shelf_rocket", 0.24, 0.1, [Color("c8ccd4"), Color("c41810")]]])
 	# Передняя стена гостиной слева от прохода на кухню: книги, школьный глобус, кактус.
 	var front_shelf := [books,
-		["shelf_globe", 0.02, 0.1, [Color("1a4da6"), Color("598c33"), Color("c8902e")]], cactus]
+		["shelf_globe", 0.02, 0.1, [Color("1a4da6"), Color("598c33"), Color("c8902e")]],
+		["shelf_cactus", 0.3, 0.11, [Color("a64d26"), Color("26592a")], PI]] # кактус зеркально
 	_wall_shelf(Vector3(-3.25, 1.55, LIVING_FRONT_Z), PI, front_shelf, FP_ONLY_LAYER)
 	# Плакаты.
 	var size := Vector2(0.5, 0.7)
@@ -628,7 +629,7 @@ func _wall_shelf(pos: Vector3, yaw: float, items: Array, layer: int = 0) -> void
 	for item: Array in items:
 		var local := Vector3(item[1], 0.03, item[2]).rotated(Vector3.UP, yaw)
 		var thing := _breakable(item[0], pos + local, item[3], 0.12, 0.03)
-		thing.rotation.y = yaw
+		thing.rotation.y = yaw + (float(item[4]) if item.size() > 4 else 0.0) # 5-й — доворот
 		if item[0] == "shelf_clock":
 			thing.add_child(ShelfClockHands.new()) # стрелки — по часам компьютера
 		if layer:
