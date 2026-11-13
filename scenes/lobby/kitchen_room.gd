@@ -175,8 +175,11 @@ func _build_window() -> void:
 	frame.rotation.y = PI # подоконник — в кухню
 	_make_fp_only(frame)
 	add_child(frame)
-	# Подоконник твёрдый: на него можно запрыгнуть.
-	_collider(Vector3(WINDOW_W + 0.2, 0.04, 0.3), Vector3(WINDOW_X, WINDOW_Y0 - 0.02, Z1 - 0.07))
+	# Подоконник (узкий) твёрдый: на него можно запрыгнуть.
+	_collider(Vector3(WINDOW_W + 0.2, 0.04, 0.15), Vector3(WINDOW_X, WINDOW_Y0, Z1 + 0.005))
+	# Низ проёма между подоконником и рамой — белый (раньше там была непокрашенная полоса).
+	_fp_only(Vector3(WINDOW_W, 0.01, 0.2), Vector3(WINDOW_X, WINDOW_Y0 + 0.015, Z1 + 0.1),
+		_mat(Color("f2f0ea"), 0.5))
 	window_glass = WindowGlass.new()
 	window_glass.panes = [
 		Vector4(-0.25, WINDOW_Y0 + 0.4175, 0.44, 0.715), Vector4(0.25, WINDOW_Y0 + 0.4175, 0.44, 0.715),
@@ -231,11 +234,20 @@ func _build_furniture() -> void:
 		[Color(0.85, 0.92, 0.95, 0.6)], 0.3, 0.03)
 	_breakable(DIR + "kitchen_tumbler_wine.glb", Vector3(table_pos.x - 0.08, 0.75, 5.55),
 		[Color(0.85, 0.92, 0.95, 0.6), Color("4a0812")], 0.3, 0.03)
-	# Радиоточка на правой стене над столом.
-	var radio := _model("kitchen_radio")
-	radio.position = Vector3(X1 - 0.012, 1.45, 4.85)
+	# Радиоточка стоит на маленькой полочке на правой стене над столом; бьётся, через 7 сек
+	# появляется снова.
+	var shelf_mat := _mat(Color("8a5a32"), 0.6)
+	_box(Vector3(0.14, 0.02, 0.32), Vector3(X1 - 0.07, 1.4, 4.85), shelf_mat)
+	for z: float in [4.74, 4.96]:
+		_box(Vector3(0.02, 0.08, 0.02), Vector3(X1 - 0.01, 1.35, z), shelf_mat) # кронштейны
+	var radio := _breakable(DIR + "kitchen_radio.glb", Vector3(X1 - 0.07, 1.418, 4.85),
+		[Color("e6d9b8"), Color("5a3320")], 0.35, 0.04)
 	radio.rotation.y = -PI / 2 # лицом в кухню (−X)
-	add_child(radio)
+	radio.respawn_time = 7.0
+	# Пачка соды на столешнице справа от мойки.
+	var soda := _breakable(DIR + "kitchen_soda.glb", sink.to_global(Vector3(0.3, 0.86, 0.05)),
+		[Color("c81e16"), Color("ffe628"), Color("fafaf5")], 0.3, 0.035)
+	soda.rotation.y = PI + 0.3
 
 
 ## Мебель на полу: модель, коробка столкновений по размеру (size — ширина, высота, глубина в

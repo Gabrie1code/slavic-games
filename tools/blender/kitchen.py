@@ -239,13 +239,14 @@ P.append(box((0.46, 0.02, 0.1), (0, -0.295, 0.08), mat("Plinth", (0.3, 0.3, 0.32
 export("kitchen_stove", P)
 # Дверца духовки: петля — нижний передний край (z = OZ0 − 0.005, y = −0.3), откидывается вниз.
 # Дверца перекрывает проём с запасом (0.48 × 0.51) — раньше по краям были щели внутрь.
-P = [box((0.48, 0.02, OZ1 - OZ0 + 0.01), (0, -0.3, (OZ0 + OZ1) / 2), ENAMEL, bevel=0.01),
-     box((0.28, 0.022, 0.16), (0, -0.3, 0.44), GLASS_DARK),                           # окошко
-     cyl(0.01, 0.36, (0, -0.33, 0.645), CHROME, verts=8, rot=(0, math.radians(90), 0))]
+# Задняя грань дверцы — на 5 мм впереди корпуса (раньше совпадала с ним и мерцала полосами).
+P = [box((0.48, 0.02, OZ1 - OZ0 + 0.01), (0, -0.305, (OZ0 + OZ1) / 2), ENAMEL, bevel=0.01),
+     box((0.28, 0.022, 0.16), (0, -0.31, 0.44), GLASS_DARK),                          # окошко
+     cyl(0.01, 0.36, (0, -0.335, 0.645), CHROME, verts=8, rot=(0, math.radians(90), 0))]
 for x in (-0.17, 0.17):
-    P.append(box((0.02, 0.04, 0.02), (x, -0.315, 0.645), CHROME))
+    P.append(box((0.02, 0.04, 0.02), (x, -0.32, 0.645), CHROME))
 for o in P:
-    o.location -= Vector((0, -0.3, OZ0 - 0.005))
+    o.location -= Vector((0, -0.305, OZ0 - 0.005))
     bpy.context.view_layer.update()
 export("kitchen_oven_door", P)
 
@@ -338,7 +339,7 @@ for z in (0.01, 0.59):
     P.append(box((1.0, 0.3, 0.02), (0, 0.0, z), CABINET))                        # дно и верх
 P.append(box((0.02, 0.28, 0.58), (0.0, 0.0, 0.3), CABINET))                       # перегородка
 P.append(box((0.47, 0.27, 0.015), (0.245, 0.005, 0.3), INSIDE))                   # полка справа
-P.append(box((0.47, 0.02, 0.56), (-0.25, -0.155, 0.3), CABINET, bevel=0.008))    # левая дверца
+P.append(box((0.484, 0.02, 0.56), (-0.248, -0.155, 0.3), CABINET, bevel=0.008))  # левая дверца (до середины)
 P.append(box((0.02, 0.025, 0.1), (-0.07, -0.175, 0.1), CAB_EDGE))
 P.append(box((1.02, 0.32, 0.02), (0, 0.0, 0.61), CAB_EDGE))                      # карниз
 for k in range(4):                                                                 # стопки
@@ -367,7 +368,7 @@ for k in range(4):
     P.append(cut)
 export("kitchen_cabinet", P)
 # Правая дверца: петля — правый край (x = 0.49, y = −0.155), открывается наружу.
-P = [box((0.47, 0.02, 0.56), (0.25, -0.155, 0.3), CABINET, bevel=0.008),
+P = [box((0.484, 0.02, 0.56), (0.248, -0.155, 0.3), CABINET, bevel=0.008),       # без щели посередине
      box((0.02, 0.025, 0.1), (0.07, -0.175, 0.1), CAB_EDGE)]
 for o in P:
     o.location -= Vector((0.49, -0.155, 0.0))
@@ -383,7 +384,7 @@ P = [box((W, 0.1, 0.06), (0, 0, 0.03), FRAME), box((W, 0.1, 0.06), (0, 0, H - 0.
 for x in (-W / 2 + 0.03, 0.0, W / 2 - 0.03):
     P.append(box((0.06, 0.1, H), (x, 0, H / 2), FRAME))
 P.append(box((W, 0.08, 0.05), (0, 0, H - 0.3), FRAME))                           # форточки
-P.append(box((W + 0.2, 0.3, 0.04), (0, -0.17, -0.02), FRAME, bevel=0.006))       # подоконник
+P.append(box((W + 0.2, 0.15, 0.04), (0, -0.095, 0.0), FRAME, bevel=0.006))       # подоконник (узкий)
 export("kitchen_window", P)
 
 # ---------------- Стол с клеёнкой ----------------
@@ -525,13 +526,29 @@ tumbler("kitchen_tumbler", None)
 tumbler("kitchen_tumbler_wine", WINE)
 
 # ---------------- Радиоточка ----------------
-P = [box((0.24, 0.08, 0.16), (0, -0.04, 0.08), IVORY, bevel=0.012, segs=2)]
-P.append(box((0.15, 0.01, 0.1), (-0.03, -0.083, 0.08), BAKELITE))
+# Стоит на полочке: низ — z = 0, центр по глубине — y = 0 (провода нет).
+P = [box((0.24, 0.08, 0.16), (0, 0.0, 0.08), IVORY, bevel=0.012, segs=2)]
+P.append(box((0.15, 0.01, 0.1), (-0.03, -0.043, 0.08), BAKELITE))
 for k in range(6):
-    P.append(box((0.13, 0.012, 0.006), (-0.03, -0.086, 0.04 + k * 0.016), IVORY))
-P.append(cyl(0.018, 0.02, (0.085, -0.088, 0.08), BAKELITE, verts=12, rot=(math.radians(90), 0, 0)))
-P.append(cyl(0.004, 0.2, (0.1, -0.02, -0.1), CORD, verts=6))                      # провод вниз
+    P.append(box((0.13, 0.012, 0.006), (-0.03, -0.046, 0.04 + k * 0.016), IVORY))
+P.append(cyl(0.018, 0.02, (0.085, -0.048, 0.08), BAKELITE, verts=12, rot=(math.radians(90), 0, 0)))
+for x in (-0.09, 0.09):
+    P.append(box((0.03, 0.06, 0.008), (x, 0.0, -0.004), BAKELITE))                # ножки
 export("kitchen_radio", P)
+
+# ---------------- Пачка соды ----------------
+# Просто: красная коробка, спереди и сзади — этикетка (assets/textures/kitchen/soda.png).
+SODA_RED = mat("SodaRed", (0.75, 0.05, 0.03), 0.6)
+SODA_LABEL = mat("SodaLabel", (1, 1, 1), 0.6, image="assets/textures/kitchen/soda.png")
+P = [box((0.075, 0.045, 0.12), (0, 0, 0.06), SODA_RED)]
+for side in (-1, 1):
+    bpy.ops.mesh.primitive_plane_add(size=1.0, location=(0, side * 0.0228, 0.06),
+                                     rotation=(math.radians(90), 0, math.radians(0 if side < 0 else 180)))
+    label = bpy.context.object
+    label.scale = (0.075, 0.12, 1)
+    bpy.ops.object.transform_apply(scale=True, rotation=True, location=False)
+    P.append(finish(label, SODA_LABEL))
+export("kitchen_soda", P)
 
 # ---------------- Абажур над столом ----------------
 P = [cyl(0.005, 0.6, (0, 0, 2.7), CORD, verts=6)]                                  # шнур
