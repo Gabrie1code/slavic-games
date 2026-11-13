@@ -329,6 +329,13 @@ func _build_living_room() -> void:
 	# Книга, сверху песенник с нотой на обложке, рядом шариковая ручка (tools/blender/decor.py).
 	var books_b := [Color("6b0d14"), Color("1a4d29"), Color("142a80")]
 	_breakable("book_stack_music", dining + Vector3(-0.1, 0.78, -0.45), books_b, 0.4)
+	# Бальзам «Звёздочка» — маленькая красная жестянка на салфетке (tools/blender/kitchen.py).
+	var balm := Breakable.new()
+	balm.position = dining + Vector3(-0.2, 0.78, 0.32)
+	balm.rotation.y = 0.4
+	add_child(balm)
+	var balm_colors: Array[Color] = [Color("9e0a10"), Color("e8be3c"), Color("1e7846")]
+	balm.setup(load("res://assets/models/kitchen/balm_tin.glb") as PackedScene, balm_colors, 0.25, 0.02)
 
 	# Банки с заготовками (огурцы, варенье) — в ряд вдоль левой стены у серванта.
 	for i in 3:

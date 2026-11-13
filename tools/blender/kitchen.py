@@ -675,6 +675,28 @@ for side in (-1, 1):
     P.append(finish(label, SODA_LABEL))
 export("kitchen_soda", P)
 
+# ---------------- Бальзам «Звёздочка» (баночка на обеденном столе в гостиной) ----------------
+# Маленькая круглая жестянка 4.5 см: красная, крышка чуть шире, сверху — картинка
+# (assets/textures/kitchen/balm_lid.png, tools/textures/balm_lid.py). Пародия, без марки.
+BALM_RED = mat("BalmRed", (0.62, 0.03, 0.04), 0.35, 0.4)
+BALM_LID = mat("BalmLid", (1, 1, 1), 0.4, image="assets/textures/kitchen/balm_lid.png")
+P = [cyl(0.0215, 0.011, (0, 0, 0.0055), BALM_RED, verts=24, smooth=True),
+     cyl(0.0225, 0.0055, (0, 0, 0.0112), BALM_RED, verts=24, smooth=True)]
+n = 32
+verts = [(0.0, 0.0, 0.0141)] + [(math.cos(k * math.tau / n) * 0.0222, math.sin(k * math.tau / n) * 0.0222, 0.0141)
+                                for k in range(n)]
+me = bpy.data.meshes.new("BalmTop")
+me.from_pydata(verts, [], [(0, k + 1, (k + 1) % n + 1) for k in range(n)])
+uv = me.uv_layers.new(name="UVMap")
+for poly in me.polygons:
+    for li in poly.loop_indices:
+        x, y, _ = verts[me.loops[li].vertex_index]
+        uv.data[li].uv = (0.5 + x / 0.0444, 0.5 + y / 0.0444)
+top = bpy.data.objects.new("BalmTop", me)
+bpy.context.scene.collection.objects.link(top)
+P.append(finish(top, BALM_LID))
+export("balm_tin", P)
+
 # ---------------- Абажур над столом ----------------
 P = [cyl(0.005, 0.6, (0, 0, 2.7), CORD, verts=6)]                                  # шнур
 P.append(cyl(0.04, 0.012, (0, 0, 2.994), IVORY, verts=12))                         # розетка на потолке
