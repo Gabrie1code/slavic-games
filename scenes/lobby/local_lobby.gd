@@ -390,8 +390,9 @@ func _punch(p: PlayerData, hammer: bool = false) -> void:
 		(target as Breakable).shatter(origin)
 	elif target is Tippable:
 		var body := target as Tippable
-		body.apply_impulse((forward + Vector3.UP * 0.3) * PUNCH_PUSH * body.mass * 0.4,
-			Vector3.UP * 0.4)
+		# Молоток бьёт сильнее и выше (торшер, стул валятся, как от столкновения с разбега).
+		var force := PUNCH_PUSH * body.mass * (1.0 if hammer else 0.4)
+		body.apply_impulse((forward + Vector3.UP * 0.2) * force, Vector3.UP * (1.0 if hammer else 0.4))
 	for other_id: int in _characters:
 		var other: PlayerCharacter = _characters[other_id]
 		if other != character and not other.sitting \

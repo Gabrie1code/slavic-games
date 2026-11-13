@@ -112,6 +112,18 @@ def leaf(base, length, width, yaw, pitch, m):
     return flat(o, m)
 
 
+def branch(p0, p1, r, m=None):
+    """Ветка — тонкий конус от точки p0 (на стволе) до p1 (в пучке листьев)."""
+    d = p1 - p0
+    bpy.ops.mesh.primitive_cone_add(vertices=6, radius1=r, radius2=r * 0.5, depth=d.length,
+                                    location=tuple((p0 + p1) / 2))
+    o = bpy.context.object
+    o.rotation_mode = "QUATERNION"
+    o.rotation_quaternion = d.to_track_quat("Z", "Y")
+    bpy.ops.object.transform_apply(rotation=True, location=False)
+    return flat(o, m or TRUNK)
+
+
 def pot(r, h, m=CLAY):
     """Горшок без крышки (стенки + дно) и земля чуть ниже края. Раньше верх горшка и земля были
     в одной плоскости и в игре мерцали (светлые треугольники на земле)."""
@@ -192,12 +204,15 @@ export_item("shelf_cactus", P, (0.2, -0.11, 0.03))
 # ---- Фикус ----
 random.seed(21) # у каждой модели свой «посев»: правка одной не меняет другие
 P = pot(0.18, 0.32, TUB)
-P.append(cyl(0.025, 0.9, (0, 0, 0.75), TRUNK, verts=6, r2=0.015))
+# Ствол до самой макушки и ветка к каждому пучку листьев (раньше пучки висели в воздухе).
+P.append(cyl(0.028, 1.15, (0, 0, 0.875), TRUNK, verts=8, r2=0.012))
 for k in range(18):
     z = random.uniform(0.75, 1.45)
     a = random.uniform(0, math.tau)
     r = random.uniform(0.12, 0.32)
-    P.append(blob(random.uniform(0.12, 0.18), (math.cos(a) * r, math.sin(a) * r, z),
+    tip = Vector((math.cos(a) * r, math.sin(a) * r, z))
+    P.append(branch(Vector((0, 0, max(0.45, z - 0.22))), tip, 0.009))
+    P.append(blob(random.uniform(0.12, 0.18), tuple(tip),
                   LEAF if k % 2 else LEAF2, scale=(1, 1, 0.7)))
 export("plant_ficus", P)
 
@@ -287,11 +302,16 @@ for i, (w, d, h, m) in enumerate([(0.32, 0.23, 0.075, MORE[6]), (0.28, 0.2, 0.06
     P.append(box((w * 0.98, d + 0.004, 0.008), (0, 0, z + h * 0.25), GOLD_STRIPE, rot=(0, 0, 0.12 * (i * 2 - 1))))
     P.append(box((w * 0.98, d + 0.004, 0.008), (0, 0, z + h * 0.75), GOLD_STRIPE, rot=(0, 0, 0.12 * (i * 2 - 1))))
     z += h
-for x in (-0.035, 0.035):                                                    # очки
-    bpy.ops.mesh.primitive_torus_add(major_radius=0.025, minor_radius=0.004, major_segments=12,
-                                     minor_segments=4, location=(x, 0, z + 0.004))
-    P.append(flat(bpy.context.object, IRON))
-P.append(box((0.02, 0.004, 0.004), (0, 0, z + 0.004), IRON))
+# Очки: толстая круглая оправа, стёкла, перемычка-дужка над носом и сложенные заушники.
+LENS = mat("GlassesLens", (0.75, 0.88, 0.95), 0.05)
+GZ = z + 0.007
+for x in (-0.034, 0.034):
+    bpy.ops.mesh.primitive_torus_add(major_radius=0.025, minor_radius=0.0055, major_segments=20,
+                                     minor_segments=8, location=(x, 0, GZ))
+    P.append(flat(bpy.context.object, IRON, smooth=True))
+    P.append(cyl(0.022, 0.003, (x, 0, GZ), LENS, verts=20))
+    P.append(box((0.006, 0.07, 0.005), (x * 1.75, 0.03, GZ + 0.002), IRON))         # заушник
+P.append(box((0.022, 0.007, 0.007), (0, 0, GZ + 0.004), IRON))                         # перемычка
 export("book_stack_tomes", P)
 
 P, z = [], 0.0
