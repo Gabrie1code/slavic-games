@@ -538,8 +538,9 @@ func _build_decor() -> void:
 	_poster("home_kefir", size, Vector3(LEFT_X + 0.012, 1.65, -2.65), PI / 2)
 	_poster("home_calendar", size, Vector3(5.75, 1.6, BACK_Z + 0.012), 0.0)
 	_poster("home_hockey", size, Vector3(PARTITION_X + 0.085, 1.6, 0.65), PI / 2)
-	# Ковровая дорожка к двери в спальню.
-	_place(_model("floor_runner"), Vector3(1.55, 0.004, -1.0))
+	# Ковровая дорожка через дверной проём: начинается в гостиной и заходит в спальню на 0.6 м —
+	# связывает комнаты (раньше обрывалась у стены, перед проёмом был голый пол).
+	_place(_model("floor_runner"), Vector3(2.15, 0.004, -1.0))
 
 
 ## Радио играет спокойную фоновую музыку (своя, без слов — tools/audio/radio_music.py).
