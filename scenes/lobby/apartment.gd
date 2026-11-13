@@ -109,6 +109,8 @@ var _night_bulb: MeshInstance3D
 ## Висящее под потолком (копии для вида сверху): {"node", "pos"} — прозрачнеют над персонажем.
 var _hanging_top: Array[Dictionary] = []
 var _sun: DirectionalLight3D
+## Текстура мягкой тени под мебелью (одна на всю квартиру).
+var _shadow_tex: GradientTexture2D
 var _sun_energy := 1.0
 var _time := 0.0
 ## Модель окна гостиной (у неё прячем «небо», чтобы видеть вид за проёмом).
@@ -751,7 +753,34 @@ func _solid(model: Node3D, size: Vector3, center_y: float, pos: Vector3,
 	add_child(body)
 	body.position = pos
 	body.rotation.y = yaw
+	if pos.y < 0.01:
+		body.add_child(_contact_shadow(Vector2(size.x, size.z)))
 	return body
+
+
+## Мягкая тень-пятно под мебелью на полу (на ковре тоже): без неё диван и кресло казались
+## висящими в воздухе — общий свет теней под ними почти не даёт. Только для слоя 1 (пол,
+## ковры, мебель): на игроков не ложится.
+func _contact_shadow(footprint: Vector2) -> Decal:
+	if _shadow_tex == null:
+		var gradient := Gradient.new()
+		gradient.set_color(0, Color(0, 0, 0, 0.55))
+		gradient.set_color(1, Color(0, 0, 0, 0.0))
+		gradient.add_point(0.6, Color(0, 0, 0, 0.4))
+		_shadow_tex = GradientTexture2D.new()
+		_shadow_tex.gradient = gradient
+		_shadow_tex.fill = GradientTexture2D.FILL_SQUARE
+		_shadow_tex.fill_from = Vector2(0.5, 0.5)
+		_shadow_tex.fill_to = Vector2(1.0, 0.5)
+		_shadow_tex.width = 64
+		_shadow_tex.height = 64
+	var decal := Decal.new()
+	decal.texture_albedo = _shadow_tex
+	decal.size = Vector3(footprint.x * 1.15, 0.24, footprint.y * 1.15)
+	decal.position.y = 0.06 # от −0.06 до 0.18: пол, ковёр и низ ножек
+	decal.cull_mask = 1
+	decal.upper_fade = 0.6 # к верху ножек тень сходит на нет
+	return decal
 
 
 ## Видно только от первого лица (потолок, передние стены).
