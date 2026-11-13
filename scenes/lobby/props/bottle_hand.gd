@@ -10,12 +10,12 @@ const REACH := 1.0
 const COOLDOWN := 4.0
 const DRUNK_COUNT := 3
 const DRUNK_WINDOW := 20.0
-const DRUNK_TIME := 30.0
+const DRUNK_TIME := 15.0
 const VOMIT_COUNT := 5
 ## 5 глотков за BLUR_WINDOW сек — сильное опьянение: размытие и двоение на BLUR_TIME сек.
 const BLUR_COUNT := 5
 const BLUR_WINDOW := 25.0
-const BLUR_TIME := 25.0
+const BLUR_TIME := 12.5
 const VOMIT_WINDOW := 30.0
 
 var kitchen: KitchenRoom
