@@ -135,6 +135,10 @@ func _toy_box(parent: Node3D, size: Vector3, pos: Vector3, mat: Material) -> voi
 func _bench(pos: Vector3, yaw: float) -> void:
 	_solid(PLAYGROUND + "bench", Vector3(1.8, 0.9, 0.5), pos, yaw)
 	benches.append(Transform3D(Basis(Vector3.UP, yaw), pos))
+	# Значок-подсказка «ЛАВОЧКА», как у горки и качелей (водящему не виден — см. freeze_tag.gd).
+	var badge := ZoneBadge.new().setup("zone_bench", 1.9)
+	badge.position += pos
+	add_child(badge)
 
 
 ## Лавочка рядом с точкой (-1 — нет): подойти можно спереди или сзади.

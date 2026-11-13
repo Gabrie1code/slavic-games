@@ -2,16 +2,22 @@ class_name SprintAbility
 extends RefCounted
 ## Спринт в «Морожке»: Shift (LB/левый стик) — на SPRINT_TIME сек скорость +bonus
 ## (бегущим +50%, водящему +15%), потом перезарядка COOLDOWN сек. Бот жмёт сам.
+## После горки — SLIDE_BONUS на SLIDE_TIME сек. С рывком не складывается: включил рывок —
+## действует только он (ускорение от горки пропадает).
 
 const BONUS := 0.5
 const SPRINT_TIME := 3.0
 const COOLDOWN := 15.0
+const SLIDE_BONUS := 0.2
+const SLIDE_TIME := 3.0
 
 ## Сколько ещё бежит быстро и сколько ждать до следующего спринта (сек).
 var left := 0.0
 ## Прибавка к скорости во время спринта (0.5 = +50%).
 var bonus := BONUS
 var cooldown := 0.0
+## Сколько ещё действует ускорение после горки (сек).
+var slide_left := 0.0
 
 
 func ready() -> bool:
@@ -23,6 +29,7 @@ func ready() -> bool:
 func update(delta: float, character: PlayerCharacter, input: PlayerInput, base_speed: float,
 		allowed: bool) -> bool:
 	cooldown = maxf(0.0, cooldown - delta)
+	slide_left = maxf(0.0, slide_left - delta)
 	var started := false
 	if left > 0.0:
 		left = maxf(0.0, left - delta)
@@ -30,7 +37,13 @@ func update(delta: float, character: PlayerCharacter, input: PlayerInput, base_s
 		left = SPRINT_TIME
 		cooldown = COOLDOWN
 		started = true
-	character.speed = base_speed * (1.0 + bonus if left > 0.0 else 1.0)
+		slide_left = 0.0 # рывок главнее горки
+	var boost := 0.0
+	if left > 0.0:
+		boost = bonus
+	elif slide_left > 0.0:
+		boost = SLIDE_BONUS
+	character.speed = base_speed * (1.0 + boost)
 	return started
 
 
@@ -38,6 +51,8 @@ func update(delta: float, character: PlayerCharacter, input: PlayerInput, base_s
 func status() -> String:
 	if left > 0.0:
 		return "спринт!"
+	if slide_left > 0.0:
+		return "горка +20%!"
 	if ready():
 		return "спринт готов"
 	return "спринт %d с" % ceili(cooldown)

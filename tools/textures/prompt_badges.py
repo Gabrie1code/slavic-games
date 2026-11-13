@@ -67,9 +67,18 @@ def swing(d, cx, cy, s):
     d.rectangle((cx - s * 0.65, cy + s * 0.45, cx + s * 0.65, cy + s * 0.75), fill="white")
 
 
+def bench(d, cx, cy, s):
+    w = int(s * 0.2)
+    d.rectangle((cx - s, cy - s * 0.15, cx + s, cy + s * 0.12), fill="white")       # сиденье
+    d.rectangle((cx - s, cy - s * 0.75, cx + s, cy - s * 0.48), fill="white")       # спинка
+    for x in (-0.75, 0.75):
+        d.line((cx + s * x, cy - s * 0.5, cx + s * x, cy + s * 0.85), fill="white", width=w)
+
+
 badge("zone_play", "ИГРАТЬ", (70, 170, 90), play)
 badge("zone_wardrobe", "ШКАФ", (215, 150, 40), hanger)
 badge("zone_rubgame", "ИГРА НА РУБЛИ", (210, 60, 140), chip)
 badge("zone_slide", "ГОРКА", (60, 120, 210), slide)
 badge("zone_swing", "КАЧЕЛИ", (225, 120, 40), swing)
+badge("zone_bench", "ЛАВОЧКА", (120, 90, 190), bench)
 print("DONE")

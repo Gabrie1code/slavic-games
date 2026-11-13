@@ -134,6 +134,7 @@ func _ready() -> void:
 	_yard = FreezeYard.new()
 	add_child(_yard)
 	_yard.slide.ride_finished.connect(_on_playground_done)
+	_yard.slide.ride_finished.connect(_on_slide_done)
 	_yard.swing.sit_finished.connect(_on_playground_done)
 	_spawn_racers()
 	_setup_views()
@@ -644,7 +645,8 @@ func _update_playground(delta: float) -> void:
 	for r in _racers:
 		for kind: String in r.play_cooldown.keys():
 			r.play_cooldown[kind] = maxf(0.0, float(r.play_cooldown[kind]) - delta)
-		var slide := _yard.slide.can_ride(r.character)
+		# Водящий горкой, качелями и лавочкой не пользуется (и значков над ними не видит).
+		var slide := not r.is_chaser and _yard.slide.can_ride(r.character)
 		var seat := -1 if r.is_chaser else _yard.swing.free_seat_near(r.character)
 		var bench := -1 if r.is_chaser else _free_bench_near(r)
 		# Пробел — прыжок, но не там, где он нужен для дела (горка, качели, лавочка).
@@ -724,6 +726,13 @@ func _set_busy(r: Racer, text: String) -> void:
 		r.player.bot_input().move = Vector2.ZERO
 
 
+## Скатился с горки — +20% к бегу на 3 сек (если не включён рывок, см. SprintAbility).
+func _on_slide_done(character: PlayerCharacter) -> void:
+	for r in _racers:
+		if r.character == character and not r.is_chaser and r.sprint.left <= 0.0:
+			r.sprint.slide_left = SprintAbility.SLIDE_TIME
+
+
 func _on_playground_done(character: PlayerCharacter) -> void:
 	for r in _racers:
 		if r.character != character:
@@ -764,7 +773,7 @@ func _setup_views() -> void:
 	layer.layer = 0
 	add_child(layer)
 	_chaser_camera = _add_view(layer, Vector2(0, 0), Vector2(0.5 if humans_running else 1.0, 1),
-		0xFFFFF & ~HUD_LAYER)
+		0xFFFFF & ~HUD_LAYER & ~ZoneBadge.OVERHEAD_LAYER) # значки площадки водящему не нужны
 	var caption := _label("Ты водишь — видно только рядом · Shift — рывок", 28, Color("ff6b5a"))
 	caption.set_anchors_preset(Control.PRESET_CENTER_TOP)
 	caption.grow_horizontal = Control.GROW_DIRECTION_BOTH
