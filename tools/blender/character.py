@@ -1101,6 +1101,76 @@ def item_face_gas_mask():
     return [part("Head", pieces)]
 
 
+def item_face_hockey_mask():
+    """Старая вратарская хоккейная маска (60–70-е): белый потёртый пластик в дырочках, прорези для
+    глаз, носа и рта, кожаные ремешки вокруг головы. Только для водящего в «Морожке» (в шкафу её
+    нет). Без красных треугольников — это не маска из фильма, а обычная вратарская."""
+    SHELL = mat("HockeyMask", (0.86, 0.83, 0.72), 0.55)
+    STRAP = mat("HockeyStrap", (0.28, 0.16, 0.08), 0.8)
+    BUCKLE = mat("HockeyBuckle", (0.6, 0.6, 0.58), 0.35, 0.8)
+    bpy.ops.mesh.primitive_uv_sphere_add(segments=56, ring_count=28, radius=1.0, location=(0, 0, 0))
+    shell = bpy.context.object
+    shell.scale = (0.28, 0.2, 0.35)
+    bpy.ops.object.transform_apply(scale=True)
+    bm = bmesh.new()
+    bm.from_mesh(shell.data)
+    bmesh.ops.delete(bm, geom=[v for v in bm.verts if v.co.y < -0.02], context="VERTS")   # только перед
+    bm.to_mesh(shell.data)
+    bm.free()
+    shell.location = (0, 0.15, 1.33)
+    bpy.ops.object.transform_apply(location=True)
+    mod = shell.modifiers.new("Thick", "SOLIDIFY")
+    mod.thickness = 0.014
+    mod.offset = -1
+    bpy.context.view_layer.objects.active = shell
+    bpy.ops.object.modifier_apply(modifier="Thick")
+    # Дырки: глаза, нос, рот и россыпь мелких отверстий — одним булевым вычитанием.
+    cutters = []
+    for x in (-0.11, 0.11):
+        cutters.append(cyl(0.062, 0.5, (x, 0.3, 1.37), SHELL, verts=16, rot=(math.radians(90), 0, 0),
+                           scale=(1.15, 1.0, 1.0)))
+    cutters.append(cyl(0.022, 0.5, (0, 0.3, 1.25), SHELL, verts=10, rot=(math.radians(90), 0, 0)))
+    cutters.append(cyl(0.03, 0.5, (0, 0.3, 1.16), SHELL, verts=10, rot=(math.radians(90), 0, 0)))
+    dots = [(0, 1.6), (-0.07, 1.57), (0.07, 1.57), (-0.14, 1.52), (0.14, 1.52), (0, 1.5),
+            (-0.06, 1.46), (0.06, 1.46), (-0.2, 1.42), (0.2, 1.42), (-0.21, 1.3), (0.21, 1.3),
+            (-0.18, 1.21), (0.18, 1.21), (-0.1, 1.24), (0.1, 1.24), (-0.13, 1.13), (0.13, 1.13),
+            (-0.06, 1.08), (0.06, 1.08), (0, 1.04), (-0.21, 1.37), (0.21, 1.37)]
+    dots = [(x, z) for x, z in dots if z < 1.58]  # маска ниже — верхний ряд уже за краем
+    for x, z in dots:
+        cutters.append(cyl(0.012, 0.5, (x, 0.3, z), SHELL, verts=8, rot=(math.radians(90), 0, 0)))
+    bpy.ops.object.select_all(action="DESELECT")
+    for c in cutters:
+        c.select_set(True)
+    bpy.context.view_layer.objects.active = cutters[0]
+    bpy.ops.object.join()
+    cutter = bpy.context.object
+    boo = shell.modifiers.new("Holes", "BOOLEAN")
+    boo.operation = "DIFFERENCE"
+    boo.object = cutter
+    bpy.context.view_layer.objects.active = shell
+    bpy.ops.object.modifier_apply(modifier="Holes")
+    bpy.data.objects.remove(cutter, do_unlink=True)
+    for p in shell.data.polygons:
+        p.use_smooth = False  # после вычитания дырок сглаживание даёт «звёздочки» вокруг них
+    pieces = [shell]
+    # Потёртости: несколько тёмных царапин-штрихов поверх.
+    SCUFF = mat("HockeyScuff", (0.55, 0.5, 0.4), 0.8)
+    for x, z, a in ((-0.15, 1.47, 0.6), (0.17, 1.15, -0.4), (0.05, 1.55, 0.2)):
+        y = 0.15 + 0.2 * math.sqrt(max(0.0, 1 - (x / 0.28) ** 2 - ((z - 1.33) / 0.35) ** 2)) + 0.002
+        pieces.append(box((0.06, 0.004, 0.006), (x, y, z), SCUFF, rot=(0, a, 0)))
+    # Ремешки вокруг головы: от краёв маски назад — на висках и над ушами, с пряжками.
+    for z in (1.25, 1.47):
+        bpy.ops.mesh.primitive_torus_add(major_radius=0.296, minor_radius=0.009, major_segments=24,
+                                         minor_segments=4, location=(0, 0, z))
+        ring = bpy.context.object
+        ring.scale = (1.0, 1.0, 1.6)
+        bpy.ops.object.transform_apply(scale=True)
+        pieces.append(flat(ring, STRAP))
+        for side in (-1, 1):
+            pieces.append(box((0.012, 0.035, 0.03), (side * 0.298, -0.08, z), BUCKLE))
+    return [part("Head", pieces)]
+
+
 def item_neck_gold_chain():
     """Толстая золотая цепь: петля вокруг шеи с провисом на грудь и медальоном."""
     GOLD = mat("GoldBright", (1.0, 0.82, 0.38), 0.2, 1.0)
@@ -1461,6 +1531,7 @@ ITEMS = {
     "face_beard": item_face_beard,
     "face_welder_mask": item_face_welder_mask,
     "face_gas_mask": item_face_gas_mask,
+    "face_hockey_mask": item_face_hockey_mask,
     # Рот
     "mouth_line": item_mouth_line,
     "mouth_o": item_mouth_o,

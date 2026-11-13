@@ -52,6 +52,8 @@ const ITEMS := {
 	"face_beard": {"slot": Slot.FACE, "name": "Борода-лопата", "price": 150},
 	"face_welder_mask": {"slot": Slot.FACE, "name": "Маска сварщика", "price": 250},
 	"face_gas_mask": {"slot": Slot.FACE, "name": "Противогаз", "price": 200},
+	# Маска водящего в «Морожке»: в шкафу её нет (hidden), надевается только на раунд.
+	"face_hockey_mask": {"slot": Slot.FACE, "name": "Хоккейная маска", "price": 0, "hidden": true},
 	# Рот (рта у базовой головы нет — он всегда из этого слота, по умолчанию «Обычный»)
 	"mouth_line": {"slot": Slot.MOUTH, "name": "Обычный", "price": 0},
 	"mouth_o": {"slot": Slot.MOUTH, "name": "Удивлённый «О»", "price": 0},
@@ -112,7 +114,7 @@ const ITEMS := {
 static func items_for_slot(slot: Slot) -> Array[String]:
 	var result: Array[String] = []
 	for id: String in ITEMS:
-		if ITEMS[id]["slot"] == slot:
+		if ITEMS[id]["slot"] == slot and not ITEMS[id].get("hidden", false):
 			result.append(id)
 	return result
 

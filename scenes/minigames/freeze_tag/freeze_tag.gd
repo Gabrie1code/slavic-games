@@ -184,7 +184,7 @@ func _spawn_racers() -> void:
 			r.sprint.bonus = CHASER_SPRINT
 			r.status.text = "ВОДЯЩИЙ"
 			r.status.modulate = Color("ff6b5a")
-			_add_chaser_hat(r.character)
+			_put_on_chaser_mask(r.character)
 		# Модель — на слое своего слота: своя камера от первого лица её не рисует.
 		r.character.set_render_layer(FreezeViews.body_layer(p.slot))
 		r.character.set_name_layer(HUD_LAYER)
@@ -830,19 +830,11 @@ func _flat_distance(a: Vector3, b: Vector3) -> float:
 	return Vector2(a.x - b.x, a.z - b.z).length()
 
 
-func _add_chaser_hat(character: PlayerCharacter) -> void:
-	var hat := MeshInstance3D.new()
-	var hat_mesh := CylinderMesh.new()
-	hat_mesh.top_radius = 0.0
-	hat_mesh.bottom_radius = 0.36
-	hat_mesh.height = 0.5
-	hat_mesh.radial_segments = 8
-	hat.mesh = hat_mesh
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color("d93a2b")
-	hat.material_override = mat
-	hat.position.y = 1.82
-	character.visual.add_child(hat)
+## Водящий — в старой хоккейной маске: шапку и всё с лица (очки, усы…) снимаем на раунд,
+## чтобы маску было хорошо видно. Сохранённый наряд игрока не меняется.
+func _put_on_chaser_mask(character: PlayerCharacter) -> void:
+	character.wear(Cosmetics.Slot.HAT, "")
+	character.wear(Cosmetics.Slot.FACE, "face_hockey_mask")
 
 
 func _make_materials() -> void:
