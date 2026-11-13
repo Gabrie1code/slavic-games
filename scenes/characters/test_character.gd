@@ -179,8 +179,7 @@ func _physics_process(delta: float) -> void:
 		# включить, сесть…), лобби отменит прыжок (jump_pending = false), и персонаж не подпрыгнет.
 		if jump_pending and is_on_floor():
 			velocity.y = JUMP_VELOCITY
-			_squash = 1.0 # толчок: вытянулся вверх
-			JumpFx.play(self, false)
+			_squash = 1.0 # толчок: вытянулся вверх (звук прыжка выключен по просьбе владельца)
 		jump_pending = not crouching and can_jump and player.input.is_just_pressed("confirm") \
 			and is_on_floor()
 
