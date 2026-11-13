@@ -248,6 +248,8 @@ func _process(delta: float) -> void:
 		if _gadgets.hand_busy(p):
 			var view: Dictionary = _views.get(p.id, {})
 			_gadgets.process_hand(p, view.get("camera"), view.get("can")) # баллончик / губка
+			if p.input.is_just_pressed("attack") and not running and _gadgets.holds_hammer(p):
+				_punch(p, true) # молоток бьёт, как кулак (+ разбивает экран автомата)
 		elif p.input.is_just_pressed("attack") and (running or not _gadgets.try_attack_use(p)):
 			_punch(p) # у раковины удар берёт губку (try_attack_use), иначе — кулак
 		elif p.input.is_just_pressed("secondary") and not running:
@@ -348,15 +350,17 @@ func _build_zone(pos: Vector3, radius: float, color: Color, badge: String) -> vo
 
 ## Удар рукой: от третьего лица — взмах вперёд, от первого — тычок кулаком в кадре.
 ## Разбивает вещи впереди, толкает стулья и гантели, отталкивает других игроков.
-func _punch(p: PlayerData) -> void:
+func _punch(p: PlayerData, hammer: bool = false) -> void:
 	var now := Time.get_ticks_msec() / 1000.0
 	if now - float(_punch_time.get(p.id, -10.0)) < PUNCH_COOLDOWN:
 		return
 	var character: PlayerCharacter = _characters[p.id]
-	if not character.punch():
+	if hammer:
+		_gadgets.swing_hammer(p)
+	elif not character.punch():
 		return
 	_punch_time[p.id] = now
-	if _views.has(p.id):
+	if _views.has(p.id) and not hammer:
 		var fist: Node3D = _views[p.id]["fist"]
 		var jab := create_tween()
 		jab.tween_property(fist, "position:z", -0.85, 0.07).set_ease(Tween.EASE_OUT)

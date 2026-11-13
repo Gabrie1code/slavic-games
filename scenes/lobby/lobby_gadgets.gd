@@ -15,6 +15,7 @@ const GRAMOPHONE_RADIUS := 1.4
 const LAMP_RADIUS := 1.2
 const SWITCH_RADIUS := 1.0
 const RADIO_RADIUS := 1.4
+const SIDEBOARD_RADIUS := 1.1
 const ARCADE_RADIUS := 1.1
 const TOILET_RADIUS := 1.2
 const SINK_RADIUS := 1.0
@@ -41,6 +42,9 @@ var _held_sponges: Dictionary = {}
 var _view_sponges: Dictionary = {}
 ## «Пульт в кадре» у камеры того, кто держит пульт (PlayerData.id -> Node3D).
 var _view_remotes: Dictionary = {}
+## Молотки в руках и «молотки в кадре»: PlayerData.id -> Hammer / Node3D.
+var _held_hammers: Dictionary = {}
+var _view_hammers: Dictionary = {}
 var _player: AudioStreamPlayer3D
 
 
@@ -168,7 +172,7 @@ func _process_can_holder(p: PlayerData, camera: Camera3D, view_can: Node3D) -> v
 	var can: SprayCan = _held_cans[p.id]
 	var character: PlayerCharacter = characters[p.id]
 	if p.input.is_just_pressed("drop"):
-		release_can(p, look_dir(character, camera)) # бросить туда, куда смотрит
+		_release_can(p, look_dir(character, camera)) # бросить туда, куда смотрит
 		return
 	if p.input.is_just_pressed("secondary"):
 		can.next_color()
@@ -214,10 +218,10 @@ func _aim_end(character: PlayerCharacter, camera: Camera3D, reach: float) -> Vec
 
 ## В руке что-то есть (баллончик или губка) — второе не взять, кулаком не бьёт.
 func hand_busy(p: PlayerData) -> bool:
-	return holds_can(p) or holds_sponge(p) or holds_remote(p)
+	return holds_can(p) or _holds_sponge(p) or _holds_remote(p) or holds_hammer(p)
 
 
-func holds_sponge(p: PlayerData) -> bool:
+func _holds_sponge(p: PlayerData) -> bool:
 	return _held_sponges.has(p.id)
 
 
@@ -225,17 +229,20 @@ func holds_sponge(p: PlayerData) -> bool:
 func process_hand(p: PlayerData, camera: Camera3D, view_can: Node3D) -> void:
 	if holds_can(p):
 		_process_can_holder(p, camera, view_can)
-	elif holds_sponge(p):
+	elif _holds_sponge(p):
 		_process_sponge(p, camera)
-	elif holds_remote(p):
+	elif _holds_remote(p):
 		_process_remote(p, camera)
+	elif holds_hammer(p):
+		_process_hammer(p, camera)
 
 
 ## Бросить всё из руки (игрок ушёл из лобби).
 func release_hand(p: PlayerData) -> void:
-	release_can(p)
-	release_sponge(p)
-	if holds_remote(p):
+	_release_can(p)
+	_release_sponge(p)
+	_release_hammer(p)
+	if _holds_remote(p):
 		_hide_view_remote(p)
 		apartment.tv_remote.go_home()
 
@@ -244,11 +251,15 @@ func release_hand(p: PlayerData) -> void:
 func hand_hint(p: PlayerData) -> Array[Dictionary]:
 	if holds_can(p):
 		return _can_holder_hint(p)
-	if holds_remote(p):
+	if holds_hammer(p):
+		var hammer_entries: Array[Dictionary] = [entry(attack_key(p), "Ударить молотком"),
+			entry(drop_key(p), "Бросить молоток")]
+		return hammer_entries
+	if _holds_remote(p):
 		var remote_entries: Array[Dictionary] = [entry(attack_key(p), "Нажать кнопку"),
 			entry(drop_key(p), "Бросить пульт")]
 		return remote_entries
-	if not holds_sponge(p):
+	if not _holds_sponge(p):
 		return _no_hint()
 	var result: Array[Dictionary] = [entry(attack_key(p), "Оттирать (зажать)"),
 		entry(drop_key(p), "Бросить губку")]
@@ -286,7 +297,7 @@ func _process_sponge(p: PlayerData, camera: Camera3D) -> void:
 	var character: PlayerCharacter = characters[p.id]
 	_show_view_sponge(p, camera)
 	if p.input.is_just_pressed("drop"):
-		release_sponge(p, look_dir(character, camera))
+		_release_sponge(p, look_dir(character, camera))
 		return
 	if not p.input.is_pressed("attack"):
 		sponge.stop_scrub()
@@ -319,7 +330,7 @@ func _hold_sponge(p: PlayerData, sponge: Sponge) -> void:
 
 
 ## Бросить губку (G или ушёл из лобби).
-func release_sponge(p: PlayerData, dir: Vector3 = Vector3.ZERO) -> void:
+func _release_sponge(p: PlayerData, dir: Vector3 = Vector3.ZERO) -> void:
 	if _view_sponges.has(p.id):
 		(_view_sponges[p.id] as Node).queue_free()
 		_view_sponges.erase(p.id)
@@ -334,7 +345,7 @@ func release_sponge(p: PlayerData, dir: Vector3 = Vector3.ZERO) -> void:
 ## «Подтвердить»: у раковины с губкой в руке — положить её; рядом брошенная губка — подобрать.
 func _use_sponge(p: PlayerData) -> bool:
 	var sink := _near_sink(p)
-	if holds_sponge(p):
+	if _holds_sponge(p):
 		if sink == null or sink.sponge != null:
 			return false
 		var sponge: Sponge = _held_sponges[p.id]
@@ -371,7 +382,7 @@ func _release_sponge_quietly(p: PlayerData) -> void:
 
 # ---------------- Пульт от телевизора ----------------
 
-func holds_remote(p: PlayerData) -> bool:
+func _holds_remote(p: PlayerData) -> bool:
 	var remote := apartment.tv_remote
 	return remote != null and remote.state == TvRemote.State.HELD and remote.holder == p
 
@@ -428,6 +439,96 @@ func _hide_view_remote(p: PlayerData) -> void:
 		_view_remotes.erase(p.id)
 
 
+# ---------------- Сервант и молоток ----------------
+
+func holds_hammer(p: PlayerData) -> bool:
+	return _held_hammers.has(p.id)
+
+
+## Взмах молотком (удар — как кулаком, это делает лобби); автомат перед игроком —
+## разбивается стекло экрана. Молоток «в кадре» резко клюёт вперёд.
+func swing_hammer(p: PlayerData) -> void:
+	var hammer: Hammer = _held_hammers[p.id]
+	hammer.swing(characters[p.id])
+	if _view_hammers.has(p.id):
+		var view: Node3D = _view_hammers[p.id]
+		var hit := view.create_tween()
+		hit.tween_property(view, "rotation:x", -0.9, 0.07).set_ease(Tween.EASE_OUT)
+		hit.tween_property(view, "rotation:x", 0.35, 0.18).set_ease(Tween.EASE_IN)
+	var arcade := _near_arcade(p)
+	if arcade:
+		arcade.smash()
+
+
+## Молоток в руке: G — бросить туда, куда смотришь.
+func _process_hammer(p: PlayerData, camera: Camera3D) -> void:
+	if camera and not _view_hammers.has(p.id):
+		var model := Hammer.make_model()
+		model.position = Vector3(0.26, -0.3, -0.5)
+		model.rotation = Vector3(0.35, 0.25, 0.0)
+		_set_layers(model, 1 << (p.slot + 10)) # слой «в кадре» этого игрока
+		camera.add_child(model)
+		_view_hammers[p.id] = model
+	if p.input.is_just_pressed("drop"):
+		_release_hammer(p, look_dir(characters[p.id], camera))
+
+
+## Бросить молоток (dir — взгляд; Vector3.ZERO — уронить под себя, игрок ушёл из лобби).
+func _release_hammer(p: PlayerData, dir: Vector3 = Vector3.ZERO) -> void:
+	if _view_hammers.has(p.id):
+		(_view_hammers[p.id] as Node).queue_free()
+		_view_hammers.erase(p.id)
+	if not _held_hammers.has(p.id):
+		return
+	var hammer: Hammer = _held_hammers[p.id]
+	_held_hammers.erase(p.id)
+	if is_instance_valid(hammer) and characters.has(p.id):
+		hammer.drop(characters[p.id], apartment, dir)
+
+
+## «Подтвердить» у тумбы серванта: открыть дверцу / взять молоток; рядом брошенный — подобрать.
+func _use_sideboard(p: PlayerData) -> bool:
+	if hand_busy(p):
+		return false
+	var hammer := _near_loose_hammer(p)
+	var cabinet := apartment.sideboard
+	var near := _near(p, cabinet.front_point(), SIDEBOARD_RADIUS)
+	if hammer == null and near and cabinet.can_take():
+		hammer = cabinet.take_hammer()
+	if hammer:
+		_held_hammers[p.id] = hammer
+		hammer.hold(p, characters[p.id])
+		return true
+	if near and cabinet.can_open():
+		cabinet.open()
+		return true
+	return false
+
+
+func _sideboard_hint(p: PlayerData) -> Array[Dictionary]:
+	var result: Array[Dictionary] = []
+	if hand_busy(p):
+		return result
+	var cabinet := apartment.sideboard
+	if _near_loose_hammer(p):
+		result.append(entry(confirm_key(p), "Подобрать молоток"))
+	elif _near(p, cabinet.front_point(), SIDEBOARD_RADIUS):
+		if cabinet.can_take():
+			result.append(entry(confirm_key(p), "Взять молоток"))
+		elif cabinet.can_open():
+			result.append(entry(confirm_key(p), "Открыть тумбу"))
+	return result
+
+
+func _near_loose_hammer(p: PlayerData) -> Hammer:
+	for node in apartment.get_tree().get_nodes_in_group("hammer"):
+		var hammer := node as Hammer
+		if hammer and hammer.state == Hammer.State.LOOSE \
+				and _near(p, hammer.global_position, CAN_RADIUS):
+			return hammer
+	return null
+
+
 func _set_layers(node: Node, layer: int) -> void:
 	if node is VisualInstance3D:
 		(node as VisualInstance3D).layers = layer
@@ -437,7 +538,7 @@ func _set_layers(node: Node, layer: int) -> void:
 
 ## Бросить баллончик (G или игрок ушёл из лобби).
 ## dir — куда бросить; Vector3.ZERO — уронить под себя (игрок ушёл из лобби).
-func release_can(p: PlayerData, dir: Vector3 = Vector3.ZERO) -> void:
+func _release_can(p: PlayerData, dir: Vector3 = Vector3.ZERO) -> void:
 	if not _held_cans.has(p.id):
 		return
 	var can: SprayCan = _held_cans[p.id]
@@ -588,7 +689,7 @@ func try_interact(p: PlayerData) -> bool:
 		_play_gramophone()
 		return true
 	# Губка первой: с губкой в руке у раковины «подтвердить» — положить её, а не мыть руки.
-	if _use_sponge(p) or _use_switch(p) or _use_cans(p, character):
+	if _use_sponge(p) or _use_switch(p) or _use_cans(p, character) or _use_sideboard(p):
 		return true
 	if _near_cat(p) and apartment.cat.pet():
 		# Персонаж тянет руку к коту.
@@ -653,9 +754,11 @@ func _furniture_hint(p: PlayerData) -> Array[Dictionary]:
 	if not light_entries.is_empty():
 		return light_entries
 	var can_entries := _can_hint(p)
+	if can_entries.is_empty():
+		can_entries = _sideboard_hint(p)
 	if not can_entries.is_empty():
 		return can_entries
-	if _near_sink(p) and not holds_sponge(p): # с губкой в руке — подсказки руки («Положить»)
+	if _near_sink(p) and not _holds_sponge(p): # с губкой в руке — подсказки руки («Положить»)
 		return _sink_hint(p)
 	if _near_toilet(p):
 		return _toilet_hint(p)

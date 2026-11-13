@@ -8,15 +8,23 @@ extends Node3D
 ## Рисуется во встроенном SubViewport и показывается на прямоугольнике поверх экрана модели.
 ## Автомат можно «сломать» кнопкой действия: сыплются искры, экран гаснет и через OFF_TIME сек
 ## включается снова (как восстанавливается разбитая посуда).
+## Молотком экран разбивается (smash): трещины по стеклу, осколки, картинка мигает и тускнеет;
+## через SMASH_TIME сек стекло «восстанавливается».
 
 const W := 96
 const H := 72
 const OFF_TIME := 8.0
+const SMASH_TIME := 10.0
+const CRACKS := preload("res://assets/textures/fx/glass_cracks.png")
 
 var _game: PixelGame
 var _mat: StandardMaterial3D
 var _sparks: CPUParticles3D
 var _off_until := 0.0
+var _smashed_until := 0.0
+var _cracks: MeshInstance3D
+var _cracks_mat: StandardMaterial3D
+var _shards: CPUParticles3D
 var _time := 0.0
 
 
@@ -44,12 +52,24 @@ func setup(mode: int, size: Vector2) -> ArcadeScreen:
 	_mat = mat
 	_sparks = _make_sparks()
 	add_child(_sparks)
+	_build_cracks(size)
 	return self
 
 
-## Работает (экран горит) — только тогда его можно сломать.
+## Работает (экран горит и стекло целое) — только тогда его можно сломать.
 func is_working() -> bool:
-	return _time >= _off_until
+	return _time >= _off_until and _time >= _smashed_until
+
+
+## Удар молотком: стекло экрана трескается, сыплются осколки; через SMASH_TIME — снова целое.
+func smash() -> void:
+	if _time < _smashed_until:
+		return
+	_smashed_until = _time + SMASH_TIME
+	_cracks.visible = true
+	_cracks.rotation.z = randf() * TAU # каждый раз трещины по-другому
+	_shards.restart()
+	_shards.emitting = true
 
 
 ## Сломать: искры, экран мигает и гаснет; через OFF_TIME сек сам включается.
@@ -76,7 +96,43 @@ func _process(delta: float) -> void:
 		_game.process_mode = Node.PROCESS_MODE_INHERIT
 	else:
 		_mat.albedo_color = Color.WHITE
+	_process_smash()
 
+
+## Разбитое стекло: картинка тусклее и иногда мигает, трещины в конце плавно исчезают.
+func _process_smash() -> void:
+	var left := _smashed_until - _time
+	if left <= 0.0:
+		_cracks.visible = false
+		return
+	if _time >= _off_until: # погашенный искрами экран остаётся тёмным
+		var dim := 0.55 if randf() > 0.04 else 1.2
+		_mat.albedo_color = Color(dim, dim, dim)
+	_cracks_mat.albedo_color.a = clampf(left / 0.6, 0.0, 1.0)
+
+
+func _build_cracks(size: Vector2) -> void:
+	_cracks = MeshInstance3D.new()
+	var quad := QuadMesh.new()
+	quad.size = Vector2.ONE * maxf(size.x, size.y) # квадрат трещин, лишнее обрезает рамка
+	_cracks.mesh = quad
+	_cracks_mat = StandardMaterial3D.new()
+	_cracks_mat.albedo_texture = CRACKS
+	_cracks_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	_cracks_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_cracks.material_override = _cracks_mat
+	_cracks.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_cracks.position.z = 0.004
+	_cracks.scale = Vector3(size.x / maxf(size.x, size.y), size.y / maxf(size.x, size.y), 1.0)
+	_cracks.visible = false
+	add_child(_cracks)
+	_shards = _make_sparks()
+	_shards.amount = 26 # осколки стекла: светло-голубые, падают вниз
+	var glass := Gradient.new()
+	glass.set_color(0, Color(0.9, 0.97, 1.0))
+	glass.set_color(1, Color(0.6, 0.8, 0.9, 0.0))
+	_shards.color_ramp = glass
+	add_child(_shards)
 
 ## Искры: короткий сноп жёлто-белых точек из экрана, падают вниз.
 func _make_sparks() -> CPUParticles3D:

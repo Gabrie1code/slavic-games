@@ -86,6 +86,8 @@ var floor_lamp_light: LobbyLamp
 var night_lamp_light: LobbyLamp
 var chandeliers: Array[Dictionary] = []
 var window_view: WindowView
+## Сервант: стеклянные дверцы и тумба с молотком.
+var sideboard: SideboardCabinet
 ## Тумбочка в спальне: ящик с баллончиком.
 var nightstand: Nightstand
 ## Дисковый телефон (гостиная, у двери в игровую) и кот.
@@ -201,6 +203,10 @@ func _build_living_room() -> void:
 	# «Стенка» у задней стены: сервант с хрусталём — телевизор — книжная секция с радио.
 	var sideboard_pos := Vector3(-4.85, 0, -3.68) # не влезает в плинтус и стену
 	_solid(_model("sideboard"), Vector3(2.0, 2.2, 0.5), 1.1, sideboard_pos)
+	# Стеклянные дверцы наверху и правая дверца тумбы с молотком внутри (SideboardCabinet).
+	sideboard = SideboardCabinet.new()
+	sideboard.position = sideboard_pos
+	add_child(sideboard)
 	# В серванте — фарфоровый сервиз (белый с кобальтом и золотом), бьётся по одной вещи.
 	var shelf_heights := [0.97, 1.365, 1.765]
 	var china_rows := [
