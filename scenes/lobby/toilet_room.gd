@@ -70,7 +70,11 @@ func _build_door_wall() -> void:
 		_fp_only(Vector3(WALL_T, HEIGHT - 2.4, length), Vector3(X0, 2.4 + (HEIGHT - 2.4) / 2.0, mid),
 			wallpaper)
 		_collider(Vector3(WALL_T, HEIGHT - 2.4, length), Vector3(X0, 2.4 + (HEIGHT - 2.4) / 2.0, mid))
-		_inner_faces(Vector3(0.02, 0, length), Vector3(X0 + 0.09, 0, mid))
+		# Краска изнутри — только в самом туалете (от Z0): раньше начиналась на 24 см раньше и
+		# голубой полосой торчала в угол спальни на стыке стен.
+		var paint_from := maxf(span.x, Z0)
+		_inner_faces(Vector3(0.02, 0, span.y - paint_from),
+			Vector3(X0 + 0.09, 0, (paint_from + span.y) / 2.0))
 	var door_len := DOOR_TO_Z - DOOR_FROM_Z
 	var door_mid := (DOOR_FROM_Z + DOOR_TO_Z) / 2.0
 	# Над дверью — твёрдо до потолка (не пролететь в прыжке сквозь «картинку» стены).

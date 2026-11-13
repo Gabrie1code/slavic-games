@@ -258,8 +258,8 @@ func _build_living_room() -> void:
 	# На подоконнике один кактус (три горшка закрывали вид за окном).
 	_breakable("cactus_pot", Vector3(window_pos.x - 0.5, 0.885, window_pos.z + 0.14),
 		[CLAY, PLANT], 0.35)
-	_tippable("dumbbell", Vector3(0.34, 0.12, 0.12), 0.06, Vector3(1.2, 0, -3.3), 3.0, 15.0)
-	_tippable("dumbbell", Vector3(0.34, 0.12, 0.12), 0.06, Vector3(1.55, 0, -3.15), 3.0, -10.0)
+	_tippable("dumbbell", Vector3(0.34, 0.104, 0.12), 0.052, Vector3(1.2, 0, -3.3), 3.0, 15.0)
+	_tippable("dumbbell", Vector3(0.34, 0.104, 0.12), 0.052, Vector3(1.55, 0, -3.15), 3.0, -10.0)
 
 	# Зона отдыха: ковёр, диван напротив телевизора, журнальный столик, кресло, торшер.
 	var rug := _place(_model("floor_rug"), Vector3(-2.6, 0.005, -0.2))
@@ -332,7 +332,7 @@ func _build_bedroom() -> void:
 		[Color("2a7040"), Color("c0a050")], 0.4)
 	_build_night_light()
 	_place(_model("floor_rug_oval"), Vector3(6.3, 0.005, -0.8)).rotation_degrees.y = 90.0
-	_tippable("dumbbell", Vector3(0.34, 0.12, 0.12), 0.06, Vector3(8.5, 0, 0.6), 3.0, 30.0)
+	_tippable("dumbbell", Vector3(0.34, 0.104, 0.12), 0.052, Vector3(8.5, 0, 0.6), 3.0, 30.0)
 	var stool := _tippable("stool", Vector3(0.36, 0.47, 0.36), 0.24, Vector3(8.4, 0, -0.4), 2.0)
 	# Книги на табурете — каждая со своей физикой: сбили табурет — книги падают на пол.
 	var pile := BookPile.new()

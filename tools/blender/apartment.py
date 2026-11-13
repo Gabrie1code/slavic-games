@@ -371,9 +371,12 @@ made.append(export("radio", P))
 
 # ---------------- Гантели ----------------
 IRON = mat("Iron", (0.12, 0.12, 0.13), 0.5, 0.7)
-P = [cyl(0.018, 0.34, (0, 0, 0.06), METAL, verts=8, rot=(0, math.radians(90), 0))]
+# Шестигранные блины лежат гранью на полу: центр на высоте апофемы 0.06·cos30° ≈ 0.052
+# (было 0.06 — гантели висели над полом на 8 мм).
+GZ = 0.06 * math.cos(math.radians(30))
+P = [cyl(0.018, 0.34, (0, 0, GZ), METAL, verts=8, rot=(0, math.radians(90), 0))]
 for x in (-0.13, -0.09, 0.09, 0.13):
-    P.append(cyl(0.06, 0.035, (x, 0, 0.06), IRON, verts=6, rot=(0, math.radians(90), 0)))
+    P.append(cyl(0.06, 0.035, (x, 0, GZ), IRON, verts=6, rot=(0, math.radians(90), 0)))
 made.append(export("dumbbell", P))
 
 # ---------------- Табурет ----------------
