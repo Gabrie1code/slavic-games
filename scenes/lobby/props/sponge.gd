@@ -118,7 +118,7 @@ func scrub_at(point: Vector3, toilet: Toilet) -> void:
 	_wet_spot(point)
 
 
-## Мокрые следы — маленькие голубые лужицы (цвет воды как в унитазе), высыхают за ~1.5 сек.
+## Мокрые следы — маленькие голубые лужицы (цвет воды как в унитазе), высыхают за ~0.9 сек.
 func _wet_spot(point: Vector3) -> void:
 	_wet_time -= get_process_delta_time()
 	if _wet_time > 0.0:
@@ -133,7 +133,7 @@ func _wet_spot(point: Vector3) -> void:
 	get_tree().current_scene.add_child(spot)
 	spot.global_position = point + Vector3(randf_range(-0.05, 0.05), 0, randf_range(-0.05, 0.05))
 	var tween := spot.create_tween()
-	tween.tween_property(spot, "modulate:a", 0.0, 1.5).set_delay(0.3)
+	tween.tween_property(spot, "modulate:a", 0.0, 0.75).set_delay(0.15) # вдвое быстрее
 	tween.tween_callback(spot.queue_free)
 
 
