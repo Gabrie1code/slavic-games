@@ -15,8 +15,8 @@ const VIEWMODEL_LAYERS := 0b1111 << 10
 const GOLD := Color("f6c343")
 ## Скорость перелёта камеры между столом и колесом.
 const CAMERA_SPEED := 3.0
-## Вход и выход — как «пролёт камеры»: вид не затухает, камера сама летит от глаз персонажа к
-## столу (и обратно), как при переходе на вид сверху; плавно проявляются только кнопки и надписи.
+## Вход — «пролёт камеры»: вид не затухает, камера летит от глаз персонажа к столу, как при
+## переходе на вид сверху; плавно проявляются кнопки и надписи. Выход — сразу, без анимации.
 const FADE_TIME := 0.35
 const EYE_HEIGHT := 1.42
 ## Угол обзора: у глаз персонажа в лобби — 75, у стола — 50 (меняется плавно вместе с полётом).
@@ -58,7 +58,6 @@ var _return_pos := Vector3.ZERO
 var _return_yaw := 0.0
 var _return_pitch := 0.0
 ## Сколько уже летим обратно к глазам (на случай, если камера долго не «долетает»).
-var _closing_time := 0.0
 var _closed := false
 var _view: SubViewportContainer
 ## Уходим от стола (идёт плавное закрытие — кнопки не слушаем).
@@ -116,9 +115,7 @@ func _process(delta: float) -> void:
 	# Пока колесо крутится и показывает итог — плавно летим к колесу (вид сверху),
 	# на время ставок — обратно ко всему столу.
 	var target := table.camera_transform()
-	if _closing:
-		target = _eye(_return_pos, _return_yaw, _return_pitch) # уходим: летим обратно к глазам
-	elif table.phase != RubgameTable.Phase.BETTING:
+	if table.phase != RubgameTable.Phase.BETTING:
 		target = table.wheel_camera_transform()
 	elif _top_view:
 		target = table.felt_camera_transform()
@@ -128,20 +125,9 @@ func _process(delta: float) -> void:
 	_show_panels(table.phase == RubgameTable.Phase.BETTING)
 	# Рамка цвета игрока вокруг выбранной ставки на сукне.
 	table.set_selection(player, _bet(), _number)
-	var step := minf(1.0, delta * CAMERA_SPEED * (1.6 if _closing else 1.0))
-	# Подлетая к глазам своего персонажа, камера не рисует его самого (не видно «изнутри головы»);
-	# у стола свой персонаж виден, как и остальные.
-	var near_eye := _camera.global_position.distance_to(_eye(_return_pos, 0.0, 0.0).origin) < 0.8
-	_camera.set_cull_mask_value(player.slot + 2, not (_closing and near_eye))
+	var step := minf(1.0, delta * CAMERA_SPEED)
 	_camera.global_transform = _camera.global_transform.interpolate_with(target, step)
-	_camera.fov = lerpf(_camera.fov, EYE_FOV if _closing else TABLE_FOV, step)
-	if _closing:
-		_closing_time += delta
-		# Долетели до глаз — окно закрывается, и дальше тот же вид уже от первого лица.
-		if _closing_time > 1.6 or (_camera.global_position.distance_to(target.origin) < 0.03
-				and absf(_camera.fov - EYE_FOV) < 1.0):
-			_finish_close()
-		return
+	_camera.fov = lerpf(_camera.fov, TABLE_FOV, step)
 	if _message_time > 0.0:
 		_message_time -= delta
 		if _message_time <= 0.0:
@@ -162,7 +148,7 @@ func close() -> void:
 		lobby_character.rotation.y = _return_yaw
 		lobby_character.velocity = Vector3.ZERO
 	table.clear_selection(player)
-	_fade_overlay(false)
+	_finish_close() # выход — сразу, без пролёта камеры (вход — с пролётом)
 
 
 func _finish_close() -> void:

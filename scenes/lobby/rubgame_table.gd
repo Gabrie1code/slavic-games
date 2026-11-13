@@ -229,9 +229,11 @@ func _clear_chips(only_lost: bool) -> void:
 	for b in bets:
 		if only_lost and not b.get("lost", false):
 			continue
-		var chip: Node3D = b["node"]
-		if not is_instance_valid(chip):
+		# Сначала проверка, потом типизированная переменная: проигравшую фишку уже убрали
+		# (queue_free), и запись удалённого объекта в «Node3D» роняла игру после проигрыша.
+		if not is_instance_valid(b["node"]):
 			continue
+		var chip: Node3D = b["node"]
 		var tween := create_tween()
 		tween.tween_property(chip, "scale", Vector3.ZERO, 0.4).set_trans(Tween.TRANS_BACK) \
 			.set_ease(Tween.EASE_IN)
