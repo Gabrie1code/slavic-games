@@ -25,6 +25,8 @@ const Z1 := 6.3
 const HEIGHT := 3.0
 ## До какой высоты кафель (выше — обои).
 const TILE_H := 1.5
+const BOTTLE_BACK := 20.0
+const BOTTLE_POS := Vector3(X1 - 0.41, 0.75, 5.12)
 ## Окно над мойкой в дальней стене: центр по X, низ и верх, ширина.
 const WINDOW_X := -3.1
 const WINDOW_Y0 := 1.15
@@ -41,6 +43,8 @@ var apartment: Apartment
 var sink: KitchenSink
 var cabinet: KitchenCabinet
 var oven: KitchenOven
+## Бутылка на столе (null — забрали; новая появится через BOTTLE_BACK сек).
+var bottle: KitchenBottle
 var window_glass: WindowGlass
 
 var _tile_mat: StandardMaterial3D
@@ -201,6 +205,11 @@ func _build_furniture() -> void:
 	_furniture("kitchen_fridge", Vector3(X0 + 0.32, 0, 4.15), PI / 2, Vector3(0.6, 1.5, 0.62))
 	var stove := _furniture("kitchen_stove", Vector3(X0 + 0.3, 0, 5.0), PI / 2,
 		Vector3(0.5, 0.88, 0.58))
+	# На холодильнике — красная мухобойка.
+	var swatter := _model("kitchen_swatter")
+	swatter.position = Vector3(X0 + 0.32, 1.5, 4.12)
+	swatter.rotation.y = 0.5
+	add_child(swatter)
 	oven = KitchenOven.new() # дверца духовки откидывается, внутри — курица
 	stove.add_child(oven)
 	# Над плитой — плакат «Береги рабочее время!» (часы и рабочий с молотом).
@@ -228,8 +237,7 @@ func _build_furniture() -> void:
 	_breakable(DIR + "kitchen_kettle.glb", stove.to_global(Vector3(-0.12, 0.878, -0.14)),
 		[Color("d9561a"), Color("1c1c1c"), Color("cfcfcf")], 0.4)
 	# На столе — бутылка и два гранёных стакана: пустой и с тёмно-бордовым (бьются).
-	_breakable(DIR + "kitchen_bottle.glb", Vector3(table_pos.x - 0.05, 0.75, 5.12),
-		[Color("0c3d18"), Color("c8b088")], 0.3, 0.04)
+	_restock_bottle()
 	_breakable(DIR + "kitchen_tumbler.glb", Vector3(table_pos.x + 0.1, 0.75, 5.42),
 		[Color(0.85, 0.92, 0.95, 0.6)], 0.3, 0.03)
 	_breakable(DIR + "kitchen_tumbler_wine.glb", Vector3(table_pos.x - 0.08, 0.75, 5.55),
@@ -365,6 +373,21 @@ func _calendar_label(pad: Node3D, text: String, size: int, color: Color, y: floa
 
 
 # ---------------- Для лобби: что перед игроком ----------------
+
+## Взять бутылку со стола (через BOTTLE_BACK сек на её месте появится новая).
+func take_bottle() -> KitchenBottle:
+	var taken := bottle
+	bottle = null
+	get_tree().create_timer(BOTTLE_BACK).timeout.connect(_restock_bottle)
+	return taken
+
+
+func _restock_bottle() -> void:
+	if bottle != null:
+		return
+	bottle = KitchenBottle.new()
+	bottle.position = BOTTLE_POS
+	add_child(bottle)
 
 ## Шкафчик или духовка ближе radius и в поле взгляда (если оба — тот, что ближе к центру
 ## взгляда); null — нет.

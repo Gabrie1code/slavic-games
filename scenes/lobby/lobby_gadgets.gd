@@ -35,6 +35,8 @@ const NOTE := preload("res://assets/textures/fx/note_pixel.png")
 var apartment: Apartment
 ## PlayerData.id -> PlayerCharacter (тот же словарь, что в лобби).
 var characters: Dictionary
+## Бутылка с кухни в руке (взять, выпить, бросить) — scenes/lobby/props/bottle_hand.gd.
+var bottles: BottleHand
 var _tune_until := 0.0
 ## Кто держит баллончик: PlayerData.id -> SprayCan.
 var _held_cans: Dictionary = {}
@@ -52,6 +54,7 @@ var _player: AudioStreamPlayer3D
 func _init(apt: Apartment, chars: Dictionary) -> void:
 	apartment = apt
 	characters = chars
+	bottles = BottleHand.new(apt.kitchen_room, chars, apt)
 
 
 ## Одна строка подсказки: кнопка, действие, недоступно ли (серым).
@@ -220,7 +223,8 @@ func _aim_end(character: PlayerCharacter, camera: Camera3D, reach: float) -> Vec
 
 ## В руке что-то есть (баллончик или губка) — второе не взять, кулаком не бьёт.
 func hand_busy(p: PlayerData) -> bool:
-	return holds_can(p) or _holds_sponge(p) or _holds_remote(p) or holds_hammer(p)
+	return holds_can(p) or _holds_sponge(p) or _holds_remote(p) or holds_hammer(p) \
+		or bottles.holds(p)
 
 
 func _holds_sponge(p: PlayerData) -> bool:
@@ -237,6 +241,8 @@ func process_hand(p: PlayerData, camera: Camera3D, view_can: Node3D) -> void:
 		_process_remote(p, camera)
 	elif holds_hammer(p):
 		_process_hammer(p, camera)
+	elif bottles.holds(p):
+		bottles.process(p, camera)
 
 
 ## Бросить всё из руки (игрок ушёл из лобби).
@@ -244,6 +250,7 @@ func release_hand(p: PlayerData) -> void:
 	_release_can(p)
 	_release_sponge(p)
 	_release_hammer(p)
+	bottles.release(p)
 	if _holds_remote(p):
 		_hide_view_remote(p)
 		apartment.tv_remote.go_home()
@@ -253,6 +260,8 @@ func release_hand(p: PlayerData) -> void:
 func hand_hint(p: PlayerData) -> Array[Dictionary]:
 	if holds_can(p):
 		return _can_holder_hint(p)
+	if bottles.holds(p):
+		return bottles.hint(p)
 	if holds_hammer(p):
 		var hammer_entries: Array[Dictionary] = [entry(attack_key(p), "Ударить молотком", false, true),
 			entry(drop_key(p), "Бросить молоток")]
@@ -271,8 +280,7 @@ func hand_hint(p: PlayerData) -> Array[Dictionary]:
 	return result
 
 
-## В подсказках руки есть действие на «подтвердить» (например, «Положить губку») — Пробел
-## тогда не прыжок.
+## В подсказках руки есть действие на «подтвердить» («Положить губку») — Пробел не прыжок.
 func hand_uses_confirm(p: PlayerData) -> bool:
 	var key := confirm_key(p)
 	for item in hand_hint(p):
@@ -281,10 +289,9 @@ func hand_uses_confirm(p: PlayerData) -> bool:
 	return false
 
 
-## Удар у раковины или у пульта, пока рука свободна, — взять губку / пульт (вместо удара
-## кулаком). true — взял.
+## Удар у раковины, пульта, бутылки (рука свободна) — взять вещь вместо удара. true — взял.
 func try_attack_use(p: PlayerData) -> bool:
-	if _use_remote(p):
+	if _use_remote(p) or (not hand_busy(p) and bottles.try_take(p)):
 		return true
 	var sink := _near_sink(p)
 	if hand_busy(p) or sink == null or sink.sponge == null:
@@ -400,6 +407,8 @@ func remote_hint(p: PlayerData) -> Array[Dictionary]:
 	var result: Array[Dictionary] = []
 	if _near_remote(p):
 		result.append(entry(attack_key(p), "Взять пульт"))
+	elif not hand_busy(p):
+		result.append_array(bottles.take_hint(p))
 	return result
 
 
@@ -616,8 +625,7 @@ func _set_layers(node: Node, layer: int) -> void:
 		_set_layers(child, layer)
 
 
-## Бросить баллончик (G или игрок ушёл из лобби).
-## dir — куда бросить; Vector3.ZERO — уронить под себя (игрок ушёл из лобби).
+## Бросить баллончик (G); dir = Vector3.ZERO — уронить под себя (игрок ушёл из лобби).
 func _release_can(p: PlayerData, dir: Vector3 = Vector3.ZERO) -> void:
 	if not _held_cans.has(p.id):
 		return
@@ -695,8 +703,7 @@ func try_secondary(p: PlayerData) -> bool:
 	return true
 
 
-## Торшер, выключатели люстр и радио. Свет днём включают, вечером выключают
-## (на время, см. LobbyLamp).
+## Торшер, выключатели люстр и радио (свет — на время, см. LobbyLamp).
 func _light_hint(p: PlayerData) -> Array[Dictionary]:
 	var result: Array[Dictionary] = []
 	if _near_tippable(p, apartment.floor_lamp, LAMP_RADIUS):
@@ -730,8 +737,7 @@ func _near_switch(p: PlayerData) -> LobbyLamp:
 	return null
 
 
-## Пустая подсказка. Именно типизированный массив: `return []` Godot 4.7 возвращает как
-## обычный Array, и `var x := …` с ним падает («Array» в «Array[Dictionary]»).
+## Пустая подсказка (типизированный массив: `return []` даёт обычный Array — падает).
 func _no_hint() -> Array[Dictionary]:
 	var none: Array[Dictionary] = []
 	return none
@@ -784,8 +790,7 @@ func try_interact(p: PlayerData) -> bool:
 	return false
 
 
-## Торшер, люстры, раковина, туалет, игровые автоматы — «щёлкнуть выключателем».
-## true — нажатие использовано.
+## Торшер, люстры, раковина, туалет, автоматы — «щёлкнуть». true — нажатие использовано.
 func _use_switch(p: PlayerData) -> bool:
 	var arcade := _near_arcade(p)
 	var toilet := _near_toilet(p)
@@ -828,8 +833,7 @@ func hint(p: PlayerData) -> Array[Dictionary]:
 	return _furniture_hint(p)
 
 
-## Граммофон, торшер, тумбочка, баллончики, туалет и автоматы.
-## Кнопка есть, только пока вещь стоит на месте (поваленную трогать нельзя).
+## Граммофон, торшер, тумбочка, баллончики, туалет, автоматы (поваленную вещь не трогают).
 func _furniture_hint(p: PlayerData) -> Array[Dictionary]:
 	if _near_tippable(p, apartment.gramophone, GRAMOPHONE_RADIUS):
 		return [entry(confirm_key(p), "Завести граммофон", not _gramophone_ready())]

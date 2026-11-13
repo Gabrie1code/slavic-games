@@ -231,10 +231,25 @@ func _build_ground() -> void:
 	_box(Vector3(400, 0.1, 80), Vector3(0, GROUND_Y - 0.05, -40), Color(0.37, 0.5, 0.28))
 	var path := Color(0.62, 0.55, 0.45)
 	_box(Vector3(60, 0.04, 1.6), Vector3(0, GROUND_Y + 0.02, -7.5), path)
-	_box(Vector3(1.4, 0.04, 20), Vector3(3.0, GROUND_Y + 0.02, -18.0), path)
+	# Ровные дорожки от тротуара прямо к трём подъездам дома напротив (раньше одна дорожка шла
+	# мимо двери и упиралась в стену). Подъезды — колонки окон 2, 6, 10 (courtyard.py),
+	# дом в z = −32, масштаб 1.35: двери на x = −11.0, 1.57, 14.1, край крыльца — z ≈ −22.6.
+	var door_z := -22.6
 	var curb := Color(0.75, 0.73, 0.68)
 	_box(Vector3(60, 0.1, 0.12), Vector3(0, GROUND_Y + 0.05, -6.65), curb)
-	_box(Vector3(60, 0.1, 0.12), Vector3(0, GROUND_Y + 0.05, -8.35), curb)
+	var gaps: Array[float] = []
+	for c: int in [2, 6, 10]:
+		var x := (-HOUSE_W / 2.0 + 1.2 + c * (HOUSE_W - 2.4) / (HOUSE_COLS - 1)) * 1.35
+		gaps.append(x)
+		var length := -8.3 - door_z
+		_box(Vector3(1.4, 0.04, length), Vector3(x, GROUND_Y + 0.025, (-8.3 + door_z) / 2.0), path)
+	# Бордюр со стороны дома — с разрывами там, где дорожки уходят к подъездам.
+	var from := -30.0
+	for x in gaps:
+		_box(Vector3(x - 0.75 - from, 0.1, 0.12),
+			Vector3((from + x - 0.75) / 2.0, GROUND_Y + 0.05, -8.35), curb)
+		from = x + 0.75
+	_box(Vector3(30.0 - from, 0.1, 0.12), Vector3((from + 30.0) / 2.0, GROUND_Y + 0.05, -8.35), curb)
 
 
 ## Хрущёвки напротив — настоящие 3D-модели, побольше (дом напротив видно высоким).
