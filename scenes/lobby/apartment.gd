@@ -104,6 +104,8 @@ var radio_music: RadioMusic
 var night_lamp: Breakable
 var _night_bulb: MeshInstance3D
 ## Солнце в комнате (DirectionalLight лобби): вечером слабее, чтобы был виден свет ламп.
+## Висящее под потолком (копии для вида сверху): {"node", "pos"} — прозрачнеют над персонажем.
+var _hanging_top: Array[Dictionary] = []
 var _sun: DirectionalLight3D
 var _sun_energy := 1.0
 var _time := 0.0
@@ -333,6 +335,7 @@ func _process(delta: float) -> void:
 	_night_bulb.visible = night_ok # разбитый — без «висящей в воздухе» лампочки
 	for chandelier in chandeliers:
 		(chandelier["lamp"] as LobbyLamp).update(delta, dark, true)
+	_fade_hanging(delta)
 	# Солнце в комнате вечером и ночью слабее (но не до темноты — играть должно быть видно).
 	if _sun == null:
 		_sun = get_parent().get_node_or_null("Sun") as DirectionalLight3D
@@ -363,18 +366,50 @@ func _build_lamp_light() -> void:
 
 
 ## Люстра под потолком со своим светом и выключатель на стене (yaw — куда смотрит выключатель).
+## Люстр две копии: для глаз игроков (всегда видна) и для вида сверху — та плавно исчезает,
+## когда под ней персонаж (иначе люстра закрывает его сверху).
 func _chandelier(pos: Vector3, switch_pos: Vector3, switch_yaw: float) -> void:
-	_no_shadow(_place(_model("chandelier"), pos)) # странная тень на полу
 	var light := _warm_light(1.4, 5.5, pos + Vector3(0, 2.3, 0))
 	add_child(light)
 	var bulb_mat := _bulb_mat()
-	add_child(_bulb(0.06, pos + Vector3(0, 2.38, 0), bulb_mat))
+	for layer in [FP_ONLY_LAYER, OVERVIEW_ONLY_LAYER]:
+		var hang := Node3D.new()
+		add_child(hang)
+		var model := _place(_model("chandelier"), pos)
+		_no_shadow(model) # странная тень на полу
+		model.reparent(hang)
+		hang.add_child(_bulb(0.06, pos + Vector3(0, 2.38, 0), bulb_mat))
+		_set_layers(hang, layer)
+		if layer == OVERVIEW_ONLY_LAYER:
+			_hanging_top.append({"node": hang, "pos": pos})
 	var plate := _box(Vector3(0.08, 0.12, 0.02), Vector3.ZERO, _mat(Color("efe6d2"), 0.5))
 	var key := _box(Vector3(0.03, 0.05, 0.015), Vector3(0, 0, 0.015), _mat(Color("d9cfb8"), 0.5))
 	key.reparent(plate, false)
 	plate.position = switch_pos
 	plate.rotation.y = switch_yaw
 	chandeliers.append({"lamp": LobbyLamp.new(light, bulb_mat), "switch": switch_pos})
+
+
+## Вид сверху: люстра плавно исчезает, когда кто-то рядом под ней (ближе ~2 м), и возвращается.
+func _fade_hanging(delta: float) -> void:
+	var people := get_tree().get_nodes_in_group("lobby_character")
+	for item in _hanging_top:
+		var pos: Vector3 = item["pos"]
+		var nearest := INF
+		for node in people:
+			var person := node as Node3D
+			nearest = minf(nearest, Vector2(person.global_position.x - pos.x,
+				person.global_position.z - pos.z).length())
+		var hang: Node3D = item["node"]
+		var target := 1.0 - smoothstep(1.2, 2.4, nearest) # 1 — совсем прозрачная
+		var now: float = hang.get_meta("fade", 0.0)
+		now = move_toward(now, target, delta * 3.0)
+		if is_equal_approx(now, float(hang.get_meta("fade", 0.0))):
+			continue
+		hang.set_meta("fade", now)
+		hang.visible = now < 0.99
+		for mesh in hang.find_children("*", "GeometryInstance3D", true, false):
+			(mesh as GeometryInstance3D).transparency = now
 
 
 func _warm_light(energy: float, light_range: float, pos: Vector3) -> OmniLight3D:

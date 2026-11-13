@@ -27,7 +27,12 @@ const TURN_SPEED := 12.0
 const KNOCKBACK_DECAY := 18.0
 ## Приседание (как Shift в Minecraft): медленнее, ниже, корпус наклонён вперёд.
 const CROUCH_SPEED := 0.4
-const CROUCH_DROP := 0.2
+## Присед: ноги выносятся вперёд на CROUCH_LEGS рад, и модель опускается ровно настолько,
+## насколько при этом поднялись ступни (длина ноги LEG_LENGTH, пятка позади оси HEEL) —
+## ступни остаются на полу (раньше модель опускалась на 0.2 м и ноги уходили в пол).
+const CROUCH_LEGS := 0.75
+const LEG_LENGTH := 0.54
+const HEEL := 0.07
 const CROUCH_LEAN := 0.45
 ## Прыжок «как в party-играх»: взлёт сразу, в момент толчка модель вытягивается, в полёте ноги
 ## поджаты и руки в стороны, на спуске ноги тянутся к земле, при приземлении — сжатие, пыль, звук.
@@ -228,7 +233,8 @@ func _process(delta: float) -> void:
 		_part("LegR").rotation.x = SIT_LEGS
 	else:
 		# Присев, ноги чуть вынесены вперёд (crouch_legs); в стойке плавно возвращаются к нему.
-		var crouch_legs := 0.35 * crouch_amount
+		var crouch_legs := CROUCH_LEGS * crouch_amount
+		swing *= 1.0 - 0.6 * crouch_amount # гуськом шаги меньше
 		var settle := 1.0 - legs_back
 		_part("LegL").rotation.x = swing + crouch_legs if amount > 0.05 \
 			else lerpf(_part("LegL").rotation.x, crouch_legs, settle)
@@ -242,7 +248,10 @@ func _process(delta: float) -> void:
 	_part("Torso").rotation.x = -CROUCH_LEAN * crouch_amount
 	# Подпрыгивание при шаге и лёгкое «дыхание» в стойке.
 	_model.position.y = SIT_DROP if sitting else absf(sin(_walk_phase)) * 0.06 * amount
-	_model.position.y -= CROUCH_DROP * crouch_amount
+	if crouch_amount > 0.0 and not sitting:
+		var legs := minf(absf(_part("LegL").rotation.x), absf(_part("LegR").rotation.x))
+		var rise := LEG_LENGTH * (1.0 - cos(legs)) - HEEL * sin(legs)
+		_model.position.y -= maxf(0.0, rise) * crouch_amount
 	_part("Head").rotation.x = sin(_idle_time * 2.0) * 0.04 + CROUCH_LEAN * crouch_amount * 0.8
 	_animate_jump(delta)
 
