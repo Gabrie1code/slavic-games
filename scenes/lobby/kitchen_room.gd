@@ -11,8 +11,8 @@ extends Node3D
 
 const DIR := "res://assets/models/kitchen/"
 const APT := "res://assets/models/apartment/"
-const DOOR_X0 := -2.0
-const DOOR_X1 := -1.2
+const DOOR_X0 := -2.15 # проём 1.1 м: персонаж (капсула радиусом 0.4) в 0.8 м застревал
+const DOOR_X1 := -1.05
 const DOOR_TOP := 2.1
 const X0 := -3.9
 const X1 := -0.7
@@ -194,7 +194,8 @@ func _build_furniture() -> void:
 	_furniture("kitchen_table", table_pos, PI / 2, Vector3(1.0, 0.75, 0.7))
 	for z: float in [4.95, 5.65]:
 		_tippable(APT + "stool.glb", Vector3(X1 - 0.95, 0, z), Vector3(0.36, 0.47, 0.36), 0.24)
-	_tippable(APT + "stool.glb", Vector3(X1 - 0.36, 0, 4.45), Vector3(0.36, 0.47, 0.36), 0.24)
+	# Третья — у дальнего торца стола (у ближнего загораживала проход от двери).
+	_tippable(APT + "stool.glb", Vector3(X1 - 0.36, 0, 6.05), Vector3(0.36, 0.47, 0.36), 0.24)
 	# Чайник на передней левой конфорке, на столе — чай в подстаканниках и заварочный чайник.
 	_breakable(DIR + "kitchen_kettle.glb", stove.to_global(Vector3(-0.12, 0.878, 0.12)),
 		[Color("b81a14"), Color("f2f2ea"), Color("111111")], 0.4)
