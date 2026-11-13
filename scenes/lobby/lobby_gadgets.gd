@@ -459,10 +459,12 @@ func swing_hammer(p: PlayerData) -> bool:
 		hit.tween_property(view, "rotation:x", 0.55, 0.09).set_ease(Tween.EASE_OUT)
 		hit.tween_property(view, "rotation:x", -1.1, 0.07).set_ease(Tween.EASE_IN)
 		hit.tween_property(view, "rotation:x", 0.0, 0.2).set_ease(Tween.EASE_OUT)
-	var cabinet := apartment.sideboard
-	for i in 2:
-		if not cabinet.pane_broken(i) and _near(p, cabinet.pane_center(i), SIDEBOARD_GLASS_RADIUS):
-			return cabinet.break_pane(i)
+	# Какое стекло под ударом — то, куда смотрит игрок (точка взгляда на плоскости стёкол).
+	var character: PlayerCharacter = characters[p.id]
+	var pane := apartment.sideboard.pane_hit(character.global_position + Vector3.UP * 1.2,
+		-character.global_basis.z, SIDEBOARD_GLASS_RADIUS)
+	if pane >= 0 and not apartment.sideboard.pane_broken(pane):
+		return apartment.sideboard.break_pane(pane)
 	var arcade := _near_arcade(p)
 	if arcade:
 		arcade.smash()

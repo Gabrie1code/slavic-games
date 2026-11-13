@@ -36,6 +36,8 @@ var _restore_at := -1.0
 var _restock_on_close := false
 ## Стёкла верхних дверец (0 — левое, 1 — правое) и до какого времени каждое разбито.
 var _panes: Array[MeshInstance3D] = []
+## Латунные ручки стёкол — одно целое со стеклом: разбили стекло — ручки нет.
+var _knobs: Array[MeshInstance3D] = []
 var _pane_broken_until: Array[float] = [-1.0, -1.0]
 
 
@@ -121,6 +123,22 @@ func pane_at(point: Vector3) -> int:
 	return 0 if to_local(point).x < 0.0 else 1
 
 
+## По какому стеклу попадает удар из точки origin в сторону dir (в мире): −1 — мимо стёкол
+## или дальше reach. Считается точка, где луч взгляда пересекает плоскость стёкол.
+func pane_hit(origin: Vector3, dir: Vector3, reach: float) -> int:
+	var o := to_local(origin)
+	var d := global_basis.inverse() * dir
+	if d.z >= -0.01:
+		return -1 # смотрим не на сервант
+	var t := (GLASS_Z - o.z) / d.z
+	if t < 0.0 or t > reach:
+		return -1
+	var x := o.x + d.x * t
+	if absf(x) > 0.95:
+		return -1
+	return 0 if x < 0.0 else 1
+
+
 ## Середина стекла (в мире) — для прицела молотка.
 func pane_center(index: int) -> Vector3:
 	return to_global(Vector3(-0.485 if index == 0 else 0.485,
@@ -133,6 +151,7 @@ func break_pane(index: int) -> bool:
 		return false
 	_pane_broken_until[index] = _time + GLASS_RESTORE
 	_panes[index].visible = false
+	_knobs[index].visible = false
 	var shards := CPUParticles3D.new()
 	shards.one_shot = true
 	shards.amount = 40
@@ -170,6 +189,7 @@ func _restore_panes() -> void:
 		if pane.visible or pane_broken(i):
 			continue
 		pane.visible = true
+		_knobs[i].visible = true
 		var mat := pane.material_override as StandardMaterial3D
 		mat.albedo_color.a = 0.0
 		pane.create_tween().tween_property(mat, "albedo_color:a", GLASS_ALPHA, 0.5)
@@ -213,7 +233,8 @@ func _build_glass() -> void:
 		knob.albedo_color = Color(0.8, 0.65, 0.3)
 		knob.metallic = 0.35
 		knob.roughness = 0.3
-		_box(Vector3(0.02, 0.06, 0.02), Vector3(x - signf(x) * 0.43, mid_y, GLASS_Z + 0.02), knob)
+		_knobs.append(_box(Vector3(0.02, 0.06, 0.02),
+			Vector3(x - signf(x) * 0.43, mid_y, GLASS_Z + 0.02), knob))
 
 
 func _box(size: Vector3, pos: Vector3, mat: Material, shadow: bool = true) -> MeshInstance3D:
