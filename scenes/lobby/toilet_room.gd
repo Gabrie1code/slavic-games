@@ -217,7 +217,8 @@ func _build_paper_holder() -> void:
 ## Рукомойник с краном на правой стене у двери, над ним зеркало.
 ## Дырчатая мусорная корзина со скомканной бумагой в углу у двери (tools/blender/kitchen.py).
 ## Бьётся ударом (Breakable): разлетается чёрными и белыми осколками, через 7 сек появляется
-## снова. Пока целая — твёрдая (через неё не пройти), разбитая — нет.
+## снова. Пока целая — твёрдая (через неё не пройти), разбитая — нет. Появилась, а на её месте
+## стоит персонаж — твёрдой станет, только когда он отойдёт (иначе застрял бы внутри).
 func _build_trash_bin() -> void:
 	var pos := Vector3(X0 + WALL_T / 2.0 + 0.3, 0, Z0 + 0.17)
 	var bin := Breakable.new()
@@ -236,8 +237,32 @@ func _build_trash_bin() -> void:
 	solid.add_child(shape)
 	solid.position = pos
 	add_child(solid)
+	# Кто стоит на месте корзины (чуть шире её: капсула персонажа 0.4 + корзина 0.14).
+	var spot := Area3D.new()
+	var spot_shape := CollisionShape3D.new()
+	var spot_cylinder := CylinderShape3D.new()
+	spot_cylinder.radius = 0.5
+	spot_cylinder.height = 1.8
+	spot_shape.shape = spot_cylinder
+	spot_shape.position.y = 0.9
+	spot.add_child(spot_shape)
+	spot.position = pos
+	add_child(spot)
 	bin.broken.connect(func() -> void: shape.set_deferred("disabled", true))
-	bin.restored.connect(func() -> void: shape.set_deferred("disabled", false))
+	bin.restored.connect(func() -> void: _solid_when_free(shape, spot, bin))
+
+
+## Включить твёрдость, когда на месте вещи нет ни одного персонажа (проверка раз в 0.2 сек).
+func _solid_when_free(shape: CollisionShape3D, spot: Area3D, item: Breakable) -> void:
+	while is_inside_tree() and not item.is_broken(): # снова разбили, пока ждали — не включать
+		var occupied := false
+		for body in spot.get_overlapping_bodies():
+			if body is CharacterBody3D:
+				occupied = true
+		if not occupied:
+			shape.disabled = false
+			return
+		await get_tree().create_timer(0.2).timeout
 
 
 func _build_sink() -> void:
