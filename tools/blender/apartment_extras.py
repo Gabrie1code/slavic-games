@@ -150,38 +150,83 @@ export("phone_handset", [join("PhoneHandset", P)])
 # В Godot: диск — в (0, 0.108, 0.047) с наклоном 16° по X; трубка — в (0, 0.16, -0.07).
 
 # ---------------- Граммофон (ставится на стол) ----------------
-P = [box((0.34, 0.34, 0.12), (0, 0, 0.06), WOOD)]
+# Как настоящий: ящик с диском, сзади-справа стойка тонарма; от неё тонарм с мембраной лежит
+# на пластинке, а вверх уходит одна плавная изогнутая труба, которая переходит прямо в раструб
+# (раньше труба была из отдельных палок, а раструб висел отдельно, в 27 см от неё).
+def tube(points, r, m, resolution=12):
+    """Плавная труба по кривой Безье через точки [(точка, касательная)]."""
+    cu = bpy.data.curves.new("Tube", "CURVE")
+    cu.dimensions = "3D"
+    cu.bevel_depth = r
+    cu.bevel_resolution = 3
+    cu.resolution_u = resolution
+    cu.use_fill_caps = True
+    sp = cu.splines.new("BEZIER")
+    sp.bezier_points.add(len(points) - 1)
+    for bp, (co, tan) in zip(sp.bezier_points, points):
+        co, tan = Vector(co), Vector(tan)
+        bp.co = co
+        bp.handle_left = co - tan
+        bp.handle_right = co + tan
+    o = bpy.data.objects.new("Tube", cu)
+    bpy.context.scene.collection.objects.link(o)
+    bpy.ops.object.select_all(action="DESELECT")
+    o.select_set(True)
+    bpy.context.view_layer.objects.active = o
+    bpy.ops.object.convert(target="MESH")
+    o = flat(bpy.context.object, m)
+    for poly in o.data.polygons:
+        poly.use_smooth = True                                      # гладкая, без граней
+    return o
+
+
+GRAM_WOOD = WOOD
+P = [box((0.34, 0.34, 0.12), (0, 0, 0.06), GRAM_WOOD)]
 P.append(box((0.36, 0.36, 0.015), (0, 0, 0.125), WOOD_D))
-P.append(cyl(0.14, 0.008, (0, 0, 0.137), BLACK, verts=28))          # пластинка
-P.append(cyl(0.04, 0.009, (0, 0, 0.138), mat("Label", (0.75, 0.1, 0.1), 0.6), verts=12))
-P.append(cyl(0.012, 0.06, (0.13, 0.12, 0.16), BRASS, verts=8))      # стойка тонарма
-P.append(rod((0.13, 0.12, 0.19), (0.04, -0.02, 0.15), 0.008, BRASS))
-P.append(cyl(0.02, 0.03, (0.04, -0.02, 0.145), BRASS, verts=10))
-P.append(cyl(0.012, 0.05, (-0.17, 0.0, 0.08), BRASS, verts=8, rot=(0, math.pi / 2, 0)))  # ручка
-# Труба: изогнутая трубка сзади и раструб вперёд-вверх.
-path = [(0.13, 0.15, 0.17), (0.12, 0.18, 0.3), (0.06, 0.15, 0.45), (0.0, 0.05, 0.55)]
-for a, b in zip(path, path[1:]):
-    P.append(rod(a, b, 0.025, BRASS))
-# Раструб — полая труба (без крышек) с толщиной: изнутри тоже золотой, без «рваных» граней.
-bpy.ops.mesh.primitive_cone_add(vertices=24, radius1=0.025, radius2=0.22, depth=0.32, end_fill_type="NOTHING",
-                                location=(0, 0, 0))
+P.append(cyl(0.145, 0.006, (0, 0, 0.135), mat("Felt", (0.25, 0.08, 0.06), 0.9), verts=28))   # диск
+P.append(cyl(0.14, 0.006, (0, 0, 0.141), BLACK, verts=28))          # пластинка
+P.append(cyl(0.04, 0.007, (0, 0, 0.143), mat("Label", (0.75, 0.1, 0.1), 0.6), verts=12))
+P.append(cyl(0.005, 0.02, (0, 0, 0.15), BRASS, verts=8))            # ось диска
+POST = Vector((0.13, 0.13, 0.0))
+P.append(cyl(0.022, 0.012, (POST.x, POST.y, 0.138), BRASS, verts=12))   # основание стойки
+P.append(cyl(0.013, 0.07, (POST.x, POST.y, 0.17), BRASS, verts=10))     # стойка
+TOP = Vector((POST.x, POST.y, 0.205))
+# Тонарм: от стойки плавно вниз-вперёд к мембране на краю пластинки.
+SOUND = Vector((0.03, -0.06, 0.172))
+P.append(tube([(TOP, (-0.02, -0.03, 0.0)), (SOUND + Vector((0.0, 0.0, 0.012)), (-0.03, -0.02, -0.01))],
+              0.007, BRASS))
+P.append(cyl(0.028, 0.012, tuple(SOUND), BRASS, verts=16, rot=(math.radians(90), 0, math.radians(30))))
+P.append(cyl(0.022, 0.014, tuple(SOUND), mat("Membrane", (0.85, 0.82, 0.72), 0.5), verts=16,
+             rot=(math.radians(90), 0, math.radians(30))))
+P.append(cyl(0.002, 0.03, tuple(SOUND + Vector((0, 0, -0.022))), BLACK, verts=4))         # игла
+# Ручка завода сбоку: ось, колено, деревянная рукоятка.
+P.append(cyl(0.008, 0.05, (-0.195, 0.0, 0.07), BRASS, verts=8, rot=(0, math.pi / 2, 0)))
+P.append(box((0.012, 0.012, 0.07), (-0.22, 0.0, 0.045), BRASS))
+P.append(cyl(0.012, 0.04, (-0.24, 0.0, 0.015), WOOD_D, verts=8, rot=(0, math.pi / 2, 0)))
+# Труба: от стойки вверх и плавно в горло раструба.
+D = Vector((0.0, 0.6, 0.8)).normalized()                            # куда смотрит раструб
+THROAT = Vector((0.03, 0.0, 0.40))
+P.append(tube([(TOP, (0.0, 0.0, 0.08)), (THROAT, tuple(D * 0.09))], 0.02, HORN))
+P.append(cyl(0.028, 0.025, tuple(THROAT), BRASS, verts=16,         # муфта на стыке
+             rot=tuple(D.to_track_quat("Z", "Y").to_euler())))
+LEN = 0.34
+bpy.ops.mesh.primitive_cone_add(vertices=28, radius1=0.022, radius2=0.2, depth=LEN, end_fill_type="NOTHING",
+                                location=tuple(THROAT + D * (LEN / 2)),
+                                rotation=tuple(D.to_track_quat("Z", "Y").to_euler()))
 horn = flat(bpy.context.object, HORN)
+for poly in horn.data.polygons:
+    poly.use_smooth = True
 mod = horn.modifiers.new("Thick", "SOLIDIFY")
-mod.thickness = 0.008
+mod.thickness = 0.006
 bpy.context.view_layer.objects.active = horn
 bpy.ops.object.modifier_apply(modifier="Thick")
-horn.rotation_euler = (math.radians(-60), 0, 0)
-horn.location = (0, -0.08, 0.63)
 bpy.ops.object.transform_apply(location=True, rotation=True)
 P.append(horn)
-bpy.ops.mesh.primitive_torus_add(major_radius=0.22, minor_radius=0.012, major_segments=24, minor_segments=5,
-                                 location=(0, 0, 0))                          # кант по краю раструба
-rim = flat(bpy.context.object, HORN)
-rim.rotation_euler = (math.radians(-60), 0, 0)
-# Сдвиг края раструба (0, 0, 0.16) после поворота на −60° по X + положение раструба.
-rim.location = Vector((0, -0.08, 0.63)) + Vector((0, 0.16 * math.sin(math.radians(60)), 0.16 * 0.5))
+bpy.ops.mesh.primitive_torus_add(major_radius=0.2, minor_radius=0.01, major_segments=28, minor_segments=5,
+                                 location=tuple(THROAT + D * LEN),
+                                 rotation=tuple(D.to_track_quat("Z", "Y").to_euler()))   # кант
+rim = flat(bpy.context.object, BRASS)
 bpy.ops.object.transform_apply(location=True, rotation=True)
-bpy.context.view_layer.objects.active = rim
 P.append(rim)
 export("gramophone", [join("Gramophone", P)])
 
