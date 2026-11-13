@@ -44,6 +44,11 @@ var holder: PlayerData
 var _loose_time := 0.0
 var _model: Node3D
 var _stream: CPUParticles3D
+## Струя из «баллончика в кадре» (от первого лица видит только сам держащий): так брызги летят
+## из баллончика на экране, а не из настоящей руки где-то сбоку.
+var _view_stream: CPUParticles3D
+## Слой модели держащего: общую струю (из руки) он сам от первого лица не видит.
+var _owner_layer := 1
 var _last_splat := Vector3.INF
 var _splat_time := 0.0
 
@@ -69,6 +74,8 @@ func _ready() -> void:
 	physics_material_override = surface
 	_stream = _make_stream()
 	add_child(_stream)
+	_view_stream = _make_stream()
+	add_child(_view_stream)
 	tint_stripe(_model, color())
 	freeze_mode = RigidBody3D.FREEZE_MODE_KINEMATIC # в руке двигается вместе с ней
 	_set_loose_physics(false)
@@ -103,7 +110,8 @@ func hold(p: PlayerData, character: PlayerCharacter) -> void:
 	_set_loose_physics(false)
 	_move_to(null)
 	character.attach_to_part("ArmR", self)
-	_stream.layers = 1 # струю видно всем, и самому держащему от первого лица
+	_stream.layers = 1 # струю видно всем (от первого лица — см. spray_at: своя струя из кадра)
+	_owner_layer = 1 << (p.slot + 1) # слой модели игрока (как в лобби)
 	position = HAND_POS
 	rotation = HAND_ROT
 	character.set_arm_pose(0.15, 0.9, 0.2)
@@ -153,18 +161,19 @@ static func tint_stripe(node: Node, paint: Color) -> void:
 ## Красить: струя от распылителя к target. hit — луч попал во что-то (collider; normal — его
 ## сторона): там остаются следы краски, плотной «дорожкой», пока ведут прицелом. На игроке и
 ## на посуде след «прилипает» к ним (двигается вместе с ними, смывается, бьётся с посудой).
+## view_can — баллончик «в кадре» у камеры держащего (null — вид сверху): тогда сам держащий
+## видит струю из него, а остальные — из руки персонажа.
 func spray_at(target: Vector3, normal: Vector3, hit: bool, delta: float,
-		collider: Object = null) -> void:
-	var nozzle := to_global(NOZZLE)
-	var to := target - nozzle
-	if to.length() < 0.05:
+		collider: Object = null, view_can: Node3D = null) -> void:
+	if not _aim_stream(_stream, to_global(NOZZLE), target):
 		return
-	_stream.global_transform = Transform3D(Basis.looking_at(to.normalized(), _up_for(to)), nozzle)
-	var speed := to.length() / STREAM_TIME
-	_stream.initial_velocity_min = speed * 0.9
-	_stream.initial_velocity_max = speed
-	_stream.color = color()
-	_stream.emitting = true
+	var in_view := view_can != null and view_can.is_visible_in_tree()
+	_stream.layers = _owner_layer if in_view else 1
+	if in_view:
+		_aim_stream(_view_stream, view_can.to_global(NOZZLE), target)
+		_view_stream.layers = _layer_of(view_can)
+	else:
+		_view_stream.emitting = false
 	_splat_time += delta
 	if hit and (target.distance_to(_last_splat) > SPLAT_STEP or _splat_time > 0.15):
 		_splat_time = 0.0
@@ -192,8 +201,34 @@ static func clear_paint(node: Node) -> void:
 			clear_paint(child)
 
 
+## Направить струю из nozzle в target (долетает за STREAM_TIME). false — цель слишком близко.
+func _aim_stream(stream: CPUParticles3D, nozzle: Vector3, target: Vector3) -> bool:
+	var to := target - nozzle
+	if to.length() < 0.05:
+		return false
+	stream.global_transform = Transform3D(Basis.looking_at(to.normalized(), _up_for(to)), nozzle)
+	var speed := to.length() / STREAM_TIME
+	stream.initial_velocity_min = speed * 0.9
+	stream.initial_velocity_max = speed
+	stream.color = color()
+	stream.emitting = true
+	return true
+
+
+## Слой видимости модели (первый меш внутри).
+static func _layer_of(node: Node) -> int:
+	if node is VisualInstance3D:
+		return (node as VisualInstance3D).layers
+	for child in node.get_children():
+		var layer := _layer_of(child)
+		if layer != 0:
+			return layer
+	return 0
+
+
 func stop_spray() -> void:
 	_stream.emitting = false
+	_view_stream.emitting = false
 	_last_splat = Vector3.INF
 
 

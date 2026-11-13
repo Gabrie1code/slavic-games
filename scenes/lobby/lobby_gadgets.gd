@@ -182,10 +182,10 @@ func _process_can_holder(p: PlayerData, camera: Camera3D, view_can: Node3D) -> v
 	var hit := _aim_hit(character, camera, SPRAY_REACH)
 	if hit.is_empty():
 		var far := _aim_end(character, camera, SPRAY_REACH)
-		can.spray_at(far, Vector3.UP, false, apartment.get_process_delta_time())
+		can.spray_at(far, Vector3.UP, false, apartment.get_process_delta_time(), null, view_can)
 	else:
 		can.spray_at(hit["position"], hit["normal"], true, apartment.get_process_delta_time(),
-			hit["collider"])
+			hit["collider"], view_can)
 
 
 ## Куда смотрит прицел: от камеры (от первого лица) или от головы вперёд (вид сверху).
