@@ -549,12 +549,24 @@ func _use_kitchen_cabinet(p: PlayerData) -> bool:
 	return false
 
 
-## Шкафчик или духовка на кухне, к которым подошли лицом (null — далеко).
+## Шкафчик или духовка на кухне, к которым подошли лицом (null — далеко). Если рядом и мойка,
+## а смотрят скорее на неё, — null (мойка и духовка стоят бок о бок: раньше у мойки всегда
+## предлагало «Открыть духовку»).
 func _near_hinged(p: PlayerData) -> HingedProp:
-	for prop: HingedProp in [apartment.kitchen_room.cabinet, apartment.kitchen_room.oven]:
-		if prop and _near(p, prop.front_point(), SIDEBOARD_RADIUS):
-			return prop
-	return null
+	var prop := _hinged_in_reach(p)
+	var sink := _sink_in_reach(p)
+	if prop and sink and _view_angle(p, sink.front_point()) < _view_angle(p, prop.front_point()):
+		return null
+	return prop
+
+
+func _hinged_in_reach(p: PlayerData) -> HingedProp:
+	return apartment.kitchen_room.hinged_near(characters[p.id], SIDEBOARD_RADIUS) \
+		if characters.has(p.id) else null
+
+
+func _view_angle(p: PlayerData, point: Vector3) -> float:
+	return KitchenRoom.view_angle(characters[p.id], point)
 
 
 func _sideboard_hint(p: PlayerData) -> Array[Dictionary]:
@@ -851,8 +863,16 @@ func _sink_hint(p: PlayerData) -> Array[Dictionary]:
 
 
 ## Рукомойник в туалете или мойка на кухне, к кранам которых игрок подошёл лицом
-## (null — далеко).
+## (null — далеко, или рядом духовка/шкафчик и смотрят скорее на них).
 func _near_sink(p: PlayerData) -> Sink:
+	var sink := _sink_in_reach(p)
+	var prop := _hinged_in_reach(p)
+	if sink and prop and _view_angle(p, prop.front_point()) < _view_angle(p, sink.front_point()):
+		return null
+	return sink
+
+
+func _sink_in_reach(p: PlayerData) -> Sink:
 	for sink: Sink in [apartment.toilet_room.sink, apartment.kitchen_room.sink]:
 		if sink and _near(p, sink.front_point(), SINK_RADIUS):
 			return sink

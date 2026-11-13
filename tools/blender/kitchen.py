@@ -327,8 +327,8 @@ export_objects("kitchen_sink", [body, hot, cold, water])
 # Полый: левая дверца — часть корпуса, правая — отдельная модель kitchen_cabinet_door (петля —
 # справа), открывается. В правой половине: наверху стопки-стаканчики, внизу — батон (не трогаются).
 GLASS_CUP = mat("CupGlass", (0.8, 0.9, 0.93), 0.05)
-BREAD = mat("Bread", (0.6, 0.33, 0.12), 0.7)                     # румяная корочка
-CRUST = mat("BreadCut", (0.93, 0.8, 0.55), 0.8)
+BREAD = mat("Bread", (0.5, 0.24, 0.07), 0.6)                     # румяная корочка
+CRUST = mat("BreadCut", (0.8, 0.55, 0.25), 0.8)                   # светлый мякиш в надрезе
 INSIDE = mat("CabinetInside", (0.85, 0.8, 0.62), 0.6)
 P = [box((1.0, 0.02, 0.6), (0, 0.14, 0.3), INSIDE)]                                # задняя стенка
 for x in (-0.49, 0.49):
@@ -343,14 +343,27 @@ P.append(box((1.02, 0.32, 0.02), (0, 0.0, 0.61), CAB_EDGE))                     
 for k in range(4):                                                                 # стопки
     x = 0.08 + k * 0.1
     P.append(cyl(0.022, 0.07, (x, 0.0, 0.3075 + 0.035), GLASS_CUP, verts=8, r2=0.026))
-# Батон: вытянутый, скруглённый, с косыми надрезами.
-bpy.ops.mesh.primitive_uv_sphere_add(segments=16, ring_count=10, radius=1.0, location=(0.245, 0.0, 0.065))
+# Батон как на фото владельца: гладкий, вытянутый, к концам сужается, низ плоский; надрезы —
+# светлые вдавленные косые полоски по верху (раньше торчали белые «палочки»).
+LX, LY, LZ = 0.245, 0.0, 0.02                                  # центр низа батона (на дне шкафчика)
+bpy.ops.mesh.primitive_uv_sphere_add(segments=32, ring_count=16, radius=1.0, location=(LX, LY, LZ))
 loaf = bpy.context.object
-loaf.scale = (0.17, 0.06, 0.045)
-bpy.ops.object.transform_apply(scale=True, location=False)
+for v in loaf.data.vertices:
+    xn = v.co.x
+    taper = 1.0 - 0.18 * xn * xn                                   # концы уже середины
+    v.co.x *= 0.16
+    v.co.y *= 0.062 * taper
+    v.co.z = (v.co.z * 0.062 * taper if v.co.z > 0 else v.co.z * 0.012) + 0.012
 P.append(finish(loaf, BREAD, smooth=True))
 for k in range(4):
-    P.append(box((0.012, 0.09, 0.006), (0.15 + k * 0.065, 0.0, 0.106), CRUST, rot=(0, 0, math.radians(35))))
+    dx = -0.09 + k * 0.06
+    xn = dx / 0.16
+    top = 0.012 + 0.062 * (1.0 - 0.18 * xn * xn) * math.sqrt(max(0.0, 1.0 - xn * xn))
+    cut = sphere(1.0, (LX + dx, LY, LZ + top - 0.0035), CRUST, scale=(0.032, 0.0075, 0.006), segs=12, rings=8)
+    cut.rotation_euler = (0, 0, math.radians(55))
+    bpy.context.view_layer.objects.active = cut
+    bpy.ops.object.transform_apply(rotation=True, location=False, scale=False)
+    P.append(cut)
 export("kitchen_cabinet", P)
 # Правая дверца: петля — правый край (x = 0.49, y = −0.155), открывается наружу.
 P = [box((0.47, 0.02, 0.56), (0.25, -0.155, 0.3), CABINET, bevel=0.008),

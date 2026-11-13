@@ -349,6 +349,36 @@ func _calendar_label(pad: Node3D, text: String, size: int, color: Color, y: floa
 	pad.add_child(label)
 
 
+# ---------------- Для лобби: что перед игроком ----------------
+
+## Шкафчик или духовка ближе radius и в поле взгляда (если оба — тот, что ближе к центру
+## взгляда); null — нет.
+func hinged_near(character: Node3D, radius: float) -> HingedProp:
+	var best: HingedProp = null
+	for prop: HingedProp in [cabinet, oven]:
+		if prop == null:
+			continue
+		var point := prop.front_point()
+		var flat := Vector2(point.x - character.global_position.x,
+			point.z - character.global_position.z)
+		if flat.length() >= radius or not LobbyGadgets.facing(character, point):
+			continue
+		if best == null or view_angle(character, point) < view_angle(character, best.front_point()):
+			best = prop
+	return best
+
+
+## На сколько градусов точка в стороне от взгляда персонажа (по горизонтали).
+static func view_angle(character: Node3D, point: Vector3) -> float:
+	var to := point - character.global_position
+	to.y = 0.0
+	var forward := -character.global_basis.z
+	forward.y = 0.0
+	if to.length() < 0.01 or forward.length() < 0.01:
+		return 0.0
+	return rad_to_deg(forward.angle_to(to))
+
+
 # ---------------- Помощники ----------------
 
 func _model(model_name: String) -> Node3D:
