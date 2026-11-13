@@ -76,7 +76,8 @@ func _build_door_wall() -> void:
 	# Над дверью — твёрдо до потолка (не пролететь в прыжке сквозь «картинку» стены).
 	_solid(Vector3(WALL_T, 2.4 - DOOR_TOP, door_len), Vector3(X0, (2.4 + DOOR_TOP) / 2.0, door_mid),
 		wallpaper)
-	_collider(Vector3(WALL_T, HEIGHT - 2.4, door_len), Vector3(X0, 2.4 + (HEIGHT - 2.4) / 2.0, door_mid))
+	_collider(Vector3(WALL_T, HEIGHT - 2.4, door_len),
+		Vector3(X0, 2.4 + (HEIGHT - 2.4) / 2.0, door_mid))
 	_fp_only(Vector3(WALL_T, HEIGHT - 2.4, door_len),
 		Vector3(X0, 2.4 + (HEIGHT - 2.4) / 2.0, door_mid), wallpaper)
 	# Табличка над дверью со стороны гостиной: синяя жестянка с человечками и «ТУАЛЕТ»
