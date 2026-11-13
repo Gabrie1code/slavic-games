@@ -216,18 +216,28 @@ func _build_paper_holder() -> void:
 
 ## Рукомойник с краном на правой стене у двери, над ним зеркало.
 ## Дырчатая мусорная корзина со скомканной бумагой в углу у двери (tools/blender/kitchen.py).
+## Бьётся ударом (Breakable): разлетается чёрными и белыми осколками, через 7 сек появляется
+## снова. Пока целая — твёрдая (через неё не пройти), разбитая — нет.
 func _build_trash_bin() -> void:
-	var bin := StaticBody3D.new()
-	bin.add_child((load("res://assets/models/kitchen/trash_bin.glb") as PackedScene).instantiate())
+	var pos := Vector3(X0 + WALL_T / 2.0 + 0.3, 0, Z0 + 0.17)
+	var bin := Breakable.new()
+	bin.position = pos
+	add_child(bin)
+	var colors: Array[Color] = [Color("1c1c1e"), Color("efeee8"), Color("2a2a2c")]
+	bin.setup(load("res://assets/models/kitchen/trash_bin.glb") as PackedScene, colors, 0.3, 0.05)
+	bin.respawn_time = 7.0
+	var solid := StaticBody3D.new()
 	var shape := CollisionShape3D.new()
 	var cylinder := CylinderShape3D.new()
 	cylinder.radius = 0.14
 	cylinder.height = 0.31
 	shape.shape = cylinder
 	shape.position.y = 0.155
-	bin.add_child(shape)
-	bin.position = Vector3(X0 + WALL_T / 2.0 + 0.3, 0, Z0 + 0.17)
-	add_child(bin)
+	solid.add_child(shape)
+	solid.position = pos
+	add_child(solid)
+	bin.broken.connect(func() -> void: shape.set_deferred("disabled", true))
+	bin.restored.connect(func() -> void: shape.set_deferred("disabled", false))
 
 
 func _build_sink() -> void:
