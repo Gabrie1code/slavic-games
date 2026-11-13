@@ -59,6 +59,11 @@ func can_close() -> bool:
 	return door != null and _open and _angle() > open_angle * 0.9 and _time >= _ready_at
 
 
+## Подсказка, пока нельзя (перезарядка, дверца ещё едет): что будет следующим действием.
+func next_text() -> String:
+	return close_text if _open else open_text
+
+
 func open() -> void:
 	_open = true
 	_close_at = _time + open_time

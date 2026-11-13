@@ -570,6 +570,8 @@ func _sideboard_hint(p: PlayerData) -> Array[Dictionary]:
 			result.append(entry(confirm_key(p), prop.open_text))
 		elif prop.can_close():
 			result.append(entry(confirm_key(p), prop.close_text))
+		else: # перезарядка или дверца ещё едет — кнопка серая, как везде
+			result.append(entry(confirm_key(p), prop.next_text(), true))
 	return result
 
 
