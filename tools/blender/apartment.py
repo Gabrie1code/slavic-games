@@ -172,7 +172,7 @@ P.append(cyl(0.045, 0.15, (0, 0, 0.115), WATER, verts=8, r2=0.075))
 made.append(export("crystal_vase", P))
 
 # Ваза с водой и букетом (на журнальном столике): та же хрустальная ваза, вода непрозрачная,
-# из неё — стебли, красные гвоздики, белые ромашки и листья.
+# из неё — стебли, 3 красные гвоздики, 3 белые ромашки, листья на стеблях.
 STEM = mat("FlowerStem", (0.16, 0.42, 0.12), 0.7)
 CARNATION = mat("Carnation", (0.78, 0.06, 0.1), 0.7)
 DAISY = mat("Daisy", (0.95, 0.95, 0.92), 0.7)
@@ -181,9 +181,9 @@ P = [cyl(0.07, 0.04, (0, 0, 0.02), GLASS, verts=8)]
 P.append(cyl(0.05, 0.22, (0, 0, 0.15), GLASS, verts=8, r2=0.09))
 P.append(cyl(0.09, 0.04, (0, 0, 0.28), GLASS, verts=8, r2=0.11))
 P.append(cyl(0.045, 0.15, (0, 0, 0.115), WATER, verts=8, r2=0.075))
-rng = random.Random(11)
-heads = [(a, r, h) for a, r, h in ((0.0, 0.0, 0.56), (0.9, 0.09, 0.5), (2.1, 0.1, 0.52), (3.2, 0.09, 0.48),
-                                   (4.3, 0.1, 0.51), (5.4, 0.09, 0.49), (1.5, 0.15, 0.44), (3.9, 0.15, 0.45))]
+# 6 цветов: чётные — красные гвоздики, нечётные — белые ромашки. Листья растут из стеблей.
+heads = [(0.0, 0.0, 0.56), (1.05, 0.1, 0.5), (2.1, 0.11, 0.52), (3.15, 0.1, 0.49), (4.2, 0.11, 0.51),
+         (5.25, 0.1, 0.48)]
 for i, (a, r, h) in enumerate(heads):
     top = Vector((math.cos(a) * r, math.sin(a) * r, h))
     base = Vector((math.cos(a) * 0.015, math.sin(a) * 0.015, 0.1))
@@ -202,15 +202,19 @@ for i, (a, r, h) in enumerate(heads):
                          tuple(top + Vector((math.cos(pa) * 0.024, math.sin(pa) * 0.024, 0))), DAISY,
                          rot=(0, math.radians(-12), pa)))
         P.append(sphere(0.014, tuple(top + Vector((0, 0, 0.003))), DAISY_MID, scale=(1, 1, 0.6), segs=8, rings=4))
-for k in range(5):                                                                        # листья
-    a = k * math.tau / 5 + 0.4                                    # из горлышка вазы наружу
-    P.append(sphere(1.0, (math.cos(a) * 0.1, math.sin(a) * 0.1, 0.33 + rng.uniform(0, 0.03)), STEM,
-                    scale=(0.07, 0.018, 0.006), segs=8, rings=4))
-    P[-1].rotation_euler = (0, math.radians(-25), a)
-    bpy.ops.object.select_all(action="DESELECT")
-    P[-1].select_set(True)
-    bpy.context.view_layer.objects.active = P[-1]
-    bpy.ops.object.transform_apply(rotation=True)
+    if i == 0:
+        continue
+    # Лист: основание на стебле над горлышком вазы, кончик — наружу и чуть вверх.
+    p0 = base + d * ((0.36 - base.z) / d.z)
+    out = Vector((math.cos(a + 0.5), math.sin(a + 0.5), 0.45)).normalized()
+    side = out.cross(Vector((0, 0, 1))).normalized() * 0.019
+    tip = p0 + out * 0.1
+    mid = p0 + out * 0.045
+    me = bpy.data.meshes.new("Leaf")
+    me.from_pydata([tuple(p0), tuple(mid + side), tuple(tip), tuple(mid - side)], [], [(0, 1, 2, 3)])
+    lf = bpy.data.objects.new("Leaf", me)
+    bpy.context.scene.collection.objects.link(lf)
+    P.append(flat(lf, STEM))
 made.append(export("vase_bouquet", P))
 P = [cyl(0.04, 0.01, (0, 0, 0.005), GLASS, verts=8), cyl(0.008, 0.08, (0, 0, 0.05), GLASS, verts=6),
      cyl(0.012, 0.07, (0, 0, 0.12), GLASS, verts=8, r2=0.04)]
@@ -291,7 +295,19 @@ P = [box((1.4, 0.85, 0.05), (0, 0, 0.75), WOOD, bevel=0.015)]
 for x in (-0.62, 0.62):
     for y in (-0.36, 0.36):
         P.append(box((0.06, 0.06, 0.73), (x, y, 0.365), WOOD))
-P.append(box((1.0, 0.6, 0.006), (0, 0, 0.778), LACE))                                  # салфетка
+# Скатерть-салфетка: тёмно-зелёная, по краю кремовая строчка, в углах вышитые красные ромбики.
+CLOTH = mat("TableClothGreen", (0.06, 0.2, 0.12), 0.95)
+CLOTH_TRIM = mat("TableClothCream", (0.9, 0.82, 0.62), 0.95)
+CLOTH_RED = mat("TableClothRed", (0.62, 0.06, 0.06), 0.95)
+P.append(box((1.0, 0.6, 0.004), (0, 0, 0.777), CLOTH))
+for y in (-0.27, 0.27):
+    P.append(box((0.92, 0.01, 0.0045), (0, y, 0.77725), CLOTH_TRIM))
+for x in (-0.46, 0.46):
+    P.append(box((0.01, 0.55, 0.0045), (x, 0, 0.77725), CLOTH_TRIM))
+for x in (-0.39, 0.39):
+    for y in (-0.2, 0.2):
+        P.append(box((0.05, 0.05, 0.0045), (x, y, 0.77725), CLOTH_RED, rot=(0, 0, math.radians(45))))
+        P.append(box((0.02, 0.02, 0.005), (x, y, 0.7775), CLOTH_TRIM, rot=(0, 0, math.radians(45))))
 made.append(export("table", P))
 P = [box((0.45, 0.45, 0.05), (0, 0, 0.47), WOOD_L, bevel=0.01)]
 for x in (-0.19, 0.19):

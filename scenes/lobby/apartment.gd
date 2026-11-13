@@ -316,19 +316,19 @@ func _build_living_room() -> void:
 	_chandelier(Vector3(-2.4, 0, -0.6), LIVING_SWITCH, -PI / 2)
 
 	# Обеденный стол — вдоль перегородки под плакатом «К звёздам!» (длинной стороной вдоль стены,
-	# от выключателя до угла с туалетом): варенье, граммофон, журналы; стулья с комнатной
+	# от выключателя до угла с туалетом): граммофон, книги с песенником и ручка; стулья с комнатной
 	# стороны, табурет у дальнего торца. Стулья и табурет падают.
 	var dining := Vector3(PARTITION_X - 0.55, 0, 0.88)
 	_solid(_model("table"), Vector3(1.4, 0.8, 0.85), 0.4, dining, PI / 2)
 	for dz: float in [-0.3, 0.3]:
 		_tippable("chair", Vector3(0.45, 0.95, 0.45), 0.47, dining + Vector3(-0.75, 0, dz), 3.0, 90.0)
 	_tippable("stool", Vector3(0.36, 0.47, 0.36), 0.24, dining + Vector3(0.0, 0, 0.95), 2.0)
-	_breakable("jar_jam", dining + Vector3(0.1, 0.78, 0.45), [Color("801010"), GLASS], 0.4)
 	# Граммофон: от удара падает со стола и через время сам возвращается (как стулья).
 	gramophone = _tippable("gramophone", Vector3(0.36, 0.14, 0.36), 0.07,
 		dining + Vector3(0.0, 0.8, -0.05), 2.0, -73.0)
-	var books_b := [Color("cc9918"), Color("6a2a6a"), Color("1a4080")]
-	_breakable("book_stack_mags", dining + Vector3(-0.1, 0.78, -0.45), books_b, 0.4)
+	# Книга, сверху песенник с нотой на обложке, рядом шариковая ручка (tools/blender/decor.py).
+	var books_b := [Color("6b0d14"), Color("1a4d29"), Color("142a80")]
+	_breakable("book_stack_music", dining + Vector3(-0.1, 0.78, -0.45), books_b, 0.4)
 
 	# Банки с заготовками (огурцы, варенье) — в ряд вдоль левой стены у серванта.
 	for i in 3:
@@ -462,8 +462,19 @@ func _fade_hanging(delta: float) -> void:
 			continue
 		hang.set_meta("fade", now)
 		hang.visible = now < 0.99
+		var ghost: Material = item.get("ghost") if now > 0.0 else null
 		for mesh in hang.find_children("*", "GeometryInstance3D", true, false):
 			(mesh as GeometryInstance3D).transparency = now
+			if item.has("ghost"):
+				(mesh as GeometryInstance3D).material_override = ghost
+
+
+## Ровный тёмный материал без освещения и свечения — для «призрака» растворяющейся лампы.
+func _ghost_mat(color: Color) -> StandardMaterial3D:
+	var mat := StandardMaterial3D.new()
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.albedo_color = color
+	return mat
 
 
 func _warm_light(energy: float, light_range: float, pos: Vector3) -> OmniLight3D:
@@ -698,7 +709,10 @@ func _build_rubgame() -> void:
 	var lamp := _place(_rubgame_model("rubgame_lamp"), RUBGAME_TABLE_POS + Vector3(0.3, 0, 0))
 	_set_layers(lamp, RUBGAME_LAMP_LAYER)
 	# Встал на стол под лампой — она плавно растворяется, чтобы не закрывать обзор.
-	_hanging_top.append({"node": lamp, "pos": lamp.position, "only_above": 0.4})
+	# «Призрак» растворяющейся лампы — тёмный, без света (ghost): иначе белое нутро абажура и
+	# лампочка ярко светились сквозь прозрачность.
+	_hanging_top.append({"node": lamp, "pos": lamp.position, "only_above": 0.4,
+		"ghost": _ghost_mat(Color("0d3a1f"))})
 	var light := OmniLight3D.new()
 	light.light_color = Color(1.0, 0.9, 0.65)
 	light.light_energy = 1.6

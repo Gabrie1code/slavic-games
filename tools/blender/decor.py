@@ -13,7 +13,7 @@
   floor_runner.glb      — ковровая дорожка 3 × 0.8 с полосами по краям;
   book_stack_tall.glb   — высокая стопка тонких книг вразнобой;
   book_stack_tomes.glb  — два толстых старых тома с золотыми полосками и очки сверху;
-  book_stack_mags.glb   — журналы («Огонёк»-подобные, без названий) и раскрытая книга сверху.
+  book_stack_music.glb  — книга, сверху песенник с нотой на обложке, рядом шариковая ручка.
 Полки: задняя сторона у стены в y = 0 (смотрят на −Y, в Godot +Z), низ полки на z = 0.
 
 Запуск:
@@ -138,6 +138,25 @@ def pot(r, h, m=CLAY):
     soil_z = h - 0.03
     soil_r = r + r * 0.25 * soil_z / h - 0.004
     return [walls, bottom, cyl(soil_r, 0.01, (0, 0, soil_z - 0.005), SOIL, verts=10)]
+
+
+def real_book(w, d, h, cover, center, yaw=0.0, stripes=None):
+    """Лежащая книга как настоящая: твёрдые крышки сверху и снизу, корешок с одной стороны (−X),
+    с трёх других сторон видны страницы (чуть утоплены). stripes — золотые полосы на корешке."""
+    t = 0.004                                                        # толщина крышки и корешка
+    cx, cy, cz = center
+    c, sn = math.cos(yaw), math.sin(yaw)
+
+    def at(x, y, z):
+        return (cx + x * c - y * sn, cy + x * sn + y * c, cz + z)
+
+    parts = [box((w, d, t), at(0, 0, t / 2), cover, rot=(0, 0, yaw)),
+             box((w, d, t), at(0, 0, h - t / 2), cover, rot=(0, 0, yaw)),
+             box((t, d, h), at(-w / 2 + t / 2, 0, h / 2), cover, rot=(0, 0, yaw)),
+             box((w - t - 0.006, d - 0.008, h - 2 * t), at(t / 2 - 0.003, 0, h / 2), PAGES, rot=(0, 0, yaw))]
+    for z in (stripes or []):
+        parts.append(box((t + 0.002, d * 0.98, 0.006), at(-w / 2 + t / 2, 0, z * h), GOLD_STRIPE, rot=(0, 0, yaw)))
+    return parts
 
 
 def export_item(name, parts, origin):
@@ -304,9 +323,7 @@ export("book_stack_tall", P)
 
 P, z = [], 0.0
 for i, (w, d, h, m) in enumerate([(0.32, 0.23, 0.075, MORE[6]), (0.28, 0.2, 0.065, MORE[2])]):
-    P.append(box((w, d, h), (0, 0, z + h / 2), m, rot=(0, 0, 0.12 * (i * 2 - 1))))
-    P.append(box((w * 0.98, d + 0.004, 0.008), (0, 0, z + h * 0.25), GOLD_STRIPE, rot=(0, 0, 0.12 * (i * 2 - 1))))
-    P.append(box((w * 0.98, d + 0.004, 0.008), (0, 0, z + h * 0.75), GOLD_STRIPE, rot=(0, 0, 0.12 * (i * 2 - 1))))
+    P += real_book(w, d, h, m, (0, 0, z), 0.12 * (i * 2 - 1), stripes=(0.25, 0.75))
     z += h
 # Очки: толстая круглая оправа, стёкла, перемычка-дужка над носом и сложенные заушники.
 LENS = mat("GlassesLens", (0.75, 0.88, 0.95), 0.05)
@@ -320,16 +337,41 @@ for x in (-0.034, 0.034):
 P.append(box((0.022, 0.007, 0.007), (0, 0, GZ + 0.004), IRON))                         # перемычка
 export("book_stack_tomes", P)
 
-P, z = [], 0.0
-for i in range(4):                                                          # журналы
-    h = 0.008
-    P.append(box((0.26, 0.2, h), (random.uniform(-0.02, 0.02), random.uniform(-0.02, 0.02), z + h / 2),
-                 MORE[(i + 2) % len(MORE)], rot=(0, 0, random.uniform(-0.5, 0.5))))
-    z += h
-for side in (-1, 1):                                                        # раскрытая книга
-    P.append(box((0.13, 0.17, 0.012), (side * 0.065, 0, z + 0.01), PAGES, rot=(0, side * -0.12, 0.2)))
-P.append(box((0.27, 0.18, 0.006), (0, 0, z + 0.003), MORE[1], rot=(0, 0, 0.2)))
-export("book_stack_mags", P)
+# Книги с песенником и ручка (на обеденном столе у граммофона): внизу толстая зелёная книга,
+# сверху тонкий бордовый «песенник» — на обложке нотный стан и золотая нота; рядом шариковая ручка.
+SONG = mat("SongbookWine", (0.42, 0.05, 0.08), 0.8)
+TOME = mat("BookGreenDark", (0.1, 0.3, 0.16), 0.8)
+PEN = mat("PenBlue", (0.08, 0.16, 0.5), 0.35)
+STEEL = mat("PenSteel", (0.8, 0.8, 0.82), 0.25)
+P = real_book(0.26, 0.19, 0.04, TOME, (0, 0, 0), -0.08, stripes=(0.25, 0.75))
+Z = 0.04
+P += real_book(0.23, 0.165, 0.018, SONG, (0.01, 0, Z), 0.1)
+TOP = Z + 0.0185  # чуть выше крышки (0.018)
+
+def on_cover(x, y):
+    """Точка на обложке песенника (обложка повёрнута на 0.1 рад вокруг центра (0.01, 0))."""
+    c, sn = math.cos(0.1), math.sin(0.1)
+    return (0.01 + x * c - y * sn, x * sn + y * c, TOP)
+
+
+for k in range(5):                                                          # нотный стан
+    P.append(box((0.17, 0.003, 0.0015), on_cover(0.0, -0.045 + k * 0.012), GOLD_STRIPE, rot=(0, 0, 0.1)))
+head = cyl(0.016, 0.002, on_cover(-0.02, -0.04), GOLD_STRIPE, verts=12, rot=(0, 0, 0.1 + 0.5))
+head.scale = (1.0, 0.7, 1.0)
+bpy.context.view_layer.update()
+P.append(head)
+P.append(box((0.004, 0.075, 0.002), on_cover(-0.006, -0.004), GOLD_STRIPE, rot=(0, 0, 0.1)))   # штиль
+P.append(box((0.022, 0.006, 0.002), on_cover(0.004, 0.03), GOLD_STRIPE, rot=(0, 0, 0.1 - 0.6)))  # флажок
+P.append(box((0.016, 0.006, 0.002), on_cover(0.004, 0.019), GOLD_STRIPE, rot=(0, 0, 0.1 - 0.6)))
+# Шариковая ручка рядом со стопкой, по диагонали: синий корпус, стальной колпачок с клипсой.
+PA = 1.25
+DIRV = Vector((math.cos(PA), math.sin(PA), 0))
+C = Vector((0.23, -0.07, 0.006))
+P.append(cyl(0.006, 0.12, tuple(C), PEN, verts=6, rot=(0, math.pi / 2, PA)))
+P.append(cyl(0.006, 0.02, tuple(C - DIRV * 0.07), PEN, verts=6, r2=0.0015, rot=(0, -math.pi / 2, PA)))
+P.append(cyl(0.0065, 0.035, tuple(C + DIRV * 0.06), STEEL, verts=6, rot=(0, math.pi / 2, PA)))
+P.append(box((0.03, 0.003, 0.002), tuple(C + DIRV * 0.06 + Vector((0, 0, 0.0075))), STEEL, rot=(0, 0, PA)))
+export("book_stack_music", P)
 
 if not RENDER:
     sys.exit(0)
