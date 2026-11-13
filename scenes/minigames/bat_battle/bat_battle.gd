@@ -37,6 +37,11 @@ const HIT_RADIUS := 2.1
 const HIT_DAMAGE_MIN := 13
 const HIT_DAMAGE_MAX := 20
 const HIT_KNOCKBACK := 9.0
+## «Последний шанс» (скрытая уловка): если у игрока HP ≤ LAST_CHANCE_HP и удар бы его добил,
+## с шансом LAST_CHANCE_MISS удар «промахивается» — ни урона, ни отбрасывания, ни цифры.
+## Победы «на последних HP» случаются чаще — так приятнее. Игрокам об этом не говорим.
+const LAST_CHANCE_HP := 20
+const LAST_CHANCE_MISS := 0.25
 ## С улучшенной битой.
 const SUPER_RADIUS := 2.6
 const SUPER_DAMAGE := 34
@@ -242,9 +247,11 @@ func _spin(f: Fighter) -> void:
 		offset.y = 0.0
 		if offset.length() > radius:
 			continue
+		var damage := SUPER_DAMAGE if is_super else randi_range(HIT_DAMAGE_MIN, HIT_DAMAGE_MAX)
+		if other.hp <= LAST_CHANCE_HP and damage >= other.hp and randf() < LAST_CHANCE_MISS:
+			continue # «не попал»: будто бита прошла мимо
 		var dir := offset.normalized() if offset.length() > 0.01 else Vector3.FORWARD
 		other.character.apply_knockback(dir * force + Vector3.UP * 4.0)
-		var damage := SUPER_DAMAGE if is_super else randi_range(HIT_DAMAGE_MIN, HIT_DAMAGE_MAX)
 		var dealt := mini(other.hp, damage)
 		other.hp -= dealt
 		_update_hp(other)
