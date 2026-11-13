@@ -22,7 +22,7 @@ func _ready() -> void:
 	open_time = OPEN_TIME
 	open_text = "Открыть шкафчик"
 	close_text = "Закрыть шкафчик"
-	front_offset = Vector3(0.25, 0.3, 0.6) # перед правой дверцей
+	front_offset = Vector3(0.25, 0.3, 0.35) # перед правой дверцей
 	# Корпус твёрдый: о шкафчик стукаются, прыгая у стены.
 	var body := StaticBody3D.new()
 	var shape := CollisionShape3D.new()

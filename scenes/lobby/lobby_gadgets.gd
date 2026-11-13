@@ -13,7 +13,7 @@ const CAT_RADIUS := 1.3
 const LOOK_ANGLE := 50.0
 const GRAMOPHONE_RADIUS := 1.4
 const LAMP_RADIUS := 1.2
-const SWITCH_RADIUS := 1.0
+const SWITCH_RADIUS := 0.8
 const RADIO_RADIUS := 1.4
 const SIDEBOARD_RADIUS := 1.1
 const SIDEBOARD_GLASS_RADIUS := 1.3
@@ -570,7 +570,7 @@ func _near_hinged(p: PlayerData) -> HingedProp:
 
 
 func _hinged_in_reach(p: PlayerData) -> HingedProp:
-	return apartment.kitchen_room.hinged_near(characters[p.id], SIDEBOARD_RADIUS) \
+	return apartment.kitchen_room.hinged_near(characters[p.id], 0.9) \
 		if characters.has(p.id) else null
 
 
@@ -610,8 +610,7 @@ func _near_loose_hammer(p: PlayerData) -> Hammer:
 	return null
 
 
-## Есть ли у игрока вещь «в кадре». Камера от первого лица удаляется вместе с ней при переходе
-## на вид сверху (F2) — тогда запись устарела: убираем её (иначе удар молотком ронял игру).
+## Есть ли вещь «в кадре» (камера удаляется на F2 — запись устарела: убираем, иначе падало).
 func _has_view(views: Dictionary, id: int) -> bool:
 	if views.has(id) and not is_instance_valid(views[id]):
 		views.erase(id)
@@ -732,7 +731,8 @@ func _near_switch(p: PlayerData) -> LobbyLamp:
 	for chandelier in apartment.chandeliers:
 		var to_player: Vector3 = character.global_position - chandelier["switch"]
 		var in_front: bool = to_player.dot(chandelier["normal"]) > 0.0 # не через стену
-		if in_front and _near(p, chandelier["switch"], SWITCH_RADIUS):
+		if in_front and Vector2(to_player.x, to_player.z).length() < SWITCH_RADIUS \
+				and facing(character, chandelier["switch"], 30.0): # уже конус: только лицом
 			return chandelier["lamp"]
 	return null
 

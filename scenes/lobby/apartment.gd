@@ -9,7 +9,7 @@ extends Node3D
 ##   окно со шторами и тюлем, гантели, обеденный стол со стульями, торшер, люстра.
 ## Спальня: шкаф с зеркалом (примерочная и покупки), кровать с ковром над ней, тумбочка с лампой.
 ## Игровая комната («игра на рубли») — слева от гостиной (дверь в левой стене):
-## стол рулетки, игровые автоматы, неон.
+## стол рулетки, игровые автоматы.
 ##
 ## Сверху (вид от третьего лица) нет потолка и передних стен — «срез». Потолок и передние стены
 ## есть только для вида от первого лица: они на отдельном слое FP_ONLY_LAYER.
@@ -718,8 +718,6 @@ func _build_rubgame() -> void:
 	poster("poster_race", poster_size, Vector3(-7.3, 1.75, RUBGAME_BACK_Z + 0.012), 0.0)
 	poster("poster_sub_hunt", poster_size, Vector3(RUBGAME_LEFT_X + 0.012, 1.7, 0.6), PI / 2)
 	poster("poster_air_battle", poster_size, Vector3(LEFT_X - 0.232, 1.7, -1.0), -PI / 2)
-	var door_z := (RUBGAME_DOOR_FROM_Z + RUBGAME_DOOR_TO_Z) / 2
-	_neon("ИГРА\nНА РУБЛИ", Vector3(LEFT_X + 0.02, 2.7, door_z), PI / 2, 36)
 
 
 ## Постер на стене (картинка из tools/textures/posters.py), освещается как стена.
@@ -755,18 +753,6 @@ func poster(poster_name: String, size: Vector2, pos: Vector3, yaw: float) -> voi
 			corner.y * (size.y / 2.0 - size.x * 0.02), 0.002)
 		tape.rotation.z = -corner.x * corner.y * deg_to_rad(35.0) # поперёк угла
 		quad.add_child(tape)
-
-
-func _neon(text: String, pos: Vector3, yaw: float, font_size: int) -> void:
-	var sign_label := Label3D.new()
-	sign_label.text = text
-	sign_label.font_size = font_size
-	sign_label.outline_size = font_size / 5
-	sign_label.modulate = Color(1.0, 0.35, 0.75)
-	sign_label.outline_modulate = Color(0.45, 0.0, 0.3)
-	sign_label.position = pos
-	sign_label.rotation.y = yaw
-	add_child(sign_label)
 
 
 func _rubgame_model(model_name: String) -> Node3D:

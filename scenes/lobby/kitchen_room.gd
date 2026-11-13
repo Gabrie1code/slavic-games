@@ -202,7 +202,16 @@ func _build_window() -> void:
 
 func _build_furniture() -> void:
 	# Вдоль левой стены (лицом в кухню, +X): холодильник у двери, плита.
-	_furniture("kitchen_fridge", Vector3(X0 + 0.32, 0, 4.15), PI / 2, Vector3(0.6, 1.5, 0.62))
+	var fridge := _furniture("kitchen_fridge", Vector3(X0 + 0.32, 0, 4.15), PI / 2,
+		Vector3(0.6, 1.5, 0.62))
+	var model_name := Label3D.new() # «192» на хромированной плашке (модель холодильника)
+	model_name.text = "192"
+	model_name.font_size = 64
+	model_name.pixel_size = 0.0004
+	model_name.modulate = Color("f2ede0")
+	model_name.outline_size = 0
+	model_name.position = Vector3(0, 1.36, 0.32)
+	fridge.add_child(model_name)
 	var stove := _furniture("kitchen_stove", Vector3(X0 + 0.3, 0, 5.0), PI / 2,
 		Vector3(0.5, 0.88, 0.58))
 	# На холодильнике — красная мухобойка.
@@ -399,7 +408,7 @@ func hinged_near(character: Node3D, radius: float) -> HingedProp:
 		var point := prop.front_point()
 		var flat := Vector2(point.x - character.global_position.x,
 			point.z - character.global_position.z)
-		if flat.length() >= radius or not LobbyGadgets.facing(character, point):
+		if flat.length() >= radius or not LobbyGadgets.facing(character, point, 35.0):
 			continue
 		if best == null or view_angle(character, point) < view_angle(character, best.front_point()):
 			best = prop
