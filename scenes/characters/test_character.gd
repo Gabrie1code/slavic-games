@@ -98,6 +98,9 @@ var lean := 0.0
 var drunk := 0.0
 ## Сколько ещё секунд пьян (потом плавно трезвеет); 0 — протрезветь (после рвоты).
 var drunk_left := 0.0
+## Сильно пьян: картинка расплывается и двоится (0..1, плавно) и сколько ещё секунд.
+var blur := 0.0
+var blur_left := 0.0
 
 var _knockback := Vector3.ZERO
 ## Направление и скорость бега до столкновения (для разгона и толчка вещей).
@@ -279,6 +282,8 @@ func _process(delta: float) -> void:
 ## Пьяный: всё тело покачивается из стороны в сторону, медленно «плывёт».
 func _update_drunk(delta: float) -> void:
 	drunk_left = maxf(0.0, drunk_left - delta)
+	blur_left = maxf(0.0, blur_left - delta)
+	blur = move_toward(blur, 1.0 if blur_left > 0.0 else 0.0, delta / 2.0)
 	var sober := drunk_left <= 0.0 # трезвеет медленнее, чем пьянеет
 	drunk = move_toward(drunk, 0.0 if sober else 1.0, delta / (4.0 if sober else 1.5))
 	_model.rotation.z = sin(_idle_time * 1.3) * 0.13 * drunk

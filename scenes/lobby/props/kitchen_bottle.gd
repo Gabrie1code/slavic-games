@@ -138,9 +138,17 @@ func throw(character: PlayerCharacter, world: Node, dir: Vector3) -> void:
 	get_parent().remove_child(self)
 	world.add_child(self)
 	global_transform = start
+	_set_render_layer(self, 1) # в руке была на слое тела — сам бросивший её бы не видел
 	_set_loose_physics(true)
 	ThrowHelper.launch(self, character, dir)
 	character.set_arm_angle(PlayerCharacter.ARM_DOWN, 0.2)
+
+
+func _set_render_layer(node: Node, layer: int) -> void:
+	if node is VisualInstance3D:
+		(node as VisualInstance3D).layers = layer
+	for child in node.get_children():
+		_set_render_layer(child, layer)
 
 
 func _set_loose_physics(on: bool) -> void:

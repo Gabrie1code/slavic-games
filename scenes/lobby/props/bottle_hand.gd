@@ -12,6 +12,10 @@ const DRUNK_COUNT := 3
 const DRUNK_WINDOW := 20.0
 const DRUNK_TIME := 30.0
 const VOMIT_COUNT := 5
+## 5 глотков за BLUR_WINDOW сек — сильное опьянение: размытие и двоение на BLUR_TIME сек.
+const BLUR_COUNT := 5
+const BLUR_WINDOW := 25.0
+const BLUR_TIME := 25.0
 const VOMIT_WINDOW := 30.0
 
 var kitchen: KitchenRoom
@@ -127,18 +131,25 @@ func _after_sip(p: PlayerData) -> void:
 	sips.append(now)
 	_sips[p.id] = sips
 	var recent := 0
+	var heavy := 0
 	for t in sips:
 		if now - t <= DRUNK_WINDOW:
 			recent += 1
+		if now - t <= BLUR_WINDOW:
+			heavy += 1
 	if sips.size() > VOMIT_COUNT:
 		_sips.erase(p.id)
 		character.drunk_left = 0.0 # после рвоты — больше никаких эффектов
+		character.blur_left = 0.0
 		if holds(p):
 			var bottle: KitchenBottle = _held[p.id]
 			_let_go(p)
 			bottle.vanish(character)
 		var cam: Camera3D = _cams.get(p.id) if is_instance_valid(_cams.get(p.id)) else null
 		VomitFx.play(character, world as Node3D, cam, 1 << (p.slot + 10))
+	elif heavy >= BLUR_COUNT:
+		character.drunk_left = maxf(character.drunk_left, DRUNK_TIME)
+		character.blur_left = maxf(character.blur_left, BLUR_TIME)
 	elif recent > DRUNK_COUNT:
 		character.drunk_left = maxf(character.drunk_left, DRUNK_TIME)
 

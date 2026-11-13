@@ -20,6 +20,7 @@ enum View { FIRST_PERSON, THIRD_PERSON }
 const VIEWMODEL_LAYERS := 0b1111 << 10
 
 const CHARACTER_SCENE := preload("res://scenes/characters/test_character.tscn")
+const DRUNK_BLUR := preload("res://scenes/lobby/drunk_blur.gdshader")
 const ROUNDS := 5
 ## Зоны в квартире (координаты — в Apartment).
 const WARDROBE_RADIUS := 1.2
@@ -607,6 +608,15 @@ func _create_view(p: PlayerData) -> void:
 	can_hand.visible = false
 	camera.add_child(can_hand)
 
+	# Сильное опьянение: размытие и двоение поверх вида (drunk_blur.gdshader).
+	var blur := ColorRect.new()
+	blur.set_anchors_preset(Control.PRESET_FULL_RECT)
+	blur.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var blur_mat := ShaderMaterial.new()
+	blur_mat.shader = DRUNK_BLUR
+	blur.material = blur_mat
+	blur.visible = false
+	container.add_child(blur)
 	var frame := ReferenceRect.new()
 	frame.border_color = p.color
 	frame.border_width = 3
@@ -625,7 +635,7 @@ func _create_view(p: PlayerData) -> void:
 	container.add_child(prompt)
 	_views_root.add_child(container)
 	_views[p.id] = {"container": container, "camera": camera, "prompt": prompt, "fist": fist,
-		"handset": handset, "can": view_can}
+		"handset": handset, "can": view_can, "blur": blur}
 	_layout_views()
 
 
@@ -708,6 +718,9 @@ func _update_first_person(delta: float) -> void:
 		var eye := character.global_position + Vector3.UP * eye_height
 		eye.y = minf(eye.y, Apartment.WALL_HEIGHT - 0.15) # камера не заглядывает за потолок
 		var wobble := _view_wobble(character) # пьёт / пьян / тошнит — камера качается
+		var blur_rect: ColorRect = _views[id]["blur"]
+		blur_rect.visible = character.blur > 0.01
+		(blur_rect.material as ShaderMaterial).set_shader_parameter("amount", character.blur)
 		camera.global_transform = Transform3D(Basis.from_euler(Vector3(
 			character.fp_pitch + wobble.x, character.rotation.y, wobble.y)), eye)
 		var entries := _prompt_for(p, character)
