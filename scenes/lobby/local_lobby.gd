@@ -709,8 +709,8 @@ func _update_first_person(delta: float) -> void:
 				character.fp_strafe = true
 			_:
 				character.fp_strafe = false # стрелки: влево/вправо — поворот
-		if not _rooms.has(id): # с Alt мышь крутит только голову (FreeLook)
-			character.rotation.y -= FreeLook.step(character, p, look.x, delta)
+		if not _rooms.has(id):
+			character.rotation.y -= look.x
 			character.fp_pitch = clampf(character.fp_pitch - look.y, -PITCH_LIMIT, PITCH_LIMIT)
 		var camera: Camera3D = _views[id]["camera"]
 		var eye_height := EYE_HEIGHT - (0.1 if character.sitting else 0.0) \
@@ -722,7 +722,7 @@ func _update_first_person(delta: float) -> void:
 		blur_rect.visible = character.blur > 0.01
 		(blur_rect.material as ShaderMaterial).set_shader_parameter("amount", character.blur)
 		camera.global_transform = Transform3D(Basis.from_euler(Vector3(
-			character.fp_pitch + wobble.x, character.rotation.y + character.head_yaw, wobble.y)), eye)
+			character.fp_pitch + wobble.x, character.rotation.y, wobble.y)), eye)
 		var entries := _prompt_for(p, character)
 		entries.append_array(_gadgets.hand_hint(p))
 		if LobbyGadgets.is_running(p, character):
