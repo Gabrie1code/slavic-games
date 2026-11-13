@@ -173,7 +173,10 @@ x = -0.4
 for i in range(7):
     h = random.uniform(0.16, 0.21)
     tilt = 0.25 if i == 6 else 0.0
-    P.append(box((0.035, 0.15, h), (x, -0.1, 0.03 + h / 2), BOOKS[i % 5], rot=(0, tilt, 0)))
+    # Наклонённая книга стоит нижним углом на полке (раньше поворачивалась вокруг центра,
+    # и угол уходил в полку).
+    zc = 0.03 + h / 2 * math.cos(tilt) + 0.035 / 2 * math.sin(tilt)
+    P.append(box((0.035, 0.15, h), (x + 0.01 * (i == 6), -0.1, zc), BOOKS[i % 5], rot=(0, tilt, 0)))
     x += 0.04
 export_item("shelf_books", P, (-0.28, -0.1, 0.03))
 P = []
