@@ -16,6 +16,9 @@ const LAMP_RADIUS := 1.2
 const ARCADE_RADIUS := 1.1
 const TOILET_RADIUS := 1.2
 const SINK_RADIUS := 1.0
+## Удар по вещам: дальность и конус (градусы от взгляда) — бьётся одна вещь, самая «в прицеле».
+const PUNCH_REACH_ITEMS := 1.3
+const PUNCH_CONE := 22.0
 const NIGHTSTAND_RADIUS := 1.1
 const CAN_RADIUS := 1.0
 ## Как далеко долетает краска из баллончика и дотягивается губка.
@@ -45,6 +48,21 @@ func _init(apt: Apartment, chars: Dictionary) -> void:
 ## Одна строка подсказки: кнопка, действие, недоступно ли (серым).
 static func entry(key: String, text: String, off: bool = false) -> Dictionary:
 	return {"key": key, "text": text, "off": off}
+
+
+## Бежит (Shift и движется) — тогда кнопки действий не работают и подсказки серые: можно
+## носиться и прыгать по квартире, ничего не задевая Пробелом случайно.
+static func is_running(p: PlayerData, character: PlayerCharacter) -> bool:
+	return p.input != null and p.input.is_pressed("sprint") \
+		and Vector2(character.velocity.x, character.velocity.z).length() > 1.0
+
+
+## Те же подсказки, но серые (на бегу).
+static func greyed(entries: Array[Dictionary]) -> Array[Dictionary]:
+	var result: Array[Dictionary] = []
+	for e in entries:
+		result.append(entry(e["key"], e["text"], true))
+	return result
 
 
 ## Смотрит ли персонаж на точку (по горизонтали, не дальше max_degrees от взгляда).
@@ -97,6 +115,40 @@ static func attack_key(p: PlayerData) -> String:
 			return "/"
 		_:
 			return "X"
+
+
+## Вещь под ударом: целая Breakable или Tippable в пределах PUNCH_REACH_ITEMS, ближе всего к лучу
+## взгляда (от первого лица — с наклоном камеры), в узком конусе PUNCH_CONE. null — мимо.
+func punch_target(character: PlayerCharacter, camera: Camera3D) -> Node3D:
+	var eye := character.global_position + Vector3.UP * 1.2
+	var aim := -character.global_basis.z
+	if camera:
+		eye = camera.global_position
+		aim = -camera.global_basis.z
+	var best: Node3D = null
+	var best_angle := deg_to_rad(PUNCH_CONE)
+	var candidates: Array[Node] = character.get_tree().get_nodes_in_group("breakable")
+	candidates.append_array(character.get_tree().get_nodes_in_group("tippable"))
+	for node in candidates:
+		var item := node as Node3D
+		if item is Breakable and (item as Breakable).is_broken():
+			continue
+		# Центр вещи чуть выше её основания (у Breakable/Tippable точка — внизу).
+		var to := item.global_position + Vector3.UP * 0.15 - eye
+		var flat := Vector2(to.x, to.z).length()
+		if flat > PUNCH_REACH_ITEMS or to.length() < 0.05:
+			continue
+		var angle := aim.angle_to(to)
+		if camera == null: # общий вид сверху: наклона камеры нет — только по полу
+			angle = Vector2(aim.x, aim.z).angle_to(Vector2(to.x, to.z))
+			angle = absf(angle) * 0.75
+		if flat < 0.45:
+			angle *= 0.5 # вплотную — попасть легче
+		if angle < best_angle:
+			best_angle = angle
+			best = item
+	return best
+
 
 
 # ---------------- Баллончики ----------------
@@ -259,13 +311,21 @@ func _use_sponge(p: PlayerData) -> bool:
 		return true
 	if hand_busy(p):
 		return false
-	for node in apartment.get_tree().get_nodes_in_group("sponge"):
-		var loose := node as Sponge
-		if loose and loose.state == Sponge.State.LOOSE \
-				and _near(p, loose.global_position, CAN_RADIUS):
-			_hold_sponge(p, loose)
-			return true
+	var loose := _near_loose_sponge(p)
+	if loose:
+		_hold_sponge(p, loose)
+		return true
 	return false
+
+
+## Брошенная губка рядом, на которую игрок смотрит (null — нет).
+func _near_loose_sponge(p: PlayerData) -> Sponge:
+	for node in apartment.get_tree().get_nodes_in_group("sponge"):
+		var sponge := node as Sponge
+		if sponge and sponge.state == Sponge.State.LOOSE \
+				and _near(p, sponge.global_position, CAN_RADIUS):
+			return sponge
+	return null
 
 
 ## Убрать губку из руки без броска (её кладут на раковину).
@@ -328,6 +388,8 @@ func _can_hint(p: PlayerData) -> Array[Dictionary]:
 		return _no_hint()
 	if _near_loose_can(p):
 		return [entry(confirm_key(p), "Подобрать баллончик")]
+	if _near_loose_sponge(p):
+		return [entry(confirm_key(p), "Подобрать губку")]
 	var stand := apartment.nightstand
 	if not _near(p, stand.front_point(), NIGHTSTAND_RADIUS):
 		return _no_hint()
@@ -498,9 +560,12 @@ func _toilet_hint(p: PlayerData) -> Array[Dictionary]:
 		text = "Смывается…"
 		disabled = true
 	elif toilet.can_flush():
-		text = "Смыть (снова — через %d с)" % ceili(toilet.cooldown_left())
+		text = "Смыть"
 	elif toilet.can_use():
 		text = "Сходить в туалет"
+	elif toilet.lid_open: # крышка поднята, но перезарядка ещё идёт
+		text = "Сходить — через %d с" % ceili(toilet.cooldown_left())
+		disabled = true
 	return [entry(key, text, disabled)]
 
 

@@ -38,8 +38,6 @@ const RUN_BONUS := 0.15
 const CROUCH_EYE_DROP := 0.45
 ## Удар рукой: дальность, перезарядка, сила толчка.
 const PUNCH_REACH := 1.3
-## Конус удара по вещам (градусы от направления взгляда): бьётся одна вещь — самая «в прицеле».
-const PUNCH_CONE := 22.0
 const PUNCH_COOLDOWN := 0.35
 const PUNCH_PUSH := 3.0
 
@@ -236,28 +234,34 @@ func _process(delta: float) -> void:
 			_gadgets.process_holder(p) # с трубкой ходят, но не дерутся и не садятся
 			continue
 		# Рядом с чем-то, что делается «подтверждением» (кот, телефон, диван, шкаф…), прыжка нет:
-		# Пробел должен погладить кота, а не подбросить персонажа.
-		if character:
-			character.can_jump = _prompt_for(p, character).is_empty()
+		# Пробел должен погладить кота, а не подбросить персонажа. На бегу (Shift) действий нет.
+		if character == null:
+			continue
+		var running := LobbyGadgets.is_running(p, character)
+		var has_action := not running and not _prompt_for(p, character).is_empty()
+		character.can_jump = not has_action
+		var act := p.input.is_just_pressed("confirm") and not running
+		if act and has_action:
+			character.jump_pending = false # Пробел ушёл на действие — не подпрыгивать
 		if _gadgets.hand_busy(p):
 			var view: Dictionary = _views.get(p.id, {})
 			_gadgets.process_hand(p, view.get("camera"), view.get("can")) # баллончик / губка
-		elif p.input.is_just_pressed("attack") and not _gadgets.try_attack_use(p):
+		elif p.input.is_just_pressed("attack") and (running or not _gadgets.try_attack_use(p)):
 			_punch(p) # у раковины удар берёт губку (try_attack_use), иначе — кулак
-		if p.input.is_just_pressed("confirm") and _gadgets.can_use_toilet(p):
+		if act and _gadgets.can_use_toilet(p):
 			_open_room(p, ToiletScreen.new().setup_for(p, character, _apartment.toilet_room.toilet))
 			continue
-		if p.input.is_just_pressed("confirm") and _gadgets.try_interact(p):
+		if act and _gadgets.try_interact(p):
 			continue
 		var at_tv := _is_near(p, Apartment.TV_ZONE, TV_ZONE_RADIUS)
 		var seat := _free_seat_near(p)
-		if p.input.is_just_pressed("confirm") and _at_wardrobe(p):
+		if act and _at_wardrobe(p):
 			_open_wardrobe(p)
-		elif p.input.is_just_pressed("confirm") and _near_rubgame(p):
+		elif act and _near_rubgame(p):
 			_open_rubgame(p)
-		elif p.input.is_just_pressed("confirm") and at_tv and _looks_at(p, Apartment.TV_POS):
+		elif act and at_tv and _looks_at(p, Apartment.TV_POS):
 			_set_ready(p, not _ready_marks.has(p.id))
-		elif p.input.is_just_pressed("confirm") and seat >= 0:
+		elif act and seat >= 0:
 			_sit(p, seat)
 		elif p.input.is_just_pressed("cancel"):
 			PlayerManager.remove_player(p)
@@ -364,7 +368,7 @@ func _punch(p: PlayerData) -> void:
 	var forward := -character.global_basis.z
 	# Удар задевает одну вещь — ту, что ближе всего к направлению взгляда (раньше бились
 	# все вещи в широком конусе: целая полка хрусталя от одного удара).
-	var target := _punch_target(p, character)
+	var target := _gadgets.punch_target(character, _views.get(p.id, {}).get("camera"))
 	if target is Breakable:
 		(target as Breakable).shatter(origin)
 	elif target is Tippable:
@@ -376,40 +380,6 @@ func _punch(p: PlayerData) -> void:
 		if other != character and not other.sitting \
 				and _in_front(origin, forward, other.global_position, 1.0):
 			other.apply_knockback(forward * 7.0 + Vector3.UP * 3.0)
-
-
-## Вещь под ударом: целая Breakable или Tippable в пределах PUNCH_REACH, ближе всего к лучу
-## взгляда (от первого лица — с наклоном камеры), в узком конусе PUNCH_CONE. null — мимо.
-func _punch_target(p: PlayerData, character: PlayerCharacter) -> Node3D:
-	var eye := character.global_position + Vector3.UP * 1.2
-	var aim := -character.global_basis.z
-	if _views.has(p.id):
-		var camera: Camera3D = _views[p.id]["camera"]
-		eye = camera.global_position
-		aim = -camera.global_basis.z
-	var best: Node3D = null
-	var best_angle := deg_to_rad(PUNCH_CONE)
-	var candidates: Array[Node] = get_tree().get_nodes_in_group("breakable")
-	candidates.append_array(get_tree().get_nodes_in_group("tippable"))
-	for node in candidates:
-		var item := node as Node3D
-		if item is Breakable and (item as Breakable).is_broken():
-			continue
-		# Центр вещи чуть выше её основания (у Breakable/Tippable точка — внизу).
-		var to := item.global_position + Vector3.UP * 0.15 - eye
-		var flat := Vector2(to.x, to.z).length()
-		if flat > PUNCH_REACH or to.length() < 0.05:
-			continue
-		var angle := aim.angle_to(to)
-		if not _views.has(p.id): # общий вид сверху: наклона камеры нет — только по полу
-			angle = Vector2(aim.x, aim.z).angle_to(Vector2(to.x, to.z))
-			angle = absf(angle) * 0.75
-		if flat < 0.45:
-			angle *= 0.5 # вплотную — попасть легче
-		if angle < best_angle:
-			best_angle = angle
-			best = item
-	return best
 
 
 ## Цель перед персонажем: ближе PUNCH_REACH по полу, в конусе ~60° и не выше max_height.
@@ -723,6 +693,8 @@ func _update_first_person(delta: float) -> void:
 			Basis.from_euler(Vector3(character.fp_pitch, character.rotation.y, 0.0)), eye)
 		var entries := _prompt_for(p, character)
 		entries.append_array(_gadgets.hand_hint(p))
+		if LobbyGadgets.is_running(p, character):
+			entries = LobbyGadgets.greyed(entries) # на бегу кнопки действий серые
 		var prompt: KeyPrompt = _views[id]["prompt"]
 		prompt.set_entries(entries)
 		# Во время отсчёта кнопка «Отменить «Готов»» — по центру под надписью «Начинаем через…».

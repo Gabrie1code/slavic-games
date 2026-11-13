@@ -49,6 +49,9 @@ var spawn_position := Vector3.ZERO
 var speed := 6.0
 var input_enabled := true
 var can_jump := true
+## Прыжок нажат и ждёт следующего кадра физики. Лобби ставит false, если в этом кадре
+## Пробел ушёл на действие (подобрать, включить, сесть…) — тогда персонаж не подпрыгнет.
+var jump_pending := false
 var respawn_on_fall := true
 var fall_limit := -10.0
 ## Наклон правой руки вперёд (>0) / назад (<0), когда рука занята (держит предмет).
@@ -142,8 +145,12 @@ func _physics_process(delta: float) -> void:
 		elif run_bonus > 0.0 and player.input.is_pressed("sprint"):
 			move *= 1.0 + run_bonus # бежит
 		# Прыжок отдельно от бега: на бегу (Shift) тоже можно прыгать. Присев — нельзя.
-		if not crouching and can_jump and player.input.is_just_pressed("confirm") and is_on_floor():
+		# Прыжок — на следующем кадре физики: если в этом кадре Пробел ушёл на действие (подобрать,
+		# включить, сесть…), лобби отменит прыжок (jump_pending = false), и персонаж не подпрыгнет.
+		if jump_pending and is_on_floor():
 			velocity.y = JUMP_VELOCITY
+		jump_pending = not crouching and can_jump and player.input.is_just_pressed("confirm") \
+			and is_on_floor()
 
 	# Камера смотрит спереди, поэтому «вверх» на экране — это -Z в мире.
 	var dir := Vector3(move.x, 0.0, move.y)

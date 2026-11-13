@@ -103,9 +103,9 @@ func cooldown_left() -> float:
 	return maxf(0.0, _cooldown_until - _time)
 
 
-## Смыв работает, пока идёт перезарядка (и сейчас не смывается).
+## Смыв — только когда вода «испорчена» (жёлтая) и сейчас не смывается.
 func can_flush() -> bool:
-	return on_cooldown() and not in_use and _flush_left <= 0.0
+	return _yellow > 0.03 and not in_use and _flush_left <= 0.0
 
 
 func is_flushing() -> bool:

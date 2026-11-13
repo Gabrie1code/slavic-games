@@ -19,6 +19,7 @@ var holder: PlayerData
 var _model: Node3D
 var _loose_time := 0.0
 var _foam: CPUParticles3D
+var _wet_time := 0.0
 
 
 func _ready() -> void:
@@ -114,6 +115,26 @@ func scrub_at(point: Vector3, toilet: Toilet) -> void:
 		toilet.scrub(point, SCRUB_RADIUS + 0.1)
 	_foam.global_position = point
 	_foam.emitting = true
+	_wet_spot(point)
+
+
+## Мокрые следы — маленькие голубые лужицы (цвет воды как в унитазе), высыхают за ~1.5 сек.
+func _wet_spot(point: Vector3) -> void:
+	_wet_time -= get_process_delta_time()
+	if _wet_time > 0.0:
+		return
+	_wet_time = 0.12
+	var spot := Decal.new()
+	var size := randf_range(0.1, 0.18)
+	spot.size = Vector3(size, 0.2, size)
+	spot.texture_albedo = SprayCan.SPLAT
+	spot.modulate = Color(Toilet.BLUE, 0.75)
+	spot.cull_mask = 0xFFFFF & ~(0b1111 << 10)
+	get_tree().current_scene.add_child(spot)
+	spot.global_position = point + Vector3(randf_range(-0.05, 0.05), 0, randf_range(-0.05, 0.05))
+	var tween := spot.create_tween()
+	tween.tween_property(spot, "modulate:a", 0.0, 1.5).set_delay(0.3)
+	tween.tween_callback(spot.queue_free)
 
 
 func stop_scrub() -> void:
@@ -140,7 +161,7 @@ func _make_foam() -> CPUParticles3D:
 	mesh.radial_segments = 6
 	mesh.rings = 3
 	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color(1, 1, 1, 0.85)
+	mat.albedo_color = Color(Toilet.BLUE.lightened(0.6), 0.85) # мыльная вода, голубоватая
 	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	mat.roughness = 0.2
 	mesh.material = mat
