@@ -60,6 +60,8 @@ const LAMP_ENERGY := 1.3
 ## Выключатели люстр — на перегородке у двери в спальню (со стороны гостиной и спальни).
 const LIVING_SWITCH := Vector3(PARTITION_X - 0.09, 1.25, 0.15)
 const BEDROOM_SWITCH := Vector3(PARTITION_X + 0.09, 1.25, 0.15)
+## Выключатель лампы над игровым столом: в игровой, справа от двери в гостиную.
+const RUBGAME_SWITCH := Vector3(LEFT_X - 0.23, 1.25, 3.25)
 const SPAWNS: Array[Vector3] = [
 	Vector3(-0.3, 0.3, -1.2), Vector3(0.9, 0.3, -1.2),
 	Vector3(-0.3, 0.3, -2.4), Vector3(0.9, 0.3, -2.4),
@@ -81,7 +83,8 @@ var rubgame_table: RubgameTable
 var gramophone: Tippable
 var floor_lamp: Tippable
 ## Свет зависит от времени суток (LobbyLamp): днём не горит, вечером горит; кнопкой — наоборот
-## на 20 сек. Торшер, ночник и люстры (у люстр — выключатели на стене: {"lamp", "switch"}).
+## на 20 сек. Торшер, ночник и люстры (у люстр и лампы игровой — выключатели на стене:
+## {"lamp", "switch", "normal" — куда смотрит клавиша, "always_on"}).
 var floor_lamp_light: LobbyLamp
 var night_lamp_light: LobbyLamp
 var chandeliers: Array[Dictionary] = []
@@ -356,7 +359,7 @@ func _process(delta: float) -> void:
 	night_lamp_light.update(delta, dark, night_ok)
 	_night_bulb.visible = night_ok # разбитый — без «висящей в воздухе» лампочки
 	for chandelier in chandeliers:
-		(chandelier["lamp"] as LobbyLamp).update(delta, dark, true)
+		(chandelier["lamp"] as LobbyLamp).update(delta, dark or chandelier["always_on"], true)
 	_fade_hanging(delta)
 	# Солнце в комнате вечером и ночью слабее (но не до темноты — играть должно быть видно).
 	if _sun == null:
@@ -404,12 +407,21 @@ func _chandelier(pos: Vector3, switch_pos: Vector3, switch_yaw: float) -> void:
 		_set_layers(hang, layer)
 		if layer == OVERVIEW_ONLY_LAYER:
 			_hanging_top.append({"node": hang, "pos": pos})
+	_add_switch(LobbyLamp.new(light, bulb_mat), switch_pos, switch_yaw, false)
+
+
+## Выключатель на стене (клавиша смотрит по yaw) для светильника lamp. always_on — горит и
+## днём (лампа над игровым столом): кнопкой гасится, а не включается.
+## В списке хранится и «лицо» выключателя: щёлкает только тот, кто стоит перед ним —
+## выключатели гостиной и спальни висят спинами друг к другу на одной перегородке.
+func _add_switch(lamp: LobbyLamp, switch_pos: Vector3, yaw: float, always_on: bool) -> void:
 	var plate := _box(Vector3(0.08, 0.12, 0.02), Vector3.ZERO, _mat(Color("efe6d2"), 0.5))
 	var key := _box(Vector3(0.03, 0.05, 0.015), Vector3(0, 0, 0.015), _mat(Color("d9cfb8"), 0.5))
 	key.reparent(plate, false)
 	plate.position = switch_pos
-	plate.rotation.y = switch_yaw
-	chandeliers.append({"lamp": LobbyLamp.new(light, bulb_mat), "switch": switch_pos})
+	plate.rotation.y = yaw
+	chandeliers.append({"lamp": lamp, "switch": switch_pos,
+		"normal": Vector3(sin(yaw), 0.0, cos(yaw)), "always_on": always_on})
 
 
 ## Вид сверху: люстра плавно исчезает, когда кто-то рядом под ней (ближе ~2 м), и возвращается.
@@ -654,6 +666,16 @@ func _build_rubgame() -> void:
 	light.omni_range = 4.5
 	light.position = RUBGAME_TABLE_POS + Vector3(0.3, 1.8, 0)
 	add_child(light)
+	# Выключатель справа от двери в гостиную (со стороны игровой).
+	# Светящийся низ абажура гаснет вместе с лампой: свой материал вместо светящегося из модели.
+	var bulb_mat := _bulb_mat()
+	for mesh in lamp.find_children("*", "MeshInstance3D", true, false):
+		var mesh_instance := mesh as MeshInstance3D
+		for i in mesh_instance.mesh.get_surface_count():
+			var surface := mesh_instance.mesh.surface_get_material(i)
+			if surface and surface.resource_name.begins_with("RubgameBulb"):
+				mesh_instance.set_surface_override_material(i, bulb_mat)
+	_add_switch(LobbyLamp.new(light, bulb_mat), RUBGAME_SWITCH, -PI / 2, true)
 
 	# Игровые автоматы 90-х: два у задней стены, один у левой. На экранах — спокойные
 	# пиксельные «демо-игры» (блоки, космос, змейка).

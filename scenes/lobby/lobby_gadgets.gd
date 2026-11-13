@@ -681,8 +681,11 @@ func _near_radio(p: PlayerData) -> bool:
 
 ## Выключатель люстры, к которому подошли лицом (null — нет рядом).
 func _near_switch(p: PlayerData) -> LobbyLamp:
+	var character: PlayerCharacter = characters[p.id]
 	for chandelier in apartment.chandeliers:
-		if _near(p, chandelier["switch"], SWITCH_RADIUS):
+		var to_player: Vector3 = character.global_position - chandelier["switch"]
+		var in_front: bool = to_player.dot(chandelier["normal"]) > 0.0 # не через стену
+		if in_front and _near(p, chandelier["switch"], SWITCH_RADIUS):
 			return chandelier["lamp"]
 	return null
 
