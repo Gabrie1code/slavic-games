@@ -11,6 +11,9 @@ signal broken
 signal restored
 
 const RESPAWN_TIME := 12.0
+## Слой «мишени для краски»: невидимое тело по размеру вещи — его видит луч баллончика,
+## а игроки сквозь него проходят (их маска — только слой 1).
+const PAINT_LAYER := 1 << 3
 const SHARD_LIFETIME := 3.0
 const SHARD_COUNT := 9
 const TOUCH_GAP := 0.6
@@ -48,6 +51,35 @@ func setup(scene: PackedScene, colors: Array[Color], reach: float = 0.45,
 	area.add_child(shape)
 	area.body_entered.connect(_on_body_entered)
 	add_child(area)
+	_add_paint_target()
+
+
+## Узел, к которому цепляются следы краски (пропадают вместе с вещью, когда она разбита).
+func paint_root() -> Node3D:
+	return _model
+
+
+func _add_paint_target() -> void:
+	var box := AABB()
+	var first := true
+	for node in _model.find_children("*", "MeshInstance3D", true, false):
+		var mesh_instance := node as MeshInstance3D
+		var local := _model.global_transform.affine_inverse() * mesh_instance.global_transform
+		var part := local * mesh_instance.get_aabb()
+		box = part if first else box.merge(part)
+		first = false
+	if first:
+		return
+	var body := StaticBody3D.new()
+	body.collision_layer = PAINT_LAYER
+	body.collision_mask = 0
+	var shape := CollisionShape3D.new()
+	var box_shape := BoxShape3D.new()
+	box_shape.size = box.size
+	shape.shape = box_shape
+	shape.position = box.get_center()
+	body.add_child(shape)
+	add_child(body)
 
 
 func is_broken() -> bool:
@@ -68,6 +100,7 @@ func _on_body_entered(body: Node3D) -> void:
 func shatter(from: Vector3) -> void:
 	_broken = true
 	_model.visible = false
+	SprayCan.clear_paint(_model) # разбили — краска на ней пропала
 	var away := global_position - from
 	away.y = 0.0
 	away = away.normalized() if away.length() > 0.05 else Vector3.BACK

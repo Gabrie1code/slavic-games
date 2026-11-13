@@ -15,6 +15,7 @@ const GRAMOPHONE_RADIUS := 1.4
 const LAMP_RADIUS := 1.2
 const ARCADE_RADIUS := 1.1
 const TOILET_RADIUS := 1.2
+const SINK_RADIUS := 1.0
 const NIGHTSTAND_RADIUS := 1.1
 const CAN_RADIUS := 1.0
 ## Как далеко долетает краска из баллончика.
@@ -123,14 +124,16 @@ func process_can_holder(p: PlayerData, camera: Camera3D, view_can: Node3D) -> vo
 	if camera:
 		from = camera.global_position
 		direction = -camera.global_basis.z
-	var query := PhysicsRayQueryParameters3D.create(from, from + direction * SPRAY_REACH, 1,
-		[character.get_rid()])
+	# Луч видит стены, мебель и игроков (слой 1) и посуду (Breakable.PAINT_LAYER).
+	var query := PhysicsRayQueryParameters3D.create(from, from + direction * SPRAY_REACH,
+		1 | Breakable.PAINT_LAYER, [character.get_rid()])
 	var hit := apartment.get_world_3d().direct_space_state.intersect_ray(query)
 	if hit.is_empty():
 		can.spray_at(from + direction * SPRAY_REACH, Vector3.UP, false,
 			apartment.get_process_delta_time())
 	else:
-		can.spray_at(hit["position"], hit["normal"], true, apartment.get_process_delta_time())
+		can.spray_at(hit["position"], hit["normal"], true, apartment.get_process_delta_time(),
+			hit["collider"])
 
 
 ## Бросить баллончик (G или игрок ушёл из лобби).
@@ -253,8 +256,11 @@ func try_interact(p: PlayerData) -> bool:
 func _use_switch(p: PlayerData) -> bool:
 	var arcade := _near_arcade(p)
 	var toilet := _near_toilet(p)
+	var sink := _near_sink(p)
 	if _near_tippable(p, apartment.floor_lamp, LAMP_RADIUS) and apartment.lamp_lit():
 		apartment.turn_off_lamp()
+	elif sink and sink.can_use(p):
+		sink.use(p, characters[p.id])
 	elif toilet and toilet.can_flush():
 		toilet.flush()
 	elif toilet and toilet.can_open():
@@ -295,9 +301,27 @@ func _furniture_hint(p: PlayerData) -> Array[Dictionary]:
 	var can_entries := _can_hint(p)
 	if not can_entries.is_empty():
 		return can_entries
+	if _near_sink(p):
+		return _sink_hint(p)
 	if _near_toilet(p):
 		return _toilet_hint(p)
 	return _arcade_hint(p)
+
+
+## Рукомойник: помыть руки (смывает краску) — каждому раз в 15 сек.
+func _sink_hint(p: PlayerData) -> Array[Dictionary]:
+	var sink := apartment.toilet_room.sink
+	if sink.busy:
+		return [entry(confirm_key(p), "Вода течёт…", true)]
+	if not sink.can_use(p):
+		return [entry(confirm_key(p), "Помыть руки (через %d с)" % ceili(sink.cooldown_left(p)), true)]
+	return [entry(confirm_key(p), "Помыть руки")]
+
+
+## Рукомойник, к кранам которого игрок подошёл лицом (null — далеко).
+func _near_sink(p: PlayerData) -> Sink:
+	var sink := apartment.toilet_room.sink
+	return sink if _near(p, sink.front_point(), SINK_RADIUS) else null
 
 
 func _arcade_hint(p: PlayerData) -> Array[Dictionary]:

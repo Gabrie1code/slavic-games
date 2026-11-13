@@ -17,10 +17,10 @@ const LOOSE_LIFE := 15.0
 ## В руке: конец руки (как точка Hand у персонажа) и поворот — баллончик стоит почти прямо.
 const HAND_POS := Vector3(0, -0.42, 0.02)
 const HAND_ROT := Vector3(-PI / 2.0, 0.0, 0.0)
-## 7 ярких цветов краски (переключаются по кругу).
+## 8 цветов краски (7 ярких и белый; переключаются по кругу).
 const COLORS: Array[Color] = [
 	Color("ff2a2a"), Color("ff8c1a"), Color("ffe11a"), Color("2ecc40"),
-	Color("1ac8ff"), Color("2a5cff"), Color("b33cff"),
+	Color("1ac8ff"), Color("2a5cff"), Color("b33cff"), Color("ffffff"),
 ]
 const SPLAT := preload("res://assets/textures/fx/paint_splat.png")
 ## Распылитель (в координатах баллончика) и сколько следов краски всего хранится в мире.
@@ -56,6 +56,13 @@ func _ready() -> void:
 	shape.position.y = 0.1
 	add_child(shape)
 	mass = 0.3
+	# Брошенный баллончик не укатывается далеко: трение, почти без отскока, гасим вращение.
+	linear_damp = 1.5
+	angular_damp = 4.0
+	var surface := PhysicsMaterial.new()
+	surface.friction = 1.0
+	surface.bounce = 0.05
+	physics_material_override = surface
 	_stream = _make_stream()
 	add_child(_stream)
 	tint_stripe(_model, color())
@@ -110,8 +117,8 @@ func drop(character: PlayerCharacter, world: Node3D) -> void:
 	_set_loose_physics(true)
 	stop_spray()
 	var forward := -character.global_basis.z
-	linear_velocity = forward * 2.2 + Vector3.UP * 1.5
-	angular_velocity = Vector3(randf_range(-6, 6), randf_range(-3, 3), randf_range(-6, 6))
+	linear_velocity = forward * 1.2 + Vector3.UP * 1.0
+	angular_velocity = Vector3(randf_range(-2, 2), randf_range(-1, 1), randf_range(-2, 2))
 	character.set_arm_angle(PlayerCharacter.ARM_DOWN, 0.2)
 
 
@@ -140,9 +147,11 @@ static func tint_stripe(node: Node, paint: Color) -> void:
 		tint_stripe(child, paint)
 
 
-## Красить: струя от распылителя к target. hit — луч попал в стену/пол/мебель (normal — её
-## сторона): тогда там остаются следы краски, плотной «дорожкой», пока ведут прицелом.
-func spray_at(target: Vector3, normal: Vector3, hit: bool, delta: float) -> void:
+## Красить: струя от распылителя к target. hit — луч попал во что-то (collider; normal — его
+## сторона): там остаются следы краски, плотной «дорожкой», пока ведут прицелом. На игроке и
+## на посуде след «прилипает» к ним (двигается вместе с ними, смывается, бьётся с посудой).
+func spray_at(target: Vector3, normal: Vector3, hit: bool, delta: float,
+		collider: Object = null) -> void:
 	var nozzle := to_global(NOZZLE)
 	var to := target - nozzle
 	if to.length() < 0.05:
@@ -157,7 +166,16 @@ func spray_at(target: Vector3, normal: Vector3, hit: bool, delta: float) -> void
 	if hit and (target.distance_to(_last_splat) > SPLAT_STEP or _splat_time > 0.15):
 		_splat_time = 0.0
 		_last_splat = target
-		_place_splat(target, normal)
+		_place_splat(target, normal, collider)
+
+
+## Смыть всю краску с персонажа (раковина в туалете).
+static func clear_paint(node: Node) -> void:
+	for child in node.get_children():
+		if child is Decal:
+			child.queue_free()
+		else:
+			clear_paint(child)
 
 
 func stop_spray() -> void:
@@ -165,14 +183,18 @@ func stop_spray() -> void:
 	_last_splat = Vector3.INF
 
 
-func _place_splat(point: Vector3, normal: Vector3) -> void:
+func _place_splat(point: Vector3, normal: Vector3, collider: Object) -> void:
 	var decal := Decal.new()
 	var size := randf_range(0.16, 0.24)
-	decal.size = Vector3(size, 0.3, size)
+	var on_body := collider is PlayerCharacter
+	if on_body:
+		size *= 0.6 # на человеке пятна поменьше
+	decal.size = Vector3(size, 0.3 if not on_body else 0.25, size)
 	decal.texture_albedo = SPLAT
 	decal.modulate = color()
-	decal.cull_mask = 1 # только стены, пол и мебель (не персонажи)
-	get_tree().current_scene.add_child(decal)
+	# Красим всё: и стены «только от первого лица» (передние), и персонажей; кроме кулаков в кадре.
+	decal.cull_mask = 0xFFFFF & ~(0b1111 << 10)
+	_splat_parent(point, collider).add_child(decal)
 	# Decal красит вдоль своей −Y: его +Y смотрит из поверхности.
 	var y := normal.normalized()
 	var x := y.cross(Vector3.FORWARD if absf(y.dot(Vector3.FORWARD)) < 0.9 else Vector3.RIGHT)
@@ -183,6 +205,24 @@ func _place_splat(point: Vector3, normal: Vector3) -> void:
 		var old: Decal = _splats.pop_front()
 		if is_instance_valid(old):
 			old.queue_free()
+
+
+## К чему прицепить след: к ближайшей части тела игрока, к посуде (Breakable) или к миру.
+func _splat_parent(point: Vector3, collider: Object) -> Node:
+	if collider is PlayerCharacter:
+		var character := collider as PlayerCharacter
+		var best: Node3D = character
+		var best_dist := INF
+		for part_name in ["Torso", "Head", "ArmL", "ArmR", "LegL", "LegR"]:
+			var part := character.part(part_name)
+			var d := part.global_position.distance_to(point)
+			if d < best_dist:
+				best_dist = d
+				best = part
+		return best
+	if collider is Node and (collider as Node).get_parent() is Breakable:
+		return ((collider as Node).get_parent() as Breakable).paint_root()
+	return get_tree().current_scene
 
 
 func _up_for(direction: Vector3) -> Vector3:

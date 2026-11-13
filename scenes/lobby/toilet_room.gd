@@ -5,7 +5,7 @@ extends Node3D
 ## Стены внизу покрашены масляной краской (видно и сверху), выше — побелка только для вида
 ## от первого лица (как потолок и передние стены квартиры). Правая стена — на своём слое
 ## WALL_LAYER / WALL_HIGH_LAYER: камера «вид сбоку» на унитаз её не рисует и смотрит сквозь неё.
-## Внутри: унитаз (Toilet), рукомойник с краном и зеркалом, держатель с рулоном справа от
+## Внутри: унитаз (Toilet), рукомойник (Sink) и зеркало над ним, держатель с рулоном справа от
 ## унитаза, лампочка на проводе, газета на гвозде.
 
 const WALL_LAYER := 1 << 14
@@ -25,6 +25,7 @@ const TILES := preload("res://assets/textures/toilet/floor_tiles.png")
 const NEWSPAPER := preload("res://assets/textures/toilet/newspaper.png")
 
 var toilet: Toilet
+var sink: Sink
 
 var _paint: StandardMaterial3D
 var _whitewash: StandardMaterial3D
@@ -195,24 +196,12 @@ func _build_paper_holder() -> void:
 
 ## Рукомойник с краном на правой стене у двери, над ним зеркало.
 func _build_sink() -> void:
-	var porcelain := _mat(Color(0.93, 0.93, 0.9))
-	porcelain.roughness = 0.25
-	var chrome := _mat(Color(0.8, 0.8, 0.82))
-	chrome.metallic = 0.9
-	chrome.roughness = 0.2
 	var z := 3.0
-	var x := X1 - 0.21
-	_solid(Vector3(0.4, 0.16, 0.5), Vector3(x, 0.8, z), porcelain) # чаша
-	_box(Vector3(0.32, 0.02, 0.4), Vector3(x - 0.01, 0.875, z), _mat(Color(0.75, 0.78, 0.8)))
-	_box(Vector3(0.14, 0.72, 0.16), Vector3(X1 - 0.12, 0.36, z), porcelain) # ножка
-	# Кран: стояк, излив к чаше, два вентиля (красный и синий).
-	_box(Vector3(0.03, 0.14, 0.03), Vector3(X1 - 0.05, 0.95, z), chrome)
-	_box(Vector3(0.14, 0.025, 0.025), Vector3(X1 - 0.11, 1.02, z), chrome)
-	_box(Vector3(0.02, 0.04, 0.02), Vector3(X1 - 0.17, 1.0, z), chrome)
-	for side in [-1.0, 1.0]:
-		var knob := _sphere(0.022, Vector3(X1 - 0.05, 0.98, z + side * 0.07),
-			_mat(Color("d93a2a") if side < 0 else Color("3a6fd9")))
-		knob.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+	# Рукомойник (Sink): чаша с углублением и сливом, краны крутятся, вода набирается.
+	sink = Sink.new()
+	sink.position = Vector3(X1, 0, z)
+	sink.rotation.y = -PI / 2.0 # лицом в комнату (−X)
+	add_child(sink)
 	# Зеркало в деревянной рамке.
 	# Рамка — на слое стены: камера зеркала (она «за стеной») её не рисует.
 	var frame := _box(Vector3(0.03, 0.62, 0.5), Vector3(X1 - 0.015, 1.55, z), _mat(Color("6b4423")))
@@ -222,8 +211,6 @@ func _build_sink() -> void:
 	mirror.position = Vector3(X1 - 0.032, 1.55, z)
 	mirror.rotation.y = -PI / 2.0
 	add_child(mirror)
-	# Мыло на краю чаши.
-	_box(Vector3(0.06, 0.03, 0.09), Vector3(x - 0.12, 0.9, z - 0.17), _mat(Color("e8c870")))
 
 
 func _mat(color: Color) -> StandardMaterial3D:
