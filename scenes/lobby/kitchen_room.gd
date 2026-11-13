@@ -209,9 +209,9 @@ func _build_furniture() -> void:
 	# Вдоль левой стены (лицом в кухню, +X): холодильник у двери, плита.
 	var fridge := _furniture("kitchen_fridge", Vector3(X0 + 0.32, 0, 4.15), PI / 2,
 		Vector3(0.6, 1.5, 0.62))
-	var model_name := Label3D.new() # «192» на хромированной плашке (модель холодильника)
-	model_name.text = "192"
-	model_name.font_size = 64
+	var model_name := Label3D.new() # «MODEL №192» на плашке холодильника
+	model_name.text = "MODEL №192"
+	model_name.font_size = 44
 	model_name.pixel_size = 0.0004
 	model_name.modulate = Color("2a2520") # тёмные цифры на светлой плашке
 	model_name.outline_size = 0
