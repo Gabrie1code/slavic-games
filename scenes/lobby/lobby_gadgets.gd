@@ -37,6 +37,8 @@ var _held_cans: Dictionary = {}
 ## Губки в руках и «губки в кадре» у камер: PlayerData.id -> Sponge / Node3D.
 var _held_sponges: Dictionary = {}
 var _view_sponges: Dictionary = {}
+## «Пульт в кадре» у камеры того, кто держит пульт (PlayerData.id -> Node3D).
+var _view_remotes: Dictionary = {}
 var _player: AudioStreamPlayer3D
 
 
@@ -199,11 +201,11 @@ func _aim_end(character: PlayerCharacter, camera: Camera3D, reach: float) -> Vec
 	return character.global_position + Vector3.UP * 1.3 - character.global_basis.z * reach
 
 
-# ---------------- Рука: баллончик или губка ----------------
+# ---------------- Рука: баллончик, губка или пульт ----------------
 
 ## В руке что-то есть (баллончик или губка) — второе не взять, кулаком не бьёт.
 func hand_busy(p: PlayerData) -> bool:
-	return holds_can(p) or holds_sponge(p)
+	return holds_can(p) or holds_sponge(p) or holds_remote(p)
 
 
 func holds_sponge(p: PlayerData) -> bool:
@@ -216,18 +218,26 @@ func process_hand(p: PlayerData, camera: Camera3D, view_can: Node3D) -> void:
 		process_can_holder(p, camera, view_can)
 	elif holds_sponge(p):
 		_process_sponge(p, camera)
+	elif holds_remote(p):
+		_process_remote(p, camera)
 
 
 ## Бросить всё из руки (игрок ушёл из лобби).
 func release_hand(p: PlayerData) -> void:
 	release_can(p)
 	release_sponge(p)
+	if holds_remote(p):
+		_hide_view_remote(p)
+		apartment.tv_remote.go_home()
 
 
 ## Подсказки тому, у кого что-то в руке.
 func hand_hint(p: PlayerData) -> Array[Dictionary]:
 	if holds_can(p):
 		return can_holder_hint(p)
+	if holds_remote(p):
+		var remote_entries: Array[Dictionary] = [entry(drop_key(p), "Бросить пульт")]
+		return remote_entries
 	if not holds_sponge(p):
 		return _no_hint()
 	var result: Array[Dictionary] = [entry(attack_key(p), "Оттирать (зажать)"),
@@ -238,8 +248,11 @@ func hand_hint(p: PlayerData) -> Array[Dictionary]:
 	return result
 
 
-## Удар у раковины, пока рука свободна, — взять губку (вместо удара кулаком). true — взял.
+## Удар у раковины или у пульта, пока рука свободна, — взять губку / пульт (вместо удара
+## кулаком). true — взял.
 func try_attack_use(p: PlayerData) -> bool:
+	if _use_remote(p):
+		return true
 	var sink := _near_sink(p)
 	if hand_busy(p) or sink == null or sink.sponge == null:
 		return false
@@ -334,6 +347,64 @@ func release_sponge_quietly(p: PlayerData) -> void:
 		(_view_sponges[p.id] as Node).queue_free()
 		_view_sponges.erase(p.id)
 	_held_sponges.erase(p.id)
+
+
+# ---------------- Пульт от телевизора ----------------
+
+func holds_remote(p: PlayerData) -> bool:
+	var remote := apartment.tv_remote
+	return remote != null and remote.state == TvRemote.State.HELD and remote.holder == p
+
+
+## Пульт рядом (на диване или брошенный), который можно взять (null — нет или уже в руке).
+func _near_remote(p: PlayerData) -> TvRemote:
+	var remote := apartment.tv_remote
+	if remote == null or remote.state == TvRemote.State.HELD or hand_busy(p):
+		return null
+	return remote if _near(p, remote.global_position, CAN_RADIUS) else null
+
+
+## Подсказка «Взять пульт» (на ЛКМ: Пробел у дивана — «сесть»). Пусто — пульта рядом нет.
+func remote_hint(p: PlayerData) -> Array[Dictionary]:
+	var result: Array[Dictionary] = []
+	if _near_remote(p):
+		result.append(entry(attack_key(p), "Взять пульт"))
+	return result
+
+
+## Удар у пульта — взять его в руку. true — взял.
+func _use_remote(p: PlayerData) -> bool:
+	var remote := _near_remote(p)
+	if remote == null:
+		return false
+	remote.hold(p, characters[p.id])
+	return true
+
+
+## Пульт в руке: G — бросить туда, куда смотришь.
+func _process_remote(p: PlayerData, camera: Camera3D) -> void:
+	var character: PlayerCharacter = characters[p.id]
+	if camera and not _view_remotes.has(p.id):
+		var model := TvRemote.make_model()
+		model.position = Vector3(0.22, -0.24, -0.4)
+		model.rotation = Vector3(0.5, 0.25, 0.0)
+		model.scale = Vector3.ONE * 1.3
+		_set_layers(model, 1 << (p.slot + 10)) # слой «в кадре» этого игрока
+		camera.add_child(model)
+		_view_remotes[p.id] = model
+	if not p.input.is_just_pressed("drop"):
+		return
+	_hide_view_remote(p)
+	var dir := -character.global_basis.z
+	if camera:
+		dir = -camera.global_basis.z
+	apartment.tv_remote.throw(character, dir)
+
+
+func _hide_view_remote(p: PlayerData) -> void:
+	if _view_remotes.has(p.id):
+		(_view_remotes[p.id] as Node).queue_free()
+		_view_remotes.erase(p.id)
 
 
 func _set_layers(node: Node, layer: int) -> void:

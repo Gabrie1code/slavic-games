@@ -740,6 +740,7 @@ func _prompt_for(p: PlayerData, character: PlayerCharacter) -> Array[Dictionary]
 	var result: Array[Dictionary] = []
 	if action != "":
 		result.append(LobbyGadgets.entry(key, action))
+	result.append_array(_gadgets.remote_hint(p)) # пульт на ЛКМ — вместе с «Сесть на диван»
 	return result
 
 

@@ -91,6 +91,8 @@ var toilet_room: ToiletRoom
 ## Экраны игровых автоматов (кнопкой действия их можно «сломать» на 8 сек).
 var arcade_screens: Array[ArcadeScreen] = []
 var cat: LobbyCat
+## Пульт от телевизора (лежит на диване, его можно взять и бросить).
+var tv_remote: TvRemote
 
 var _lamp_light: OmniLight3D
 var _lamp_glow: MeshInstance3D
@@ -250,6 +252,12 @@ func _build_living_room() -> void:
 		var seat_pos := SOFA_POS + Vector3(local_x, 0.1, 0.12).rotated(Vector3.UP, SOFA_YAW)
 		seats.append({"pos": seat_pos, "yaw": SOFA_YAW + PI, "approach": seat_pos + front * 0.9,
 			"name": "Сесть на диван"})
+	# Пульт — посередине дивана, между местами для сидения.
+	tv_remote = TvRemote.new()
+	tv_remote.home_position = SOFA_POS + Vector3(0, 0.6, 0.15).rotated(Vector3.UP, SOFA_YAW)
+	tv_remote.home_yaw = SOFA_YAW + 0.4
+	tv_remote.set_meta("home_parent", self)
+	add_child(tv_remote)
 	var table_pos := Vector3(-2.6, 0, -0.25)
 	_solid(_model("coffee_table"), Vector3(1.0, 0.5, 0.55), 0.25, table_pos)
 	_breakable("crystal_vase", table_pos + Vector3(-0.25, 0.47, 0.0), [CRYSTAL], 0.4, 0.05)

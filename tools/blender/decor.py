@@ -274,13 +274,17 @@ for k in range(7):
 export("floor_rug_oval", P)
 
 # ---- Ковровая дорожка ----
-RUN = mat("RunnerRed", (0.5, 0.06, 0.06), 0.95)
+# Дорожка — тёмная вишня с синей каймой и золотыми ромбами (была «арбузная»: красный + зелёный).
+RUN = mat("RunnerWine", (0.26, 0.04, 0.06), 0.95)
+RUN_EDGE = mat("RunnerNavy", (0.05, 0.08, 0.2), 0.95)
+RUN_GOLD = mat("RunnerGold", (0.72, 0.5, 0.18), 0.95)
 P = [box((3.0, 0.8, 0.012), (0, 0, 0.006), RUN)]
 for y in (-0.3, 0.3):
-    P.append(box((3.0, 0.07, 0.015), (0, y, 0.0075), mat("RunnerGreen", (0.12, 0.35, 0.18), 0.95)))
-    P.append(box((3.0, 0.025, 0.016), (0, y * 0.82, 0.008), BEIGE))
+    P.append(box((3.0, 0.07, 0.015), (0, y, 0.0075), RUN_EDGE))
+    P.append(box((3.0, 0.02, 0.016), (0, y * 0.82, 0.008), RUN_GOLD))
 for i in range(8):
-    P.append(box((0.12, 0.12, 0.016), (-1.3 + i * 0.37, 0, 0.008), BEIGE, rot=(0, 0, math.radians(45))))
+    P.append(box((0.12, 0.12, 0.016), (-1.3 + i * 0.37, 0, 0.008), RUN_GOLD, rot=(0, 0, math.radians(45))))
+    P.append(box((0.05, 0.05, 0.017), (-1.3 + i * 0.37, 0, 0.0085), RUN_EDGE, rot=(0, 0, math.radians(45))))
 export("floor_runner", P)
 
 # ---- Стопки книг (разные, чтобы не повторялись) ----
