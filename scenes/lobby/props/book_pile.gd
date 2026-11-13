@@ -17,7 +17,7 @@ func build(count: int, support: Tippable, seed_value: int = 33) -> void:
 	rng.seed = seed_value
 	var y := 0.0
 	for i in count:
-		var size := Vector3(rng.randf_range(0.17, 0.24), rng.randf_range(0.03, 0.045),
+		var size := Vector3(rng.randf_range(0.17, 0.24), rng.randf_range(0.038, 0.05),
 			rng.randf_range(0.12, 0.16))
 		var book := Tippable.new()
 		book.setup_model(_book_model(size, COLORS[(i * 3) % COLORS.size()]), size,
@@ -25,6 +25,9 @@ func build(count: int, support: Tippable, seed_value: int = 33) -> void:
 		book.support = support
 		book.position = Vector3(rng.randf_range(-0.02, 0.02), y, rng.randf_range(-0.02, 0.02))
 		book.rotation.y = rng.randf_range(-0.35, 0.35)
+		# Тонкая быстрая книга за один шаг физики «ныряла» в пол глубже своей толщины и
+		# застревала в нём — непрерывная проверка столкновений ловит касание вовремя.
+		book.continuous_cd = true
 		book.can_sleep = true
 		book.sleeping = true # лежит спокойно, пока стопку не тронули
 		add_child(book)
