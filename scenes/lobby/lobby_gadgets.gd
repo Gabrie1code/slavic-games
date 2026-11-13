@@ -472,7 +472,7 @@ func _process_hammer(p: PlayerData, camera: Camera3D) -> void:
 ## поворот всего кулака с молотком (точка поворота — кулак).
 func _make_view_hammer(p: PlayerData) -> Node3D:
 	var root := Node3D.new()
-	root.position = Vector3(0.26, -0.3, -0.45)
+	root.position = Vector3(0.3, -0.33, -0.62) # кулак справа внизу, подальше от камеры
 	var fist := MeshInstance3D.new()
 	var fist_mesh := SphereMesh.new()
 	fist_mesh.radius = 0.06
@@ -485,8 +485,13 @@ func _make_view_hammer(p: PlayerData) -> Node3D:
 	fist.material_override = fist_mat
 	root.add_child(fist)
 	var model := Hammer.make_model()
-	model.rotation = Vector3(-0.3, 0.35, 0.0) # ручка вверх и чуть вперёд, боёк смотрит вперёд
-	model.scale = Vector3.ONE * 1.25
+	# Ручка из кулака вверх, чуть влево и от камеры; гвоздодёр — вправо-назад, ударная часть —
+	# влево-вперёд (базис задаём осями: так не ошибиться с порядком поворотов).
+	var up := Vector3(-0.25, 1.0, -0.35).normalized()
+	var claw := Vector3(0.9, 0.0, 0.4)
+	claw = (claw - up * claw.dot(up)).normalized()
+	model.basis = Basis(up.cross(claw), up, claw)
+	model.position.y = -0.02
 	root.add_child(model)
 	_set_layers(root, 1 << (p.slot + 10)) # слой «в кадре» этого игрока
 	_view_hammers[p.id] = root

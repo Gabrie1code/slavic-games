@@ -10,7 +10,10 @@ const LOOSE_LIFE := 10.0
 ## В кулаке: точка (0, 0, 0) модели — середина рукоятки; ручка — вверх по +Y, боёк наверху
 ## (ударная часть смотрит на −Z, гвоздодёр — на +Z). В руке ручка перпендикулярна руке, вперёд.
 const HAND_POS := Vector3(0, -0.44, 0.0)
-const HAND_ROT := Vector3(-PI / 2.0, 0.0, 0.0)
+## Куда в руке смотрит ручка (в осях руки; рука вынесена вперёд на 0.9 рад): в мире это почти
+## вертикально вверх с наклоном вперёд ~25° — как держат молоток наготове. Гвоздодёр — назад.
+const HAND_UP := Vector3(0.0, 0.22, -0.975)
+const HAND_CLAW := Vector3(0.0, 0.975, 0.22)
 const GRIP_COLOR := Color("d81e1e")
 const STEEL_COLOR := Color("2c3138")
 
@@ -128,7 +131,7 @@ func hold(p: PlayerData, character: PlayerCharacter) -> void:
 	_move_to(null)
 	character.attach_to_part("ArmR", self)
 	position = HAND_POS
-	rotation = HAND_ROT # ручка в кулаке, перпендикулярно руке, боёк сверху-впереди
+	basis = Basis(HAND_UP.cross(HAND_CLAW), HAND_UP, HAND_CLAW) # ручка в кулаке, боёк наверху
 	character.set_arm_pose(0.15, 0.9, 0.2)
 
 
