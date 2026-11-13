@@ -101,6 +101,8 @@ var _bumped: Dictionary = {}
 ## Прыжок: насколько персонаж в «позе полёта» (0..1), сколько уже в воздухе, сжатие/растяжение
 ## модели (>0 — вытянут, <0 — сплющен), стоял ли на земле в прошлом кадре.
 var _air := 0.0
+## Наклон головы вверх/вниз за взглядом (плавно догоняет fp_pitch).
+var _head_pitch := 0.0
 var _air_time := 0.0
 var _squash := 0.0
 var _was_on_floor := true
@@ -256,7 +258,11 @@ func _process(delta: float) -> void:
 		var legs := minf(absf(_part("LegL").rotation.x), absf(_part("LegR").rotation.x))
 		var rise := LEG_LENGTH * (1.0 - cos(legs)) - HEEL * sin(legs)
 		_model.position.y -= maxf(0.0, rise) * crouch_amount
-	_part("Head").rotation.x = sin(_idle_time * 2.0) * 0.04 + CROUCH_LEAN * crouch_amount * 0.8
+	# Голова смотрит туда же, куда игрок от первого лица (вверх/вниз) — видно другим и в зеркале.
+	# Не до конца (70% наклона взгляда), иначе голова «ломается» на шее.
+	_head_pitch = lerpf(_head_pitch, clampf(fp_pitch, -0.9, 0.9) * 0.7, minf(1.0, delta * 12.0))
+	_part("Head").rotation.x = sin(_idle_time * 2.0) * 0.04 + CROUCH_LEAN * crouch_amount * 0.8 \
+		+ _head_pitch
 	_animate_jump(delta)
 
 
