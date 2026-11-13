@@ -32,9 +32,11 @@ const LIGHT_OFF := Vector2(5.0, 90.0)
 const LIGHT_FADE := 1.5
 ## Окна загораются по очереди: не чаще одного раза в столько секунд на весь двор.
 const LIGHT_GAP := 3.0
-## Яркость света (было 1.0 — на 30% тусклее) и прозрачность горящего «стекла».
+## Яркость света (было 1.0 — на 30% тусклее).
 const LIGHT_BRIGHT := 0.7
-const LIGHT_ALPHA := 0.9
+## Свет «прибавляется» к обычному стеклу (смешивание ADD): 1 — горит, 0 — окно как обычно
+## (раньше гасло прозрачностью, и при выключении было видно тёмную картинку штор/рамы).
+const LIGHT_FULL := 1.0
 ## Атлас узоров горящего окна (tools/textures/window_glow.py): 4 узора в ряд —
 ## просто свет, шторы, тюль, цветы на подоконнике.
 const GLOW_TEX := preload("res://assets/textures/window/window_glow.png")
@@ -282,9 +284,9 @@ static func _glow_mesh(centers: Array[Vector2], tiles: Array[int]) -> ArrayMesh:
 func _glow_instance(house: Node3D, mesh: ArrayMesh) -> MeshInstance3D:
 	var mat := StandardMaterial3D.new()
 	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
 	mat.albedo_texture = GLOW_TEX
-	mat.albedo_color = Color(LIGHT_BRIGHT, LIGHT_BRIGHT, LIGHT_BRIGHT, 0.0)
+	mat.albedo_color = Color.BLACK # ничего не прибавляет — окно обычное
 	mat.cull_mode = BaseMaterial3D.CULL_DISABLED # видно с любой стороны (порядок вершин не важен)
 	var glow := MeshInstance3D.new()
 	glow.mesh = mesh
@@ -310,9 +312,7 @@ func _add_window_lights(house: Node3D) -> void:
 		if is_dark() and randf() < 0.35:
 			_win_on[_win_on.size() - 1] = 1
 			_win_timer[_win_timer.size() - 1] = randf_range(0.0, LIGHT_ON.y)
-			_win_level[_win_level.size() - 1] = LIGHT_ALPHA
-			(glow.material_override as StandardMaterial3D).albedo_color.a = LIGHT_ALPHA
-			glow.visible = true
+			_win_level[_win_level.size() - 1] = _fade_glow(glow, 0.0, LIGHT_FULL, LIGHT_FADE)
 
 
 ## Боковой дом: один из 4 заготовленных узоров (какие окна горят) — одной сеткой.
@@ -349,7 +349,7 @@ func _update_windows(delta: float) -> void:
 					_win_timer[i] = randf_range(LIGHT_OFF.x, LIGHT_OFF.y)
 				else:
 					_light_queue.append(i) # хочет загореться — встаёт в очередь
-		var target := LIGHT_ALPHA if _win_on[i] == 1 else 0.0
+		var target := LIGHT_FULL if _win_on[i] == 1 else 0.0
 		_win_level[i] = _fade_glow(_win_glows[i], _win_level[i], target, delta)
 	if not night:
 		_light_queue.clear()
@@ -359,14 +359,15 @@ func _update_windows(delta: float) -> void:
 		_win_timer[next] = randf_range(LIGHT_ON.x, LIGHT_ON.y)
 		_light_wait = LIGHT_GAP
 	_pattern_level = _fade_glow_all(_pattern_glows, _pattern_level,
-		LIGHT_ALPHA if night else 0.0, delta)
+		LIGHT_FULL if night else 0.0, delta)
 
 
 ## Плавно довести яркость «стекла» до target; возвращает новую яркость.
 static func _fade_glow(glow: MeshInstance3D, level: float, target: float, delta: float) -> float:
 	var next := move_toward(level, target, delta / LIGHT_FADE)
 	if next != level:
-		(glow.material_override as StandardMaterial3D).albedo_color.a = next
+		var bright := LIGHT_BRIGHT * next
+		(glow.material_override as StandardMaterial3D).albedo_color = Color(bright, bright, bright)
 		glow.visible = next > 0.0
 	return next
 
