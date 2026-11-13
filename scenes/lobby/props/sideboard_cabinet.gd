@@ -1,9 +1,11 @@
 class_name SideboardCabinet
 extends Node3D
 ## Сервант в гостиной (сама модель и столкновения — в Apartment): стеклянные дверцы наверху
-## (не открываются) и правая дверца тумбы. «Подтвердить» у тумбы — дверца распахивается и
-## «ломается» на OPEN_TIME сек (потом сама закрывается). Внутри двойная полка, на нижней —
-## молоток (Hammer): его можно взять. Когда дверца закроется, а молоток забрали, — лежит новый.
+## (не открываются) и правая дверца тумбы. «Подтвердить» у тумбы — открыть / закрыть дверцу.
+## Сквозь открытую дверцу не пройти (у неё своё тело). Через OPEN_TIME сек после открытия тумба
+## «восстанавливается»: дверца сама закрывается и, если молоток забрали, на полке лежит новый.
+## Закрыть дверцу рукой можно в любой момент — но это не восстановление (новый молоток не появится).
+## Внутри двойная полка, на нижней — молоток (Hammer).
 ## Узел ставится в точку серванта; координаты ниже — от неё (Blender → Godot: z = −y).
 
 const DOOR := preload("res://assets/models/apartment/sideboard_door.glb")
@@ -12,8 +14,8 @@ const OPEN_ANGLE := deg_to_rad(100.0)
 ## Петля правой дверцы тумбы (правый край, перед тумбой).
 const HINGE := Vector3(0.975, 0.5, 0.255)
 ## Молоток лежит на нижней полке поперёк отделения.
-const HAMMER_POS := Vector3(0.5, 0.118, 0.0)
-const HAMMER_ROT := Vector3(0.0, PI / 2.0 + 0.25, 0.0)
+const HAMMER_POS := Vector3(0.66, 0.122, 0.0)
+const HAMMER_ROT := Vector3(0.0, 0.25, PI / 2.0) # лежит на боку, ручкой вправо, бойком влево
 ## Верх серванта со стеклом: x ±0.97, высота 0.95..2.14, передний край по z.
 const GLASS_Z := 0.248
 const GLASS_BOTTOM := 0.97
@@ -24,7 +26,10 @@ var hammer: Hammer
 
 var _door: Node3D
 var _time := 0.0
-var _open_until := -1.0
+## Дверца открыта (её открыли и ещё не закрыли — рукой или само восстановление).
+var _door_open := false
+## Когда тумба «восстановится» (−1 — не ждём).
+var _restore_at := -1.0
 var _restock_on_close := false
 
 
@@ -32,38 +37,62 @@ func _ready() -> void:
 	_door = DOOR.instantiate() as Node3D
 	_door.position = HINGE
 	add_child(_door)
+	# Тело дверцы: двигается вместе с ней, сквозь открытую не пройти.
+	var body := AnimatableBody3D.new()
+	var shape := CollisionShape3D.new()
+	var box := BoxShape3D.new()
+	box.size = Vector3(0.95, 0.8, 0.03)
+	shape.shape = box
+	shape.position = Vector3(-0.475, 0.0, 0.0)
+	body.add_child(shape)
+	_door.add_child(body)
 	_build_glass()
 	_restock()
 
 
 func _process(delta: float) -> void:
 	_time += delta
-	var target := OPEN_ANGLE if is_open() else 0.0
+	if _restore_at >= 0.0 and _time >= _restore_at: # восстановление: сама закрывается
+		_restore_at = -1.0
+		_door_open = false
+		_restock_on_close = true
+	var target := OPEN_ANGLE if _door_open else 0.0
 	_door.rotation.y = move_toward(_door.rotation.y, target, delta * 4.0)
-	if _restock_on_close and not is_open() and _door.rotation.y == 0.0:
+	if _restock_on_close and not _door_open and _door.rotation.y == 0.0:
 		_restock_on_close = false
 		if hammer == null or not is_instance_valid(hammer):
 			_restock()
 
 
 func is_open() -> bool:
-	return _time < _open_until
+	return _door_open
 
 
-## Открыть можно, только когда дверца закрыта (открытая «сломана» на OPEN_TIME сек).
 func can_open() -> bool:
-	return not is_open() and _door.rotation.y == 0.0
+	return not _door_open and _door.rotation.y == 0.0
+
+
+## Закрыть рукой — когда дверца уже распахнулась.
+func can_close() -> bool:
+	return _door_open and _door.rotation.y > OPEN_ANGLE * 0.9
 
 
 func open() -> void:
-	if can_open():
-		_open_until = _time + OPEN_TIME
-		_restock_on_close = true
+	if not can_open():
+		return
+	_door_open = true
+	if _restore_at < 0.0:
+		_restore_at = _time + OPEN_TIME # отсчёт до восстановления — с первого открытия
+
+
+func close() -> void:
+	if can_close():
+		_door_open = false # просто закрыли: не восстановление, новый молоток не появится
 
 
 ## Взять молоток можно, когда дверца уже распахнулась.
 func can_take() -> bool:
-	return is_open() and hammer != null and is_instance_valid(hammer) \
+	return _door_open and hammer != null and is_instance_valid(hammer) \
 		and hammer.state == Hammer.State.STORED and _door.rotation.y > OPEN_ANGLE * 0.6
 
 

@@ -7,10 +7,12 @@ extends RigidBody3D
 enum State { STORED, HELD, LOOSE }
 
 const LOOSE_LIFE := 10.0
-const HAND_POS := Vector3(0, -0.44, 0.03)
-## Ручка вдоль локальной −Z (от бойка), боёк — на конце.
-const HANDLE := Vector3(0.028, 0.028, 0.3)
-const HEAD := Vector3(0.05, 0.05, 0.13)
+## В кулаке: точка (0, 0, 0) модели — середина рукоятки; ручка — вверх по +Y, боёк наверху
+## (ударная часть смотрит на −Z, гвоздодёр — на +Z). В руке ручка перпендикулярна руке, вперёд.
+const HAND_POS := Vector3(0, -0.44, 0.0)
+const HAND_ROT := Vector3(-PI / 2.0, 0.0, 0.0)
+const GRIP_COLOR := Color("d81e1e")
+const STEEL_COLOR := Color("2c3138")
 
 var state := State.STORED
 var holder: PlayerData
@@ -25,8 +27,9 @@ func _ready() -> void:
 	add_child(_model)
 	var shape := CollisionShape3D.new()
 	var box := BoxShape3D.new()
-	box.size = Vector3(0.13, 0.05, 0.32)
+	box.size = Vector3(0.07, 0.4, 0.2) # весь молоток: рукоятка, рукоять и боёк с гвоздодёром
 	shape.shape = box
+	shape.position.y = 0.125
 	add_child(shape)
 	mass = 0.6
 	angular_damp = 1.5
@@ -38,15 +41,50 @@ func _ready() -> void:
 	_set_loose_physics(false)
 
 
-## Деревянная ручка и стальной боёк (и для «молотка в кадре»).
+## Слесарный молоток-гвоздодёр: красная резиновая рукоятка, тёмная стальная рукоять,
+## боёк с круглой ударной частью и раздвоенным гвоздодёром (и для «молотка в кадре»).
 static func make_model() -> Node3D:
 	var root := Node3D.new()
-	root.add_child(_box(HANDLE, Vector3.ZERO, Color("a8743f"), 0.8))
-	var head := _box(HEAD, Vector3(0, 0, -0.16), Color("5d6266"), 0.35, 0.35) # боёк поперёк
-	head.rotation.y = PI / 2.0
-	root.add_child(head)
-	root.add_child(_box(Vector3(0.032, 0.032, 0.03), Vector3(0, 0, 0.15), Color("2b2b2b"), 0.6))
+	root.add_child(_cyl(0.021, 0.15, Vector3.ZERO, GRIP_COLOR, 0.7))                  # рукоятка
+	root.add_child(_cyl(0.023, 0.012, Vector3(0, -0.075, 0), GRIP_COLOR, 0.7))        # торец
+	root.add_child(_cyl(0.013, 0.19, Vector3(0, 0.17, 0), STEEL_COLOR, 0.35, 0.35))   # рукоять
+	root.add_child(_cyl(0.017, 0.025, Vector3(0, 0.27, 0), STEEL_COLOR, 0.35, 0.35))  # шейка
+	root.add_child(_box(Vector3(0.04, 0.05, 0.06), Vector3(0, 0.295, 0), STEEL_COLOR, 0.35, 0.35))
+	var face := _cyl(0.022, 0.06, Vector3(0, 0.295, -0.055), STEEL_COLOR, 0.3, 0.35) # ударная
+	face.rotation.x = PI / 2.0
+	root.add_child(face)
+	var cap := _cyl(0.025, 0.012, Vector3(0, 0.295, -0.088), STEEL_COLOR, 0.3, 0.35)
+	cap.rotation.x = PI / 2.0
+	root.add_child(cap)
+	for side: float in [-1.0, 1.0]:                                                     # гвоздодёр
+		var claw := _box(Vector3(0.013, 0.026, 0.08), Vector3(side * 0.01, 0.288, 0.066),
+			STEEL_COLOR, 0.35, 0.35)
+		claw.rotation.x = 0.4 # загнут вниз
+		root.add_child(claw)
 	return root
+
+
+static func _cyl(radius: float, height: float, pos: Vector3, color: Color, rough: float,
+		metal: float = 0.0) -> MeshInstance3D:
+	var mesh_instance := MeshInstance3D.new()
+	var mesh := CylinderMesh.new()
+	mesh.top_radius = radius
+	mesh.bottom_radius = radius
+	mesh.height = height
+	mesh.radial_segments = 8
+	mesh.rings = 1
+	mesh_instance.mesh = mesh
+	mesh_instance.material_override = _mat(color, rough, metal)
+	mesh_instance.position = pos
+	return mesh_instance
+
+
+static func _mat(color: Color, rough: float, metal: float) -> StandardMaterial3D:
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = color
+	mat.roughness = rough
+	mat.metallic = metal
+	return mat
 
 
 ## metal — не больше 0.35: чистый металл без отражений в игре чёрный.
@@ -56,11 +94,7 @@ static func _box(size: Vector3, pos: Vector3, color: Color, rough: float,
 	var mesh := BoxMesh.new()
 	mesh.size = size
 	mesh_instance.mesh = mesh
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = color
-	mat.roughness = rough
-	mat.metallic = metal
-	mesh_instance.material_override = mat
+	mesh_instance.material_override = _mat(color, rough, metal)
 	mesh_instance.position = pos
 	return mesh_instance
 
@@ -94,7 +128,7 @@ func hold(p: PlayerData, character: PlayerCharacter) -> void:
 	_move_to(null)
 	character.attach_to_part("ArmR", self)
 	position = HAND_POS
-	rotation = Vector3(PI / 2.0, 0, 0)
+	rotation = HAND_ROT # ручка в кулаке, перпендикулярно руке, боёк сверху-впереди
 	character.set_arm_pose(0.15, 0.9, 0.2)
 
 

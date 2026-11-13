@@ -68,6 +68,9 @@ var can_jump := true
 ## Прыжок нажат и ждёт следующего кадра физики. Лобби ставит false, если в этом кадре
 ## Пробел ушёл на действие (подобрать, включить, сесть…) — тогда персонаж не подпрыгнет.
 var jump_pending := false
+## Сколько ещё секунд прыжок запрещён: Пробел только что ушёл на действие. Нужно при высоком FPS:
+## кадр физики может прийти уже после того, как подсказка пропала, — и «Пробел» стал бы прыжком.
+var jump_lock := 0.0
 var respawn_on_fall := true
 var fall_limit := -10.0
 ## Наклон правой руки вперёд (>0) / назад (<0), когда рука занята (держит предмет).
@@ -180,7 +183,9 @@ func _physics_process(delta: float) -> void:
 		if jump_pending and is_on_floor():
 			velocity.y = JUMP_VELOCITY
 			_squash = 1.0 # толчок: вытянулся вверх (звук прыжка выключен по просьбе владельца)
-		jump_pending = not crouching and can_jump and player.input.is_just_pressed("confirm") \
+		jump_lock = maxf(0.0, jump_lock - delta)
+		jump_pending = not crouching and can_jump and jump_lock <= 0.0 \
+			and player.input.is_just_pressed("confirm") \
 			and is_on_floor()
 
 	# Камера смотрит спереди, поэтому «вверх» на экране — это -Z в мире.

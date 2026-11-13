@@ -244,7 +244,7 @@ func _process(delta: float) -> void:
 		character.can_jump = not has_action
 		var act := p.input.is_just_pressed("confirm") and not running
 		if act and has_action:
-			character.jump_pending = false # Пробел ушёл на действие — не подпрыгивать
+			_eat_jump(character) # Пробел ушёл на действие — не подпрыгивать
 		if _gadgets.hand_busy(p):
 			var view: Dictionary = _views.get(p.id, {})
 			_gadgets.process_hand(p, view.get("camera"), view.get("can")) # баллончик / губка
@@ -255,13 +255,13 @@ func _process(delta: float) -> void:
 		elif p.input.is_just_pressed("secondary") and not running:
 			_gadgets.try_secondary(p) # ПКМ у тумбочки — ночник
 		if act and _gadgets.can_use_toilet(p):
-			character.jump_pending = false
+			_eat_jump(character)
 			_open_room(p, ToiletScreen.new().setup_for(p, character, _apartment.toilet_room.toilet))
 			continue
 		if act and _gadgets.try_interact(p):
 			# Пробел ушёл на действие (положить губку, взять баллончик…) — даже если подсказка была
 			# «рукой» (её нет в has_action), персонаж не подпрыгивает.
-			character.jump_pending = false
+			_eat_jump(character)
 			continue
 		var at_tv := _is_near(p, Apartment.TV_ZONE, TV_ZONE_RADIUS)
 		var seat := _free_seat_near(p)
@@ -350,6 +350,12 @@ func _build_zone(pos: Vector3, radius: float, color: Color, badge: String) -> vo
 
 ## Удар рукой: от третьего лица — взмах вперёд, от первого — тычок кулаком в кадре.
 ## Разбивает вещи впереди, толкает стулья и гантели, отталкивает других игроков.
+## Пробел ушёл на действие: отменить прыжок и не прыгать ещё чуть-чуть (см. jump_lock).
+func _eat_jump(character: PlayerCharacter) -> void:
+	character.jump_pending = false
+	character.jump_lock = 0.25
+
+
 func _punch(p: PlayerData, hammer: bool = false) -> void:
 	var now := Time.get_ticks_msec() / 1000.0
 	if now - float(_punch_time.get(p.id, -10.0)) < PUNCH_COOLDOWN:

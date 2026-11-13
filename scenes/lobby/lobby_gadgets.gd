@@ -453,8 +453,8 @@ func swing_hammer(p: PlayerData) -> void:
 	if _view_hammers.has(p.id):
 		var view: Node3D = _view_hammers[p.id]
 		var hit := view.create_tween()
-		hit.tween_property(view, "rotation:x", -0.9, 0.07).set_ease(Tween.EASE_OUT)
-		hit.tween_property(view, "rotation:x", 0.35, 0.18).set_ease(Tween.EASE_IN)
+		hit.tween_property(view, "rotation:x", -1.1, 0.08).set_ease(Tween.EASE_OUT)
+		hit.tween_property(view, "rotation:x", 0.0, 0.18).set_ease(Tween.EASE_IN)
 	var arcade := _near_arcade(p)
 	if arcade:
 		arcade.smash()
@@ -463,14 +463,34 @@ func swing_hammer(p: PlayerData) -> void:
 ## Молоток в руке: G — бросить туда, куда смотришь.
 func _process_hammer(p: PlayerData, camera: Camera3D) -> void:
 	if camera and not _view_hammers.has(p.id):
-		var model := Hammer.make_model()
-		model.position = Vector3(0.26, -0.3, -0.5)
-		model.rotation = Vector3(0.35, 0.25, 0.0)
-		_set_layers(model, 1 << (p.slot + 10)) # слой «в кадре» этого игрока
-		camera.add_child(model)
-		_view_hammers[p.id] = model
+		camera.add_child(_make_view_hammer(p))
 	if p.input.is_just_pressed("drop"):
 		_release_hammer(p, look_dir(characters[p.id], camera))
+
+
+## Молоток «в кадре»: кулак персонажа (его цвета) сжимает рукоятку, боёк — вверху. Взмах —
+## поворот всего кулака с молотком (точка поворота — кулак).
+func _make_view_hammer(p: PlayerData) -> Node3D:
+	var root := Node3D.new()
+	root.position = Vector3(0.26, -0.3, -0.45)
+	var fist := MeshInstance3D.new()
+	var fist_mesh := SphereMesh.new()
+	fist_mesh.radius = 0.06
+	fist_mesh.height = 0.11
+	fist_mesh.radial_segments = 8
+	fist_mesh.rings = 4
+	fist.mesh = fist_mesh
+	var fist_mat := StandardMaterial3D.new()
+	fist_mat.albedo_color = p.color
+	fist.material_override = fist_mat
+	root.add_child(fist)
+	var model := Hammer.make_model()
+	model.rotation = Vector3(-0.3, 0.35, 0.0) # ручка вверх и чуть вперёд, боёк смотрит вперёд
+	model.scale = Vector3.ONE * 1.25
+	root.add_child(model)
+	_set_layers(root, 1 << (p.slot + 10)) # слой «в кадре» этого игрока
+	_view_hammers[p.id] = root
+	return root
 
 
 ## Бросить молоток (dir — взгляд; Vector3.ZERO — уронить под себя, игрок ушёл из лобби).
@@ -502,6 +522,9 @@ func _use_sideboard(p: PlayerData) -> bool:
 	if near and cabinet.can_open():
 		cabinet.open()
 		return true
+	if near and cabinet.can_close():
+		cabinet.close()
+		return true
 	return false
 
 
@@ -517,6 +540,8 @@ func _sideboard_hint(p: PlayerData) -> Array[Dictionary]:
 			result.append(entry(confirm_key(p), "Взять молоток"))
 		elif cabinet.can_open():
 			result.append(entry(confirm_key(p), "Открыть тумбу"))
+		elif cabinet.can_close():
+			result.append(entry(confirm_key(p), "Закрыть тумбу"))
 	return result
 
 

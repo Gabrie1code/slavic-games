@@ -8,7 +8,7 @@ extends Node3D
 ## Рисуется во встроенном SubViewport и показывается на прямоугольнике поверх экрана модели.
 ## Автомат можно «сломать» кнопкой действия: сыплются искры, экран гаснет и через OFF_TIME сек
 ## включается снова (как восстанавливается разбитая посуда).
-## Молотком экран разбивается (smash): трещины по стеклу, осколки, картинка мигает и тускнеет;
+## Молотком экран разбивается (smash): трещины по стеклу, осколки; игра за стеклом идёт дальше;
 ## через SMASH_TIME сек стекло «восстанавливается».
 
 const W := 96
@@ -67,7 +67,10 @@ func smash() -> void:
 		return
 	_smashed_until = _time + SMASH_TIME
 	_cracks.visible = true
-	_cracks.rotation.z = randf() * TAU # каждый раз трещины по-другому
+	# Каждый раз трещины по-другому: картинку отражаем по горизонтали/вертикали (не поворачиваем —
+	# иначе углы вылезали за экран).
+	_cracks_mat.uv1_scale = Vector3(1.0 if randf() < 0.5 else -1.0, 1.0 if randf() < 0.5 else -1.0,
+		1.0)
 	_shards.restart()
 	_shards.emitting = true
 
@@ -99,22 +102,19 @@ func _process(delta: float) -> void:
 	_process_smash()
 
 
-## Разбитое стекло: картинка тусклее и иногда мигает, трещины в конце плавно исчезают.
+## Разбитое стекло: игра за ним идёт как обычно (экран не гаснет), трещины в конце плавно тают.
 func _process_smash() -> void:
 	var left := _smashed_until - _time
 	if left <= 0.0:
 		_cracks.visible = false
 		return
-	if _time >= _off_until: # погашенный искрами экран остаётся тёмным
-		var dim := 0.55 if randf() > 0.04 else 1.2
-		_mat.albedo_color = Color(dim, dim, dim)
 	_cracks_mat.albedo_color.a = clampf(left / 0.6, 0.0, 1.0)
 
 
 func _build_cracks(size: Vector2) -> void:
 	_cracks = MeshInstance3D.new()
 	var quad := QuadMesh.new()
-	quad.size = Vector2.ONE * maxf(size.x, size.y) # квадрат трещин, лишнее обрезает рамка
+	quad.size = size # ровно по экрану
 	_cracks.mesh = quad
 	_cracks_mat = StandardMaterial3D.new()
 	_cracks_mat.albedo_texture = CRACKS
@@ -123,7 +123,6 @@ func _build_cracks(size: Vector2) -> void:
 	_cracks.material_override = _cracks_mat
 	_cracks.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_cracks.position.z = 0.004
-	_cracks.scale = Vector3(size.x / maxf(size.x, size.y), size.y / maxf(size.x, size.y), 1.0)
 	_cracks.visible = false
 	add_child(_cracks)
 	_shards = _make_sparks()
