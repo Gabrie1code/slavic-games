@@ -2,7 +2,8 @@
 синусов, шума и простых фильтров (никаких чужих записей и сэмплов) — можно использовать свободно.
 Каждый вариант — бесшовная петля (хвосты нот заворачиваются в начало).
 
-  disco  — «Ретро-диско»: бодрый ровный бит, пружинистый октавный бас, электропианино, синт-мелодия;
+  disco  — «Ретро-диско»: бодрый ровный бит, пружинистый октавный бас, электропианино, синт-мелодия
+           (выбран для лобби: assets/audio/radio_music.wav, 22050 Гц);
   bossa  — «Босса у телевизора»: мягкая босса-нова, септаккорды, флейта, щелчки по ободку;
   funk   — «Лёгкий фанк»: хлопки на 2 и 4, «клавинет» на слабые доли, прыгучий бас, орган;
   chip   — «Дворовый чиптюн»: весёлые арпеджио приглушёнными «квадратами», как старая приставка.
@@ -55,8 +56,8 @@ def env(length, attack=0.005, decay=3.0, release=0.05, sustain=None):
 def epiano(f, length):
     t, e = env(length, 0.004, 2.2)
     bell = np.exp(-t * 9)
-    return e * (np.sin(2 * np.pi * f * t) + 0.25 * np.sin(4 * np.pi * f * t)
-                + 0.18 * bell * np.sin(2 * np.pi * f * 7.0 * t))
+    return e * (np.sin(2 * np.pi * f * t) + 0.2 * np.sin(4 * np.pi * f * t)
+                + 0.05 * bell * np.sin(2 * np.pi * f * 7.0 * t))   # «колокольчик» еле слышен
 
 
 def pluck(f, length, bright=0.5):
@@ -78,7 +79,7 @@ def soft_square(f, length, decay=3.0):
 def lead(f, length, vibrato=0.0):
     t, e = env(length, 0.02, 1.2, 0.06, sustain=0.6)
     ph = 2 * np.pi * f * t + vibrato * np.sin(2 * np.pi * 5.5 * t) * np.minimum(1, t * 3)
-    return e * (np.sin(ph) + 0.3 * np.sin(2 * ph) + 0.12 * np.sin(3 * ph))
+    return e * (np.sin(ph) + 0.15 * np.sin(2 * ph) + 0.04 * np.sin(3 * ph))  # мягкий, без «звона»
 
 
 def flute(f, length):
@@ -180,16 +181,16 @@ def style_disco():
             tr.put(b + beat + 0.5, bass(hz(root - 12 + 12), 0.2), 0.22)    # октавный бас
             tr.put(b + beat, bass(hz(root - 12), 0.22), 0.3)
         for beat in (1, 3):
-            tr.put(b + beat, clap(), 0.16)
+            tr.put(b + beat, clap(), 0.11)
         for k, n in enumerate(chord_notes(root + 12, kind)):
             for beat in (0.5, 1.5, 2.5, 3.5):                              # «чак» на слабые
                 tr.put(b + beat + k * 0.01, epiano(hz(n), 0.35), 0.05)
     motif = [[(0, 0.5, 4), (0.5, 0.5, 2), (1, 1, 0), (2.5, 0.5, 2), (3, 1, 4)],
              [(0, 1.5, 5), (1.5, 0.5, 4), (2, 0.5, 2), (2.5, 1.5, 0)],
-             [(0, 0.5, 2), (0.5, 0.5, 4), (1, 0.5, 5), (1.5, 1.5, 7), (3.5, 0.5, 5)],
+             [(0, 0.5, 2), (0.5, 0.5, 4), (1, 0.5, 5), (1.5, 1.5, 4), (3.5, 0.5, 2)],
              [(0, 1, 4), (1, 1, 2), (2, 2, 1)]]
-    melody(tr, chords, motif, 1, lambda f, l: lead(f, l, 0.2), 0.09, start_bar=8, bars=24)
-    return tr, 0.5
+    melody(tr, chords, motif, 1, lambda f, l: lead(f, l, 0.12), 0.07, start_bar=8, bars=24)
+    return tr, 0.38
 
 
 def style_bossa():
@@ -271,8 +272,8 @@ def style_chip():
 track, softness = {"disco": style_disco, "bossa": style_bossa, "funk": style_funk,
                    "chip": style_chip}[STYLE]()
 mix = room(lowpass(track.buf, softness))       # тёплый, не режущий звук + немного комнаты
-mix = np.tanh(mix / (np.max(np.abs(mix)) + 1e-9) * 1.6) # мягкое сжатие
-mix = mix / np.max(np.abs(mix)) * 0.85
+# Без «сжатия» (tanh давал хрип-перегруз на громких местах) — просто ровная громкость.
+mix = mix / (np.max(np.abs(mix)) + 1e-9) * 0.85
 with wave.open(OUT, "wb") as w:
     w.setnchannels(1)
     w.setsampwidth(2)
