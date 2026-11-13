@@ -30,7 +30,15 @@ const LIGHT_ON := Vector2(30.0, 120.0)
 ## …а погасшее окно загорается снова через столько.
 const LIGHT_OFF := Vector2(5.0, 90.0)
 const LIGHT_FADE := 1.5
-const LIGHT_COLOR := Color(1.0, 0.8, 0.45)
+## Окна загораются по очереди: не чаще одного раза в столько секунд на весь двор.
+const LIGHT_GAP := 3.0
+## Яркость света (было 1.0 — на 30% тусклее) и прозрачность горящего «стекла».
+const LIGHT_BRIGHT := 0.7
+const LIGHT_ALPHA := 0.9
+## Атлас узоров горящего окна (tools/textures/window_glow.py): 4 узора в ряд —
+## просто свет, шторы, тюль, цветы на подоконнике.
+const GLOW_TEX := preload("res://assets/textures/window/window_glow.png")
+const GLOW_TILES := 4
 
 ## Время суток: ключевые точки привязаны к восходу и закату ЭТОГО дня (SunCalendar — Россия,
 ## по дате на компьютере): [от чего («0», «rise», «set», «24»), сдвиг в часах, верх неба,
@@ -70,6 +78,9 @@ var _win_timer := PackedFloat32Array()
 ## Узоры горящих окон боковых домов (по сетке на дом) и их общая яркость.
 var _pattern_glows: Array[MeshInstance3D] = []
 var _pattern_level := 0.0
+## Окна центрального дома, которым пора загореться, — ждут своей очереди (LIGHT_GAP).
+var _light_queue: Array[int] = []
+var _light_wait := 0.0
 ## Сколько ещё часов «промотать» плавно (F8 — час за 3 секунды, без рывка).
 var _skip_left := 0.0
 
@@ -246,21 +257,25 @@ static func _window_spots() -> Array[Vector2]:
 	return spots
 
 
-## Одна сетка из «светящихся стёкол» для окон centers (две половинки — между ними рама).
-## Всё одной сеткой — один вызов отрисовки, а не по одному на каждое окно.
-static func _glow_mesh(centers: Array[Vector2]) -> ArrayMesh:
+## Одна сетка из «светящихся стёкол» для окон centers; tiles — узор каждого окна (номер в
+## атласе GLOW_TEX, переплёт нарисован в нём). Всё одной сеткой — один вызов отрисовки.
+static func _glow_mesh(centers: Array[Vector2], tiles: Array[int]) -> ArrayMesh:
 	var tool := SurfaceTool.new()
 	tool.begin(Mesh.PRIMITIVE_TRIANGLES)
 	tool.set_normal(Vector3.BACK)
-	for center in centers:
-		for side: float in [-1.0, 1.0]:
-			var x0 := center.x + side * 0.28 - 0.25
-			var x1 := x0 + 0.5
-			var y0 := center.y - 0.575
-			var y1 := center.y + 0.575
-			for v: Vector2 in [Vector2(x0, y0), Vector2(x1, y1), Vector2(x1, y0),
-					Vector2(x0, y0), Vector2(x0, y1), Vector2(x1, y1)]:
-				tool.add_vertex(Vector3(v.x, v.y, HOUSE_FRONT))
+	for i in centers.size():
+		var x0 := centers[i].x - 0.58
+		var x1 := centers[i].x + 0.58
+		var y0 := centers[i].y - 0.63
+		var y1 := centers[i].y + 0.63
+		var u0 := (tiles[i] + 0.01) / GLOW_TILES
+		var u1 := (tiles[i] + 0.99) / GLOW_TILES
+		var corners: Array[Vector4] = [Vector4(x0, y0, u0, 1.0), Vector4(x1, y1, u1, 0.0),
+			Vector4(x1, y0, u1, 1.0), Vector4(x0, y0, u0, 1.0), Vector4(x0, y1, u0, 0.0),
+			Vector4(x1, y1, u1, 0.0)]
+		for c in corners:
+			tool.set_uv(Vector2(c.z, c.w))
+			tool.add_vertex(Vector3(c.x, c.y, HOUSE_FRONT))
 	return tool.commit()
 
 
@@ -268,7 +283,8 @@ func _glow_instance(house: Node3D, mesh: ArrayMesh) -> MeshInstance3D:
 	var mat := StandardMaterial3D.new()
 	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	mat.albedo_color = Color(LIGHT_COLOR, 0.0)
+	mat.albedo_texture = GLOW_TEX
+	mat.albedo_color = Color(LIGHT_BRIGHT, LIGHT_BRIGHT, LIGHT_BRIGHT, 0.0)
 	mat.cull_mode = BaseMaterial3D.CULL_DISABLED # видно с любой стороны (порядок вершин не важен)
 	var glow := MeshInstance3D.new()
 	glow.mesh = mesh
@@ -284,14 +300,19 @@ func _glow_instance(house: Node3D, mesh: ArrayMesh) -> MeshInstance3D:
 func _add_window_lights(house: Node3D) -> void:
 	for spot in _window_spots():
 		var one: Array[Vector2] = [spot]
-		_win_glows.append(_glow_instance(house, _glow_mesh(one)))
+		var tile: Array[int] = [randi() % GLOW_TILES]
+		var glow := _glow_instance(house, _glow_mesh(one, tile))
+		_win_glows.append(glow)
 		_win_level.append(0.0)
 		_win_on.append(0)
-		# Сразу ночью уже горит примерно каждое третье окно, остальные загорятся позже.
 		_win_timer.append(randf_range(0.0, LIGHT_OFF.y))
-		if randf() < 0.35:
+		# Зашли в лобби ночью — примерно треть окон уже горит (сразу, без очереди).
+		if is_dark() and randf() < 0.35:
 			_win_on[_win_on.size() - 1] = 1
 			_win_timer[_win_timer.size() - 1] = randf_range(0.0, LIGHT_ON.y)
+			_win_level[_win_level.size() - 1] = LIGHT_ALPHA
+			(glow.material_override as StandardMaterial3D).albedo_color.a = LIGHT_ALPHA
+			glow.visible = true
 
 
 ## Боковой дом: один из 4 заготовленных узоров (какие окна горят) — одной сеткой.
@@ -300,26 +321,45 @@ func _add_pattern_lights(house: Node3D, pattern: int) -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 1000 + pattern # узор всегда один и тот же
 	var lit: Array[Vector2] = []
+	var tiles: Array[int] = []
 	for spot in _window_spots():
 		if rng.randf() < 0.3:
 			lit.append(spot)
-	_pattern_glows.append(_glow_instance(house, _glow_mesh(lit)))
+			tiles.append(rng.randi() % GLOW_TILES)
+	_pattern_glows.append(_glow_instance(house, _glow_mesh(lit, tiles)))
 
 
 ## Ночью окна центрального дома по одному плавно загораются и гаснут — каждое по своему
 ## случайному таймеру (горит 30–120 сек); узоры боковых домов горят всю ночь. Днём всё гаснет.
 ## Стоит дёшево: ~60 чисел за кадр, а погасшие окна вообще не рисуются (visible = false).
+## Загораются окна строго по очереди: не чаще раза в LIGHT_GAP сек на весь дом — если время
+## пришло, а очередь занята, окно ждёт (_light_queue). Гаснут — когда истекло их время.
+## Днём окна не загораются вовсе; вечером начинают по одному.
 func _update_windows(delta: float) -> void:
 	var night := is_dark()
+	_light_wait -= delta
 	for i in _win_glows.size():
-		_win_timer[i] -= delta
-		if _win_timer[i] <= 0.0:
-			_win_on[i] = 1 - _win_on[i]
-			var range_s := LIGHT_ON if _win_on[i] == 1 else LIGHT_OFF
-			_win_timer[i] = randf_range(range_s.x, range_s.y)
-		var target := 0.9 if night and _win_on[i] == 1 else 0.0
+		if not night:
+			_win_on[i] = 0
+		elif _win_on[i] == 1 or not _light_queue.has(i):
+			_win_timer[i] -= delta
+			if _win_timer[i] <= 0.0:
+				if _win_on[i] == 1:
+					_win_on[i] = 0
+					_win_timer[i] = randf_range(LIGHT_OFF.x, LIGHT_OFF.y)
+				else:
+					_light_queue.append(i) # хочет загореться — встаёт в очередь
+		var target := LIGHT_ALPHA if _win_on[i] == 1 else 0.0
 		_win_level[i] = _fade_glow(_win_glows[i], _win_level[i], target, delta)
-	_pattern_level = _fade_glow_all(_pattern_glows, _pattern_level, 0.9 if night else 0.0, delta)
+	if not night:
+		_light_queue.clear()
+	elif _light_wait <= 0.0 and not _light_queue.is_empty():
+		var next: int = _light_queue.pop_front()
+		_win_on[next] = 1
+		_win_timer[next] = randf_range(LIGHT_ON.x, LIGHT_ON.y)
+		_light_wait = LIGHT_GAP
+	_pattern_level = _fade_glow_all(_pattern_glows, _pattern_level,
+		LIGHT_ALPHA if night else 0.0, delta)
 
 
 ## Плавно довести яркость «стекла» до target; возвращает новую яркость.
