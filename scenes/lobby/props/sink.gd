@@ -33,8 +33,9 @@ var front_offset := Vector3(0, 0.9, 0.3)
 var stand_offset := STAND
 var body_size := Vector3(0.52, 0.88, 0.42)
 var body_center := Vector3(0, 0.44, 0.21)
-## Есть ли место для губки (у кухонной мойки — нет).
+## Есть ли место для губки и где она лежит (в координатах раковины).
 var has_sponge := true
+var sponge_spot := SPONGE_SPOT
 
 var busy := false
 ## Губка на раковине (null — её взяли).
@@ -129,7 +130,7 @@ func return_sponge(item: Sponge) -> bool:
 	if not accepts_sponge():
 		return false
 	sponge = item
-	item.store_in(self, SPONGE_SPOT)
+	item.store_in(self, sponge_spot)
 	return true
 
 
@@ -138,7 +139,7 @@ func _restock_sponge() -> void:
 		return # вернули сами
 	sponge = Sponge.new()
 	add_child(sponge)
-	sponge.store_in(self, SPONGE_SPOT)
+	sponge.store_in(self, sponge_spot)
 
 
 ## Куда смотреть/подходить (перед кранами).
