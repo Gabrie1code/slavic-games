@@ -369,7 +369,7 @@ func holds_remote(p: PlayerData) -> bool:
 ## Пульт рядом (на диване или брошенный), который можно взять (null — нет или уже в руке).
 func _near_remote(p: PlayerData) -> TvRemote:
 	var remote := apartment.tv_remote
-	if remote == null or remote.state == TvRemote.State.HELD or hand_busy(p):
+	if remote == null or remote.state == TvRemote.State.HELD or remote.returning or hand_busy(p):
 		return null
 	return remote if _near(p, remote.global_position, CAN_RADIUS) else null
 

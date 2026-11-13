@@ -15,6 +15,8 @@ var holder: PlayerData
 ## Где пульт лежит на диване (в координатах квартиры).
 var home_position := Vector3.ZERO
 var home_yaw := 0.0
+## Сейчас исчезает с пола, чтобы появиться на диване (в это время взять нельзя).
+var returning := false
 
 var _model: Node3D
 var _still_time := 0.0
@@ -99,7 +101,22 @@ func _physics_process(delta: float) -> void:
 		_still_time = 0.0
 	if _still_time > BACK_TIME or global_position.y < -5.0:
 		state = State.HOME # чтобы не вызвать дважды; перенос узла — после физического кадра
-		go_home.call_deferred()
+		_return_like_restored.call_deferred()
+
+
+## Вернуться на диван, как вещь после поломки: на полу сжимается и исчезает, на диване
+## появляется из точки и «пружинит» до нормального размера (как Breakable).
+func _return_like_restored() -> void:
+	_set_loose_physics(false)
+	returning = true
+	var shrink := create_tween()
+	shrink.tween_property(_model, "scale", Vector3.ONE * 0.01, 0.2).set_ease(Tween.EASE_IN)
+	await shrink.finished
+	returning = false
+	go_home()
+	_model.scale = Vector3.ONE * 0.01
+	create_tween().tween_property(_model, "scale", Vector3.ONE, 0.35) \
+		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 
 ## Вернуться на диван.
@@ -115,6 +132,7 @@ func go_home() -> void:
 
 func hold(p: PlayerData, character: PlayerCharacter) -> void:
 	state = State.HELD
+	_model.scale = Vector3.ONE # схватили посреди «восстановления» — сразу нормальный размер
 	holder = p
 	_set_loose_physics(false)
 	_move_to(null)
