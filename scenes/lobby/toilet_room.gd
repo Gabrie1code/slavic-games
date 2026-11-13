@@ -13,6 +13,9 @@ const WALL_LAYER := 1 << 14
 ## как FP_ONLY_LAYER), и тоже не видит «вид сбоку».
 const WALL_HIGH_LAYER := 1 << 5
 const X0 := 3.1 # стена с дверью (общая с гостиной)
+## Толщина стены с дверью — как у перегородки гостиная/спальня (0.16): раньше была 0.12,
+## и на стыке со стеной гостиной была видна «ступенька».
+const WALL_T := 0.16
 const X1 := 5.4
 const Z0 := 1.74 # перед стеной спальни (её передняя стенка видна от первого лица)
 const Z1 := 3.5
@@ -63,18 +66,18 @@ func _build_door_wall() -> void:
 		var length := span.y - span.x
 		var mid := (span.x + span.y) / 2.0
 		# Низ до 2.4 м виден всегда (как перегородка между комнатами), выше — только от 1-го лица.
-		_solid(Vector3(0.12, 2.4, length), Vector3(X0, 1.2, mid), wallpaper)
-		_fp_only(Vector3(0.12, HEIGHT - 2.4, length), Vector3(X0, 2.4 + (HEIGHT - 2.4) / 2.0, mid),
+		_solid(Vector3(WALL_T, 2.4, length), Vector3(X0, 1.2, mid), wallpaper)
+		_fp_only(Vector3(WALL_T, HEIGHT - 2.4, length), Vector3(X0, 2.4 + (HEIGHT - 2.4) / 2.0, mid),
 			wallpaper)
-		_collider(Vector3(0.12, HEIGHT - 2.4, length), Vector3(X0, 2.4 + (HEIGHT - 2.4) / 2.0, mid))
-		_inner_faces(Vector3(0.02, 0, length), Vector3(X0 + 0.07, 0, mid))
+		_collider(Vector3(WALL_T, HEIGHT - 2.4, length), Vector3(X0, 2.4 + (HEIGHT - 2.4) / 2.0, mid))
+		_inner_faces(Vector3(0.02, 0, length), Vector3(X0 + 0.09, 0, mid))
 	var door_len := DOOR_TO_Z - DOOR_FROM_Z
 	var door_mid := (DOOR_FROM_Z + DOOR_TO_Z) / 2.0
 	# Над дверью — твёрдо до потолка (не пролететь в прыжке сквозь «картинку» стены).
-	_solid(Vector3(0.12, 2.4 - DOOR_TOP, door_len), Vector3(X0, (2.4 + DOOR_TOP) / 2.0, door_mid),
+	_solid(Vector3(WALL_T, 2.4 - DOOR_TOP, door_len), Vector3(X0, (2.4 + DOOR_TOP) / 2.0, door_mid),
 		wallpaper)
-	_collider(Vector3(0.12, HEIGHT - 2.4, door_len), Vector3(X0, 2.4 + (HEIGHT - 2.4) / 2.0, door_mid))
-	_fp_only(Vector3(0.12, HEIGHT - 2.4, door_len),
+	_collider(Vector3(WALL_T, HEIGHT - 2.4, door_len), Vector3(X0, 2.4 + (HEIGHT - 2.4) / 2.0, door_mid))
+	_fp_only(Vector3(WALL_T, HEIGHT - 2.4, door_len),
 		Vector3(X0, 2.4 + (HEIGHT - 2.4) / 2.0, door_mid), wallpaper)
 	# Табличка над дверью со стороны гостиной: синяя жестянка с человечками и «ТУАЛЕТ»
 	# (tools/textures/toilet_sign.py).
@@ -87,14 +90,14 @@ func _build_door_wall() -> void:
 	plate_mat.roughness = 0.5
 	plate.material_override = plate_mat
 	plate.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	plate.position = Vector3(X0 - 0.062, DOOR_TOP + 0.15, door_mid)
+	plate.position = Vector3(X0 - 0.082, DOOR_TOP + 0.15, door_mid)
 	plate.rotation.y = -PI / 2.0 # лицом в гостиную
 	add_child(plate)
 	# Изнутри над дверью — тоже побелка (было видно обои гостиной).
-	_box(Vector3(0.02, 2.4 - DOOR_TOP, door_len), Vector3(X0 + 0.07, (2.4 + DOOR_TOP) / 2.0, door_mid),
+	_box(Vector3(0.02, 2.4 - DOOR_TOP, door_len), Vector3(X0 + 0.09, (2.4 + DOOR_TOP) / 2.0, door_mid),
 		_whitewash)
 	_fp_only(Vector3(0.02, HEIGHT - 2.4, door_len),
-		Vector3(X0 + 0.07, 2.4 + (HEIGHT - 2.4) / 2.0, door_mid), _whitewash)
+		Vector3(X0 + 0.09, 2.4 + (HEIGHT - 2.4) / 2.0, door_mid), _whitewash)
 
 
 ## Задняя, правая и передняя стены.
@@ -163,11 +166,11 @@ func _build_details() -> void:
 	paper_mat.roughness = 0.9
 	paper_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
 	paper.material_override = paper_mat
-	# Перед покраской стены (её слой — до X0 + 0.08), иначе газета пряталась внутри, торчал гвоздь.
-	paper.position = Vector3(X0 + 0.086, 0.95, Z0 + 0.35)
+	# Перед покраской стены (её слой — до X0 + 0.10), иначе газета пряталась внутри, торчал гвоздь.
+	paper.position = Vector3(X0 + 0.106, 0.95, Z0 + 0.35)
 	paper.rotation = Vector3(0.0, PI / 2.0, 0.05) # лицом в туалет, чуть криво висит
 	add_child(paper)
-	_box(Vector3(0.02, 0.012, 0.012), Vector3(X0 + 0.088, 1.115, Z0 + 0.35), _mat(Color("444444")))
+	_box(Vector3(0.02, 0.012, 0.012), Vector3(X0 + 0.108, 1.115, Z0 + 0.35), _mat(Color("444444")))
 
 
 ## Держатель туалетной бумаги на задней стене справа от унитаза: кронштейн, палочка, рулон.
