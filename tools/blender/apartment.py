@@ -170,6 +170,48 @@ P.append(cyl(0.09, 0.04, (0, 0, 0.28), GLASS, verts=8, r2=0.11))
 WATER = mat("VaseWater", (0.62, 0.78, 0.84), 0.05)
 P.append(cyl(0.045, 0.15, (0, 0, 0.115), WATER, verts=8, r2=0.075))
 made.append(export("crystal_vase", P))
+
+# Ваза с водой и букетом (на журнальном столике): та же хрустальная ваза, вода непрозрачная,
+# из неё — стебли, красные гвоздики, белые ромашки и листья.
+STEM = mat("FlowerStem", (0.16, 0.42, 0.12), 0.7)
+CARNATION = mat("Carnation", (0.78, 0.06, 0.1), 0.7)
+DAISY = mat("Daisy", (0.95, 0.95, 0.92), 0.7)
+DAISY_MID = mat("DaisyMid", (0.95, 0.72, 0.1), 0.6)
+P = [cyl(0.07, 0.04, (0, 0, 0.02), GLASS, verts=8)]
+P.append(cyl(0.05, 0.22, (0, 0, 0.15), GLASS, verts=8, r2=0.09))
+P.append(cyl(0.09, 0.04, (0, 0, 0.28), GLASS, verts=8, r2=0.11))
+P.append(cyl(0.045, 0.15, (0, 0, 0.115), WATER, verts=8, r2=0.075))
+rng = random.Random(11)
+heads = [(a, r, h) for a, r, h in ((0.0, 0.0, 0.56), (0.9, 0.09, 0.5), (2.1, 0.1, 0.52), (3.2, 0.09, 0.48),
+                                   (4.3, 0.1, 0.51), (5.4, 0.09, 0.49), (1.5, 0.15, 0.44), (3.9, 0.15, 0.45))]
+for i, (a, r, h) in enumerate(heads):
+    top = Vector((math.cos(a) * r, math.sin(a) * r, h))
+    base = Vector((math.cos(a) * 0.015, math.sin(a) * 0.015, 0.1))
+    d = top - base
+    P.append(cyl(0.005, d.length, tuple((top + base) / 2), STEM, verts=5,
+                 rot=tuple(d.to_track_quat("Z", "Y").to_euler())))
+    if i % 2 == 0:                                                                        # гвоздика
+        P.append(cyl(0.012, 0.03, tuple(top + Vector((0, 0, -0.01))), STEM, verts=6, r2=0.02))
+        for k in range(3):
+            P.append(cyl(0.034 - k * 0.008, 0.016, tuple(top + Vector((0, 0, 0.012 + k * 0.012))),
+                         CARNATION, verts=7, r2=0.026 - k * 0.006, rot=(0, 0, k * 0.5)))
+    else:                                                                                 # ромашка
+        for k in range(10):
+            pa = k * math.tau / 10
+            P.append(box((0.036, 0.012, 0.004),
+                         tuple(top + Vector((math.cos(pa) * 0.024, math.sin(pa) * 0.024, 0))), DAISY,
+                         rot=(0, math.radians(-12), pa)))
+        P.append(sphere(0.014, tuple(top + Vector((0, 0, 0.003))), DAISY_MID, scale=(1, 1, 0.6), segs=8, rings=4))
+for k in range(5):                                                                        # листья
+    a = k * math.tau / 5 + 0.4                                    # из горлышка вазы наружу
+    P.append(sphere(1.0, (math.cos(a) * 0.1, math.sin(a) * 0.1, 0.33 + rng.uniform(0, 0.03)), STEM,
+                    scale=(0.07, 0.018, 0.006), segs=8, rings=4))
+    P[-1].rotation_euler = (0, math.radians(-25), a)
+    bpy.ops.object.select_all(action="DESELECT")
+    P[-1].select_set(True)
+    bpy.context.view_layer.objects.active = P[-1]
+    bpy.ops.object.transform_apply(rotation=True)
+made.append(export("vase_bouquet", P))
 P = [cyl(0.04, 0.01, (0, 0, 0.005), GLASS, verts=8), cyl(0.008, 0.08, (0, 0, 0.05), GLASS, verts=6),
      cyl(0.012, 0.07, (0, 0, 0.12), GLASS, verts=8, r2=0.04)]
 made.append(export("wine_glass", P))
@@ -377,7 +419,20 @@ P.append(box((0.9, 0.45, 0.02), (0, 0, 0.18), WOOD_L))
 for x in (-0.44, 0.44):
     for y in (-0.22, 0.22):
         P.append(cyl(0.022, 0.45, (x, y, 0.22), WOOD, verts=6, r2=0.015))
-P.append(box((0.5, 0.3, 0.005), (0, 0, 0.472), LACE))
+# Салфетка-дорожка: бордовая, по краю кремовая кайма, в середине ромбики, на концах кисточки.
+RUNNER = mat("RunnerWine", (0.42, 0.06, 0.08), 0.95)
+RUNNER_TRIM = mat("RunnerCream", (0.93, 0.85, 0.66), 0.95)
+P.append(box((0.6, 0.32, 0.004), (0, 0, 0.472), RUNNER))
+for y in (-0.14, 0.14):
+    P.append(box((0.56, 0.012, 0.0045), (0, y, 0.4725), RUNNER_TRIM))
+for x in (-0.28, 0.28):
+    P.append(box((0.012, 0.29, 0.0045), (x, 0, 0.4725), RUNNER_TRIM))
+    for k in range(7):                                                                    # кисточки
+        P.append(box((0.03, 0.008, 0.003), (x + (0.025 if x > 0 else -0.025), -0.12 + k * 0.04, 0.4715),
+                     RUNNER_TRIM))
+for x in (-0.16, 0.0, 0.16):                                                              # ромбики
+    P.append(box((0.05, 0.05, 0.0045), (x, 0, 0.4725), RUNNER_TRIM, rot=(0, 0, math.radians(45))))
+    P.append(box((0.024, 0.024, 0.005), (x, 0, 0.47275), RUNNER, rot=(0, 0, math.radians(45))))
 made.append(export("coffee_table", P))
 
 # ---------------- Книжная секция стенки (полки с книгами, место под радио) ----------------

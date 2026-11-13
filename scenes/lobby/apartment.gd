@@ -297,7 +297,9 @@ func _build_living_room() -> void:
 	add_child(tv_remote)
 	var table_pos := Vector3(-2.6, 0, -0.25)
 	_solid(_model("coffee_table"), Vector3(1.0, 0.5, 0.55), 0.25, table_pos)
-	_breakable("crystal_vase", table_pos + Vector3(-0.25, 0.47, 0.0), [CRYSTAL], 0.4, 0.05)
+	# Ваза с водой и букетом (гвоздики, ромашки) — бьётся, осколки стеклянные, красные, зелёные.
+	_breakable("vase_bouquet", table_pos + Vector3(-0.25, 0.47, 0.0),
+		[CRYSTAL, Color("c4101a"), Color("2a6b1f")], 0.4, 0.05)
 	# Стопки книг везде разные (tools/blender/decor.py): тома с очками, журналы, высокая стопка.
 	_breakable("book_stack_tomes", table_pos + Vector3(0.25, 0.47, 0.0),
 		[Color("2a6a2a"), Color("333338"), Color("d9a640")], 0.4)
