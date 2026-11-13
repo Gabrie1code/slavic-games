@@ -133,35 +133,7 @@ static func attack_key(p: PlayerData) -> String:
 ## Вещь под ударом: целая Breakable или Tippable в пределах PUNCH_REACH_ITEMS, ближе всего к лучу
 ## взгляда (от первого лица — с наклоном камеры), в узком конусе PUNCH_CONE. null — мимо.
 func punch_target(character: PlayerCharacter, camera: Camera3D) -> Node3D:
-	var eye := character.global_position + Vector3.UP * 1.2
-	var aim := -character.global_basis.z
-	if camera:
-		eye = camera.global_position
-		aim = -camera.global_basis.z
-	var best: Node3D = null
-	var best_angle := deg_to_rad(PUNCH_CONE)
-	var candidates: Array[Node] = character.get_tree().get_nodes_in_group("breakable")
-	candidates.append_array(character.get_tree().get_nodes_in_group("tippable"))
-	for node in candidates:
-		var item := node as Node3D
-		if item is Breakable and not (item as Breakable).can_break():
-			continue # разбита или за целым стеклом серванта
-		# Центр вещи чуть выше её основания (у Breakable/Tippable точка — внизу).
-		var to := item.global_position + Vector3.UP * 0.15 - eye
-		var flat := Vector2(to.x, to.z).length()
-		if flat > PUNCH_REACH_ITEMS or to.length() < 0.05:
-			continue
-		var angle := aim.angle_to(to)
-		if camera == null: # общий вид сверху: наклона камеры нет — только по полу
-			angle = Vector2(aim.x, aim.z).angle_to(Vector2(to.x, to.z))
-			angle = absf(angle) * 0.75
-		if flat < 0.45:
-			angle *= 0.5 # вплотную — попасть легче
-		if angle < best_angle:
-			best_angle = angle
-			best = item
-	return best
-
+	return PunchAim.target(character, camera, PUNCH_REACH_ITEMS, PUNCH_CONE)
 
 
 # ---------------- Баллончики ----------------
@@ -774,7 +746,7 @@ func try_interact(p: PlayerData) -> bool:
 	if _near(p, Apartment.PHONE_TABLE_POS, PHONE_RADIUS) and apartment.phone.can_use(p):
 		apartment.phone.pick_up(p, character)
 		return true
-	if _near_tippable(p, apartment.gramophone, GRAMOPHONE_RADIUS) and _gramophone_ready():
+	if _gramophone_near(p) and _gramophone_ready():
 		_play_gramophone()
 		return true
 	# Губка первой: с губкой в руке у раковины «подтвердить» — положить её, а не мыть руки.
@@ -835,7 +807,7 @@ func hint(p: PlayerData) -> Array[Dictionary]:
 
 ## Граммофон, торшер, тумбочка, баллончики, туалет, автоматы (поваленную вещь не трогают).
 func _furniture_hint(p: PlayerData) -> Array[Dictionary]:
-	if _near_tippable(p, apartment.gramophone, GRAMOPHONE_RADIUS):
+	if _gramophone_near(p):
 		return [entry(confirm_key(p), "Завести граммофон", not _gramophone_ready())]
 	var light_entries := _light_hint(p)
 	if not light_entries.is_empty():
@@ -937,6 +909,11 @@ func _near_arcade(p: PlayerData) -> ArcadeScreen:
 ## Рядом с вещью, которая стоит на месте (поваленную трогать нельзя — кнопки нет).
 func _near_tippable(p: PlayerData, item: Tippable, radius: float) -> bool:
 	return item.is_at_home() and _near(p, item.global_position, radius)
+
+
+## Граммофон рядом — но если выключатель тоже рядом (стол стоит под ним), граммофон уступает.
+func _gramophone_near(p: PlayerData) -> bool:
+	return _near_tippable(p, apartment.gramophone, GRAMOPHONE_RADIUS) and _near_switch(p) == null
 
 
 func _gramophone_ready() -> bool:

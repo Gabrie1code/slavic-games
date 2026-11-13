@@ -11,6 +11,8 @@ var run_up_needed := 0.4
 ## На чём вещь стоит (книга на табурете): пока опора не вернулась на место, вещь тоже не
 ## возвращается — иначе книга появилась бы в воздухе над пустым местом и снова упала.
 var support: Tippable
+## Высота вещи (для прицела удара: попасть можно по всей высоте, а не только у основания).
+var height := 0.5
 
 var _home: Transform3D
 var _model: Node3D
@@ -34,10 +36,23 @@ func setup_model(model: Node3D, size: Vector3, center_y: float, body_mass: float
 	shape.position.y = center_y
 	add_child(shape)
 	mass = body_mass
+	height = size.y
+	continuous_cd = true # падая, не проваливается в пол
 	run_up_needed = clampf(0.15 + maxf(size.x, maxf(size.y, size.z)) * 0.6, 0.3, 1.4)
 	# Центр масс пониже — чтобы вещь падала, но не кувыркалась бесконечно.
 	center_of_mass_mode = RigidBody3D.CENTER_OF_MASS_MODE_CUSTOM
 	center_of_mass = Vector3(0, center_y * 0.6, 0)
+
+
+## Ещё одна коробка столкновений (абажур торшера шире стойки — иначе, упав, уходил в пол).
+func add_box(size: Vector3, center: Vector3) -> void:
+	var shape := CollisionShape3D.new()
+	var box := BoxShape3D.new()
+	box.size = size
+	shape.shape = box
+	shape.position = center
+	add_child(shape)
+	height = maxf(height, center.y + size.y / 2.0)
 
 
 func _ready() -> void:
