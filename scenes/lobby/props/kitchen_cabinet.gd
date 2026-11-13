@@ -7,7 +7,7 @@ extends HingedProp
 
 const BODY := preload("res://assets/models/kitchen/kitchen_cabinet.glb")
 const DOOR := preload("res://assets/models/kitchen/kitchen_cabinet_door.glb")
-const OPEN_TIME := 10.0
+const OPEN_TIME := 15.0
 const OPEN_ANGLE := deg_to_rad(100.0)
 ## Петля правой дверцы (правый край, перед шкафчиком) в координатах шкафчика.
 const HINGE := Vector3(0.49, 0.0, 0.155)

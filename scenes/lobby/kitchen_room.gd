@@ -253,9 +253,9 @@ func _build_furniture() -> void:
 	radio.rotation.y = -PI / 2 # лицом в кухню (−X)
 	radio.respawn_time = 7.0
 	# Пачка соды на столешнице справа от мойки.
-	var soda := _breakable(DIR + "kitchen_soda.glb", sink.to_global(Vector3(0.3, 0.86, 0.05)),
+	var soda := _breakable(DIR + "kitchen_soda.glb", sink.to_global(Vector3(0.3, 0.86, -0.16)),
 		[Color("c81e16"), Color("ffe628"), Color("fafaf5")], 0.3, 0.035)
-	soda.rotation.y = PI + 0.3
+	soda.rotation.y = PI * 1.5 + 0.15 # этикеткой к тому, кто стоит у мойки
 
 
 ## Мебель на полу: модель, коробка столкновений по размеру (size — ширина, высота, глубина в
