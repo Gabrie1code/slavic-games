@@ -258,6 +258,16 @@ func hand_hint(p: PlayerData) -> Array[Dictionary]:
 	return result
 
 
+## В подсказках руки есть действие на «подтвердить» (например, «Положить губку») — Пробел
+## тогда не прыжок.
+func hand_uses_confirm(p: PlayerData) -> bool:
+	var key := confirm_key(p)
+	for item in hand_hint(p):
+		if item["key"] == key and not item["off"]:
+			return true
+	return false
+
+
 ## Удар у раковины или у пульта, пока рука свободна, — взять губку / пульт (вместо удара
 ## кулаком). true — взял.
 func try_attack_use(p: PlayerData) -> bool:

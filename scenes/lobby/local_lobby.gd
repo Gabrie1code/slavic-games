@@ -239,7 +239,8 @@ func _process(delta: float) -> void:
 		if character == null:
 			continue
 		var running := LobbyGadgets.is_running(p, character)
-		var has_action := not running and not _prompt_for(p, character).is_empty()
+		var has_action := not running and (not _prompt_for(p, character).is_empty()
+			or _gadgets.hand_uses_confirm(p)) # «Положить губку» — тоже действие на Пробел
 		character.can_jump = not has_action
 		var act := p.input.is_just_pressed("confirm") and not running
 		if act and has_action:
@@ -252,9 +253,13 @@ func _process(delta: float) -> void:
 		elif p.input.is_just_pressed("secondary") and not running:
 			_gadgets.try_secondary(p) # ПКМ у тумбочки — ночник
 		if act and _gadgets.can_use_toilet(p):
+			character.jump_pending = false
 			_open_room(p, ToiletScreen.new().setup_for(p, character, _apartment.toilet_room.toilet))
 			continue
 		if act and _gadgets.try_interact(p):
+			# Пробел ушёл на действие (положить губку, взять баллончик…) — даже если подсказка была
+			# «рукой» (её нет в has_action), персонаж не подпрыгивает.
+			character.jump_pending = false
 			continue
 		var at_tv := _is_near(p, Apartment.TV_ZONE, TV_ZONE_RADIUS)
 		var seat := _free_seat_near(p)
