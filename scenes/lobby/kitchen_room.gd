@@ -31,8 +31,6 @@ const WINDOW_Y1 := 2.25
 const WINDOW_W := 1.0
 const LINOLEUM := preload("res://assets/textures/kitchen/linoleum.png")
 const TILES := preload("res://assets/textures/kitchen/tiles.png")
-const MONTHS: Array[String] = ["ЯНВАРЯ", "ФЕВРАЛЯ", "МАРТА", "АПРЕЛЯ", "МАЯ", "ИЮНЯ", "ИЮЛЯ",
-	"АВГУСТА", "СЕНТЯБРЯ", "ОКТЯБРЯ", "НОЯБРЯ", "ДЕКАБРЯ"]
 const WEEKDAYS: Array[String] = ["ВОСКРЕСЕНЬЕ", "ПОНЕДЕЛЬНИК", "ВТОРНИК", "СРЕДА", "ЧЕТВЕРГ",
 	"ПЯТНИЦА", "СУББОТА"]
 
@@ -305,33 +303,50 @@ func _build_lamp() -> void:
 			Vector3(DOOR_X0 - 0.25, 1.25, Z0 + 0.01), 0.0, false)
 
 
-## Отрывной календарь на правой стене: картонка, листок с сегодняшним числом.
+## Отрывной календарь на правой стене (как настоящий): толстый блок листков, сверху золотистая
+## планка со скрепкой и рваные остатки оторванных листков. На листке — «КАЛЕНДАРЬ», большое
+## число и день недели по часам компьютера; в субботу и воскресенье — красные, иначе чёрные.
 func _build_calendar() -> void:
-	var board := Node3D.new()
-	board.position = Vector3(X1 - 0.02, 1.55, 5.95)
-	board.rotation.y = -PI / 2 # лицом в кухню
-	add_child(board)
-	var back := _box(Vector3(0.2, 0.3, 0.01), Vector3.ZERO, _mat(Color("b8322a"), 0.6))
-	back.reparent(board, false)
-	var sheet := _box(Vector3(0.16, 0.18, 0.012), Vector3(0, -0.04, 0.006), _mat(Color("f6f1e4"), 0.8))
-	sheet.reparent(board, false)
+	var pad := Node3D.new()
+	pad.position = Vector3(X1 - 0.011, 1.62, 5.95)
+	pad.rotation.y = -PI / 2 # лицом в кухню
+	add_child(pad)
+	var paper := _mat(Color("f3f0e8"), 0.9)
+	var stack := _box(Vector3(0.15, 0.2, 0.03), Vector3(0, 0, 0.015), _mat(Color("dcd6c8"), 0.95))
+	stack.reparent(pad, false)
+	var sheet := _box(Vector3(0.146, 0.196, 0.002), Vector3(0, -0.002, 0.031), paper)
+	sheet.reparent(pad, false)
+	var torn := _box(Vector3(0.152, 0.012, 0.033), Vector3(0, 0.104, 0.0165),
+		_mat(Color("e9e4d6"), 1.0))
+	torn.reparent(pad, false) # рваные остатки листков под планкой
+	var gold := _mat(Color("c9a43c"), 0.25)
+	gold.metallic = 0.8
+	var bar := _box(Vector3(0.16, 0.035, 0.038), Vector3(0, 0.125, 0.019), gold)
+	bar.reparent(pad, false)
+	var blue := _mat(Color("2a4f9a"), 0.4)
+	for x: float in [-0.022, 0.022]:
+		var dot := _box(Vector3(0.012, 0.012, 0.002), Vector3(x, 0.125, 0.0385), blue)
+		dot.reparent(pad, false)
+	var staple := _box(Vector3(0.044, 0.002, 0.002), Vector3(0, 0.125, 0.0395),
+		_mat(Color("b0b0b0"), 0.3))
+	staple.reparent(pad, false)
 	var date := Time.get_date_dict_from_system()
-	var day := Label3D.new()
-	day.text = str(date["day"])
-	day.font_size = 96
-	day.pixel_size = 0.0008
-	day.modulate = Color("b8322a")
-	day.outline_size = 0
-	day.position = Vector3(0, -0.035, 0.014)
-	board.add_child(day)
-	var month := Label3D.new()
-	month.text = "%s\n%s" % [MONTHS[int(date["month"]) - 1], WEEKDAYS[int(date["weekday"])]]
-	month.font_size = 28
-	month.pixel_size = 0.0006
-	month.modulate = Color("222222")
-	month.outline_size = 0
-	month.position = Vector3(0, 0.07, 0.014)
-	board.add_child(month)
+	var weekday := int(date["weekday"]) # 0 — воскресенье, 6 — суббота
+	var ink := Color("c4172c") if weekday == 0 or weekday == 6 else Color("1c1c1c")
+	_calendar_label(pad, "КАЛЕНДАРЬ", 26, Color("1c1c1c"), 0.075)
+	_calendar_label(pad, str(date["day"]), 150, ink, -0.005)
+	_calendar_label(pad, WEEKDAYS[weekday], 28, ink, -0.08)
+
+
+func _calendar_label(pad: Node3D, text: String, size: int, color: Color, y: float) -> void:
+	var label := Label3D.new()
+	label.text = text
+	label.font_size = size
+	label.pixel_size = 0.0005
+	label.modulate = color
+	label.outline_size = 0
+	label.position = Vector3(0, y, 0.0325)
+	pad.add_child(label)
 
 
 # ---------------- Помощники ----------------
