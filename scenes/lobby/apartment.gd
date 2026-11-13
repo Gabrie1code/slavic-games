@@ -88,6 +88,8 @@ var chandeliers: Array[Dictionary] = []
 var window_view: WindowView
 ## Сервант: стеклянные дверцы и тумба с молотком.
 var sideboard: SideboardCabinet
+## Стёкла окна гостиной (бьются молотком).
+var window_glass: WindowGlass
 ## Тумбочка в спальне: ящик с баллончиком.
 var nightstand: Nightstand
 ## Дисковый телефон (гостиная, у двери в игровую) и кот.
@@ -250,6 +252,9 @@ func _build_living_room() -> void:
 	# Окно со шторами, на подоконнике горшки, под окном гантели.
 	var window_pos := Vector3(1.65, 0, BACK_Z + 0.08)
 	_last_window = _place(_model("window"), window_pos)
+	window_glass = WindowGlass.new()
+	window_glass.position = window_pos
+	add_child(window_glass)
 	_build_window_view(window_pos)
 	_place(_model("curtains"), window_pos + Vector3(0, 0, 0.12))
 	# Подоконник и батарея твёрдые: на подоконник можно запрыгнуть (раньше проваливались сквозь).

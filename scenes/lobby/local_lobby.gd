@@ -369,7 +369,7 @@ func _punch(p: PlayerData, hammer: bool = false) -> void:
 		return
 	var character: PlayerCharacter = _characters[p.id]
 	if hammer:
-		if _gadgets.swing_hammer(p):
+		if _gadgets.swing_hammer(p, _views.get(p.id, {}).get("camera")):
 			_punch_time[p.id] = now
 			return # разбил стекло серванта — посуда за ним цела до следующего удара
 	elif not character.punch():

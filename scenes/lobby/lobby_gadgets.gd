@@ -445,7 +445,7 @@ func holds_hammer(p: PlayerData) -> bool:
 ## Взмах молотком (удар — как кулаком, это делает лобби); автомат перед игроком —
 ## разбивается стекло экрана. Молоток «в кадре» резко клюёт вперёд.
 ## true — удар пришёлся по стеклу серванта (тогда больше ничего не бьётся).
-func swing_hammer(p: PlayerData) -> bool:
+func swing_hammer(p: PlayerData, camera: Camera3D = null) -> bool:
 	var hammer: Hammer = _held_hammers[p.id]
 	hammer.swing(characters[p.id])
 	if _has_view(_view_hammers, p.id):
@@ -457,10 +457,16 @@ func swing_hammer(p: PlayerData) -> bool:
 		hit.tween_property(view, "rotation:x", 0.0, 0.2).set_ease(Tween.EASE_OUT)
 	# Какое стекло под ударом — то, куда смотрит игрок (точка взгляда на плоскости стёкол).
 	var character: PlayerCharacter = characters[p.id]
-	var pane := apartment.sideboard.pane_hit(character.global_position + Vector3.UP * 1.2,
-		-character.global_basis.z, SIDEBOARD_GLASS_RADIUS)
+	var eye := camera.global_position if camera else character.global_position + Vector3.UP * 1.2
+	var pane := apartment.sideboard.pane_hit(eye, look_dir(character, camera),
+		SIDEBOARD_GLASS_RADIUS)
 	if pane >= 0 and not apartment.sideboard.pane_broken(pane):
 		return apartment.sideboard.break_pane(pane)
+	# Окно гостиной: 4 створки, с наклоном головы (верхние — если смотреть вверх).
+	var window := apartment.window_glass.pane_hit(eye, look_dir(character, camera),
+		SIDEBOARD_GLASS_RADIUS)
+	if window >= 0:
+		return apartment.window_glass.break_pane(window)
 	var arcade := _near_arcade(p)
 	if arcade:
 		arcade.smash()
