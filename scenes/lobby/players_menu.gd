@@ -1,8 +1,10 @@
 class_name PlayersMenu
-extends PanelContainer
+extends CenterContainer
 ## Меню игроков в лобби: появляется, пока зажат Tab (или Back/Select на геймпаде).
 ## Вместо постоянной полоски слотов внизу экрана. В каждой строке: цвет, имя, чем управляет,
 ## кошелёк и «готов» у телевизора; пустые места — подсказка, как войти.
+## Сам узел растянут на весь экран и ставит панель ровно по центру (CenterContainer):
+## у панели с якорем «по центру» размер считался позже, и она уезжала в левый верхний угол.
 
 const ROW_HEIGHT := 58
 const FADE_SPEED := 10.0
@@ -16,21 +18,22 @@ var _refresh_left := 0.0
 
 
 func _ready() -> void:
-	set_anchors_preset(Control.PRESET_CENTER)
-	grow_horizontal = Control.GROW_DIRECTION_BOTH
-	grow_vertical = Control.GROW_DIRECTION_BOTH
-	custom_minimum_size = Vector2(620, 0)
+	set_anchors_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var panel := PanelContainer.new()
+	panel.custom_minimum_size = Vector2(620, 0)
+	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(panel)
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color(0.08, 0.06, 0.05, 0.88)
 	style.border_color = Color("f6c343")
 	style.set_border_width_all(2)
 	style.set_corner_radius_all(14)
 	style.set_content_margin_all(18)
-	add_theme_stylebox_override("panel", style)
+	panel.add_theme_stylebox_override("panel", style)
 	var column := VBoxContainer.new()
 	column.add_theme_constant_override("separation", 10)
-	add_child(column)
+	panel.add_child(column)
 	_title = _label("", 28, Color("f6c343"))
 	_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	column.add_child(_title)
