@@ -97,6 +97,8 @@ var window_glass: WindowGlass
 var nightstand: Nightstand
 ## Дисковый телефон (гостиная, у двери в игровую) и кот.
 var phone: RotaryPhone
+## Кухня (за диваном, вход из гостиной).
+var kitchen_room: KitchenRoom
 ## Туалет (унитаз — toilet_room.toilet).
 var toilet_room: ToiletRoom
 ## Экраны игровых автоматов (кнопкой действия их можно «сломать» на 8 сек).
@@ -132,6 +134,9 @@ func _ready() -> void:
 	_build_living_extras()
 	toilet_room = ToiletRoom.new()
 	add_child(toilet_room)
+	kitchen_room = KitchenRoom.new()
+	kitchen_room.apartment = self
+	add_child(kitchen_room)
 	_build_decor()
 
 
@@ -174,8 +179,8 @@ func _build_rooms() -> void:
 	_solid_box(Vector3(0.16, partition_h, BEDROOM_FRONT_Z - DOOR_TO_Z),
 		Vector3(PARTITION_X, partition_h / 2, (DOOR_TO_Z + BEDROOM_FRONT_Z) / 2), wallpaper)
 	# Невидимые стенки спереди, чтобы не уйти из квартиры.
-	_invisible_wall(Vector3(living_w, 3, 0.4),
-		Vector3((LEFT_X + PARTITION_X) / 2, 1.5, LIVING_FRONT_Z + 0.2))
+	# Спереди гостиной — проём на кухню (KitchenRoom): стенка из кусков вокруг проёма.
+	_front_with_kitchen_door(wallpaper)
 	_invisible_wall(Vector3(bed_w, 3, 0.4),
 		Vector3((PARTITION_X + RIGHT_X) / 2, 1.5, BEDROOM_FRONT_Z + 0.2))
 	# Потолок и передние стены — только для вида от первого лица.
@@ -187,8 +192,6 @@ func _build_rooms() -> void:
 	_fp_only(_box(Vector3(RIGHT_X - RUBGAME_LEFT_X, 0.1, LIVING_FRONT_Z - BACK_Z),
 		Vector3((RUBGAME_LEFT_X + RIGHT_X) / 2, WALL_HEIGHT + 0.05, (BACK_Z + LIVING_FRONT_Z) / 2),
 		ceiling))
-	_fp_only(_box(Vector3(living_w, WALL_HEIGHT, 0.2),
-		Vector3((LEFT_X + PARTITION_X) / 2, WALL_HEIGHT / 2, LIVING_FRONT_Z + 0.1), wallpaper))
 	_fp_only(_box(Vector3(bed_w, WALL_HEIGHT, 0.2),
 		Vector3((PARTITION_X + RIGHT_X) / 2, WALL_HEIGHT / 2, BEDROOM_FRONT_Z + 0.1), wallpaper_bed))
 	# Правее гостиной перед спальней — туалет (ToiletRoom), стена с дверью строится там.
@@ -410,14 +413,14 @@ func _chandelier(pos: Vector3, switch_pos: Vector3, switch_yaw: float) -> void:
 		_set_layers(hang, layer)
 		if layer == OVERVIEW_ONLY_LAYER:
 			_hanging_top.append({"node": hang, "pos": pos})
-	_add_switch(LobbyLamp.new(light, bulb_mat), switch_pos, switch_yaw, false)
+	add_switch(LobbyLamp.new(light, bulb_mat), switch_pos, switch_yaw, false)
 
 
 ## Выключатель на стене (клавиша смотрит по yaw) для светильника lamp. always_on — горит и
 ## днём (лампа над игровым столом): кнопкой гасится, а не включается.
 ## В списке хранится и «лицо» выключателя: щёлкает только тот, кто стоит перед ним —
 ## выключатели гостиной и спальни висят спинами друг к другу на одной перегородке.
-func _add_switch(lamp: LobbyLamp, switch_pos: Vector3, yaw: float, always_on: bool) -> void:
+func add_switch(lamp: LobbyLamp, switch_pos: Vector3, yaw: float, always_on: bool) -> void:
 	var plate := _box(Vector3(0.08, 0.12, 0.02), Vector3.ZERO, _mat(Color("efe6d2"), 0.5))
 	var key := _box(Vector3(0.03, 0.05, 0.015), Vector3(0, 0, 0.015), _mat(Color("d9cfb8"), 0.5))
 	key.reparent(plate, false)
@@ -678,7 +681,7 @@ func _build_rubgame() -> void:
 			var surface := mesh_instance.mesh.surface_get_material(i)
 			if surface and surface.resource_name.begins_with("RubgameBulb"):
 				mesh_instance.set_surface_override_material(i, bulb_mat)
-	_add_switch(LobbyLamp.new(light, bulb_mat), RUBGAME_SWITCH, -PI / 2, true)
+	add_switch(LobbyLamp.new(light, bulb_mat), RUBGAME_SWITCH, -PI / 2, true)
 
 	# Игровые автоматы 90-х: два у задней стены, один у левой. На экранах — спокойные
 	# пиксельные «демо-игры» (блоки, космос, змейка).
@@ -801,7 +804,7 @@ func _solid(model: Node3D, size: Vector3, center_y: float, pos: Vector3,
 	body.position = pos
 	body.rotation.y = yaw
 	if pos.y < 0.01:
-		body.add_child(_contact_shadow(Vector2(size.x, size.z)))
+		body.add_child(contact_shadow(Vector2(size.x, size.z)))
 	return body
 
 
@@ -820,10 +823,30 @@ func _rug_floor(rug: Node3D) -> void:
 		shape.global_transform = mesh_instance.global_transform
 
 
+## Передняя стена гостиной (только от первого лица — сверху закрывала бы комнату) с проёмом
+## на кухню; невидимые стенки — по бокам проёма и над ним.
+func _front_with_kitchen_door(wallpaper: Material) -> void:
+	var z := LIVING_FRONT_Z + 0.1
+	var door_x0 := KitchenRoom.DOOR_X0
+	var door_x1 := KitchenRoom.DOOR_X1
+	var top := KitchenRoom.DOOR_TOP
+	for span: Vector2 in [Vector2(LEFT_X, door_x0), Vector2(door_x1, PARTITION_X)]:
+		var w := span.y - span.x
+		var cx := (span.x + span.y) / 2.0
+		_fp_only(_box(Vector3(w, WALL_HEIGHT, 0.2), Vector3(cx, WALL_HEIGHT / 2, z), wallpaper))
+		_invisible_wall(Vector3(w, 3, 0.2), Vector3(cx, 1.5, z))
+	var door_w := door_x1 - door_x0
+	var door_cx := (door_x0 + door_x1) / 2.0
+	_fp_only(_box(Vector3(door_w, WALL_HEIGHT - top, 0.2),
+		Vector3(door_cx, (WALL_HEIGHT + top) / 2, z), wallpaper))
+	_invisible_wall(Vector3(door_w, WALL_HEIGHT - top + 0.3, 0.2),
+		Vector3(door_cx, (WALL_HEIGHT + 0.3 + top) / 2, z))
+
+
 ## Мягкая тень-пятно под мебелью на полу (на ковре тоже): без неё диван и кресло казались
 ## висящими в воздухе — общий свет теней под ними почти не даёт. Только для слоя 1 (пол,
 ## ковры, мебель): на игроков не ложится.
-func _contact_shadow(footprint: Vector2) -> Decal:
+func contact_shadow(footprint: Vector2) -> Decal:
 	if _shadow_tex == null:
 		var gradient := Gradient.new()
 		gradient.set_color(0, Color(0, 0, 0, 0.6))

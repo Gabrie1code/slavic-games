@@ -47,6 +47,8 @@ Party-игра на Godot 4.7 (GDScript), стилизованный low-poly, �
 - Игровая комната («игра на рубли», rubgame) слева от гостиной: `RubgameTable` (круг 20 сек, правила в `Roulette`), экран у стола
   `RubgameScreen`. Окна игроков в лобби (примерочная, стол) наследуют `LobbyRoom`.
   Фишки в профиле: `PlayerManager.chips / add_chips`, номиналы `CHIP_VALUES`.
+- Кухня `KitchenRoom` (scenes/lobby/kitchen_room.gd) — за диваном, проём в передней стене гостиной
+  (`Apartment._front_with_kitchen_door`); модели `assets/models/kitchen/` (tools/blender/kitchen.py).
 - Живые вещи: `RotaryPhone`, `CuckooClock`, `LobbyCat` (scenes/lobby/props/). Подсказка лобби с «~»
   в начале показывается серой (действие недоступно).
 
