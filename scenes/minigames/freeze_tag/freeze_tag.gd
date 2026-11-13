@@ -807,13 +807,13 @@ func _hide_hud_bars_from_chaser() -> void:
 	_hud_bars_box.offset_bottom = -150
 
 
-## Камеры игроков: от глаз, а на качелях / горке / под лавочкой — плавно сзади-сверху.
+## Камеры игроков: от глаз, а на качелях / горке / под лавочкой и во льду — плавно сзади-сверху.
 func _process(delta: float) -> void:
 	if _views == null:
 		return
 	var busy: Array[int] = []
 	for r in _racers:
-		if r.busy:
+		if r.busy or r.frozen: # во льду — тоже вид сзади, пока не разморозят / не кончится раунд
 			busy.append(r.player.id)
 	_views.update(delta, busy)
 

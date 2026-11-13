@@ -225,7 +225,7 @@ func _spin(f: Fighter) -> void:
 	f.character.set_arm_pose(PlayerCharacter.ARM_SIDE, 0.0, 0.06)
 	if f.bat:
 		create_tween().tween_property(f.bat, "rotation:x", 0.0, 0.06)
-	_spawn_swoosh(f, SUPER_RADIUS if is_super else HIT_RADIUS)
+	_spawn_swoosh(f, SUPER_RADIUS if is_super else HIT_RADIUS, is_super)
 	var tween := create_tween()
 	f.character.visual.rotation.y = 0.0
 	tween.tween_interval(0.05)
@@ -470,7 +470,9 @@ func _damage_number(character: PlayerCharacter, amount: int, big: bool) -> void:
 
 
 ## След биты в воздухе: полупрозрачная дуга, крутится вместе с персонажем и тает.
-func _spawn_swoosh(f: Fighter, radius: float) -> void:
+## С супер-битой след красный (обычный — белый).
+func _spawn_swoosh(f: Fighter, radius: float, is_super: bool = false) -> void:
+	var tint := Color(1.0, 0.12, 0.08) if is_super else Color(1, 1, 1)
 	var mesh := ArrayMesh.new()
 	var arrays := []
 	arrays.resize(Mesh.ARRAY_MAX)
@@ -484,8 +486,8 @@ func _spawn_swoosh(f: Fighter, radius: float) -> void:
 		var alpha := t * t * 0.7 # хвост прозрачный, голова — плотнее
 		verts.append(dir * 0.45)
 		verts.append(dir * radius)
-		colors.append(Color(1, 1, 1, 0.0))
-		colors.append(Color(1, 1, 1, alpha))
+		colors.append(Color(tint, 0.0))
+		colors.append(Color(tint, alpha))
 	arrays[Mesh.ARRAY_VERTEX] = verts
 	arrays[Mesh.ARRAY_COLOR] = colors
 	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLE_STRIP, arrays)

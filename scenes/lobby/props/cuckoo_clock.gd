@@ -2,6 +2,7 @@ class_name CuckooClock
 extends Node3D
 ## Часы с кукушкой на стене. Маятник чуть покачивается всегда, а когда рядом проходит
 ## персонаж (группа "lobby_character"), раскачивается сильнее и потом успокаивается.
+## Стрелки (ClockHour / ClockMinute в модели) показывают время компьютера (ShelfClockHands).
 
 const DIR := "res://assets/models/apartment/"
 const PENDULUM_POS := Vector3(0, -0.18, 0.075)
@@ -18,6 +19,7 @@ var _time := 0.0
 
 func _ready() -> void:
 	add_child(_model("cuckoo_clock"))
+	add_child(ShelfClockHands.new())
 	_pendulum = _model("cuckoo_pendulum")
 	_pendulum.position = PENDULUM_POS
 	add_child(_pendulum)

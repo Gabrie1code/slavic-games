@@ -186,28 +186,42 @@ P.append(rim)
 export("gramophone", [join("Gramophone", P)])
 
 # ---------------- Часы с кукушкой (висят на стене, задняя стенка в y = 0) ----------------
+# Без «золота»: цепочки — тёмное железо, гири-шишки — тёмное дерево, маятник — потемневшая
+# бронза, кукушка — коричневая птичка. Стрелки — отдельные объекты ClockHour / ClockMinute
+# (точка вращения — центр циферблата), в игре показывают время компьютера (ShelfClockHands).
+IRON_D = mat("ClockIron", (0.09, 0.085, 0.08), 0.5, 0.6)
+CONE = mat("ClockCone", (0.16, 0.08, 0.035), 0.75)
+BRONZE = mat("ClockBronze", (0.3, 0.19, 0.09), 0.55, 0.3)
+BIRD = mat("CuckooBird", (0.45, 0.25, 0.1), 0.7)
+DIAL = (0, -0.152, -0.03)
 P = [box((0.3, 0.14, 0.34), (0, -0.07, 0), WOOD)]
 for s in (-1, 1):                                                   # крыша
     P.append(box((0.24, 0.18, 0.025), (s * 0.08, -0.08, 0.215), WOOD_D, rot=(0, s * math.radians(35), 0)))
 P.append(box((0.08, 0.01, 0.07), (0, -0.142, 0.12), WOOD_D))        # дверца кукушки
-P.append(sphere(0.025, (0, -0.15, 0.125), mat("Bird", (0.9, 0.75, 0.2), 0.6), scale=(1, 1.3, 1)))
+P.append(sphere(0.025, (0, -0.15, 0.125), BIRD, scale=(1, 1.3, 1)))
+P.append(sphere(0.008, (0, -0.178, 0.128), mat("CuckooBeak", (0.75, 0.45, 0.1), 0.6)))
 P.append(cyl(0.09, 0.01, (0, -0.145, -0.03), WHITE, verts=24, rot=(math.pi / 2, 0, 0)))
-P.append(box((0.008, 0.004, 0.065), (0, -0.152, 0.0), BLACK))      # стрелки
-P.append(box((0.05, 0.004, 0.008), (0.022, -0.152, -0.03), BLACK))
 for i in range(12):
     a = i * math.pi / 6
     P.append(box((0.008, 0.003, 0.008), (math.cos(a) * 0.075, -0.151, -0.03 + math.sin(a) * 0.075), BLACK))
+P.append(cyl(0.007, 0.006, (0, -0.156, -0.03), BLACK, verts=10, rot=(math.pi / 2, 0, 0)))   # ось стрелок
 for i in range(5):                                                  # резные листья внизу
     P.append(box((0.04, 0.02, 0.06), (-0.12 + i * 0.06, -0.12, -0.19), WOOD_D,
                  rot=(0, math.radians(30 * (1 if i % 2 else -1)), 0)))
 for x in (-0.06, 0.06):                                             # гири-шишки на цепочках
-    P.append(rod((x, -0.07, -0.17), (x, -0.07, -0.55), 0.003, BRASS, verts=4))
-    P.append(cyl(0.022, 0.1, (x, -0.07, -0.6), BRASS, verts=8, r2=0.012))
-export("cuckoo_clock", [join("CuckooClock", P)])
+    P.append(rod((x, -0.07, -0.17), (x, -0.07, -0.55), 0.003, IRON_D, verts=4))
+    P.append(cyl(0.022, 0.1, (x, -0.07, -0.6), CONE, verts=8, r2=0.012))
+    for k in range(3):                                              # чешуйки шишки
+        P.append(cyl(0.024 - k * 0.003, 0.012, (x, -0.07, -0.63 + k * 0.03), CONE, verts=8, r2=0.014))
+body = join("CuckooClock", P)
+# Стрелки смотрят на 12 (вверх), вращаются вокруг центра циферблата.
+hour = join("ClockHour", [box((0.009, 0.004, 0.045), (0, -0.154, -0.03 + 0.019), BLACK)], pivot=DIAL)
+minute = join("ClockMinute", [box((0.006, 0.004, 0.066), (0, -0.157, -0.03 + 0.029), BLACK)], pivot=DIAL)
+export("cuckoo_clock", [body, hour, minute])
 
 # Маятник: точка подвеса в начале координат, висит вниз.
-P = [rod((0, 0, 0), (0, 0, -0.3), 0.004, BRASS, verts=6)]
-P.append(cyl(0.035, 0.008, (0, 0, -0.32), BRASS, verts=16, rot=(math.pi / 2, 0, 0)))
+P = [rod((0, 0, 0), (0, 0, -0.3), 0.004, IRON_D, verts=6)]
+P.append(cyl(0.035, 0.008, (0, 0, -0.32), BRONZE, verts=16, rot=(math.pi / 2, 0, 0)))
 export("cuckoo_pendulum", [join("CuckooPendulum", P)])
 
 # ---------------- Кот: части с суставами (смотрит в +Y) ----------------

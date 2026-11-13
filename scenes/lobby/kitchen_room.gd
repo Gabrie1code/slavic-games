@@ -422,6 +422,10 @@ func hinged_near(character: Node3D, radius: float) -> HingedProp:
 	for prop: HingedProp in [cabinet, oven, apartment.curtains]:
 		if prop == null:
 			continue
+		if prop is WindowCurtains: # шторы — только если смотришь на саму штору, не в окно
+			if (prop as WindowCurtains).aimed_by(character, radius + 0.7):
+				best = prop if best == null else best
+			continue
 		var point := prop.front_point()
 		var flat := Vector2(point.x - character.global_position.x,
 			point.z - character.global_position.z)
