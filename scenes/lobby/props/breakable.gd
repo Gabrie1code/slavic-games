@@ -39,7 +39,13 @@ var _run_up_needed := 0.3
 ## scene — модель вещи, colors — цвета осколков, reach — радиус зоны задевания.
 func setup(scene: PackedScene, colors: Array[Color], reach: float = 0.45,
 		shard_size: float = 0.07) -> void:
-	_model = scene.instantiate()
+	setup_model(scene.instantiate() as Node3D, colors, reach, shard_size)
+
+
+## То же, но модель уже собрана кодом (отрывной календарь на кухне).
+func setup_model(model: Node3D, colors: Array[Color], reach: float = 0.45,
+		shard_size: float = 0.07) -> void:
+	_model = model
 	add_child(_model)
 	add_to_group("breakable")
 	_colors = colors

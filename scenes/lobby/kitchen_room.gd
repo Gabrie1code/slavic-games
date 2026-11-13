@@ -344,9 +344,14 @@ func _build_lamp() -> void:
 ## планка со скрепкой и рваные остатки оторванных листков. На листке — «КАЛЕНДАРЬ», большое
 ## число и день недели по часам компьютера; в субботу и воскресенье — красные, иначе чёрные.
 func _build_calendar() -> void:
+	# Календарь бьётся (кулаком, молотком) и через 6 сек появляется снова: модель — внутри
+	# Breakable, точка вещи — на 15 см ниже середины (прицел удара берёт +0.15).
+	var item := Breakable.new()
+	item.position = Vector3(X1 - 0.011, 1.47, 5.95)
+	item.rotation.y = -PI / 2 # лицом в кухню
+	add_child(item)
 	var pad := Node3D.new()
-	pad.position = Vector3(X1 - 0.011, 1.62, 5.95)
-	pad.rotation.y = -PI / 2 # лицом в кухню
+	pad.position = Vector3(0, 0.15, 0)
 	add_child(pad)
 	var paper := _mat(Color("f3f0e8"), 0.9)
 	var stack := _box(Vector3(0.15, 0.2, 0.03), Vector3(0, 0, 0.015), _mat(Color("dcd6c8"), 0.95))
@@ -375,6 +380,10 @@ func _build_calendar() -> void:
 	title.outline_modulate = Color("1c1c1c")
 	_calendar_label(pad, str(date["day"]), 150, ink, -0.005)
 	_calendar_label(pad, WEEKDAYS[weekday], 28, ink, -0.08)
+	remove_child(pad) # setup_model сам кладёт модель внутрь вещи
+	var shards: Array[Color] = [Color("f3f0e8"), Color("c9a43c"), Color("c4172c")]
+	item.setup_model(pad, shards, 0.25, 0.035)
+	item.respawn_time = 6.0
 
 
 func _calendar_label(pad: Node3D, text: String, size: int, color: Color, y: float) -> Label3D:

@@ -17,6 +17,10 @@ var close_text := "Закрыть"
 ## Куда подходить и смотреть (в координатах вещи).
 var front_offset := Vector3.ZERO
 
+## Перезарядка: после открытия/закрытия столько секунд нельзя снова (духовка — 2 сек).
+var cooldown := 0.0
+var _ready_at := 0.0
+
 var _open := false
 var _close_at := 0.0
 var _time := 0.0
@@ -48,20 +52,22 @@ func _angle() -> float:
 
 
 func can_open() -> bool:
-	return door != null and not _open and _angle() == 0.0
+	return door != null and not _open and _angle() == 0.0 and _time >= _ready_at
 
 
 func can_close() -> bool:
-	return door != null and _open and _angle() > open_angle * 0.9
+	return door != null and _open and _angle() > open_angle * 0.9 and _time >= _ready_at
 
 
 func open() -> void:
 	_open = true
 	_close_at = _time + open_time
+	_ready_at = _time + cooldown
 
 
 func close() -> void:
 	_open = false
+	_ready_at = _time + cooldown
 
 
 func front_point() -> Vector3:

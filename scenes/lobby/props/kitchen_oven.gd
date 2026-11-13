@@ -20,6 +20,7 @@ func _ready() -> void:
 	add_child(door)
 	swing_x = true
 	open_time = 15.0 # сама закрывается через 15 сек, как шкафчик
+	cooldown = 2.0 # открыть/закрыть — не чаще раза в 2 сек
 	open_angle = deg_to_rad(12.5) # чуть приоткрыта — как у старых плит
 	open_text = "Открыть духовку"
 	close_text = "Закрыть духовку"
