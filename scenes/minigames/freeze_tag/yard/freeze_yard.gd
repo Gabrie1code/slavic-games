@@ -1,7 +1,8 @@
 class_name FreezeYard
 extends Node3D
-## Двор 90-х для «Морожки»: хрущёвки вокруг, забор, лавочки, открытая песочница с «грибком»,
-## деревья, фонари и площадка — горка, качели, карусель (см. их скрипты).
+## Двор 90-х для «Морожки»: разные дома вокруг на все 360° (хрущёвки, девятиэтажка, сталинка,
+## башни, гаражи; вдали труба ТЭЦ, водокачка, краны), забор, лавочки, открытая песочница
+## с «грибком», деревья, фонари и площадка — горка, качели, карусель (см. их скрипты).
 ## Площадка игры — X −15.75..15.75, Z −9.75..9.75 (в 1.5 раза больше прежней; забор-столкновения
 ## в сцене, здесь — модели). В песочнице — ведёрко, лопатка и формочка.
 
@@ -12,6 +13,40 @@ const FENCE_Z := 11.0
 ## Во сколько раз двор больше первой версии (все расстановки умножаются на него).
 const S := 1.5
 const SANDBOX := Vector3(-5.0, 0, -2.5) * S
+
+## Дома вокруг двора на все 360° (разные, tools/blender/city.py) и дальний горизонт: башни,
+## труба ТЭЦ, водонапорная башня, краны. Только декорации (без столкновений, за забором).
+const SURROUNDINGS: Array = [
+	# Близкий круг: лицом к площадке.
+	["khrushchevka", Vector3(0, 0, -26.25), 0.0],
+	["khrushchevka", Vector3(-36, 0, -4.5), PI / 2],
+	["brick_khrushchevka", Vector3(35, 0, -4.5), -PI / 2],
+	["panel_ninestory", Vector3(-6, 0, 31), PI],
+	["garage_row", Vector3(22, 0, 20), PI],
+	["transformer_box", Vector3(-24, 0, 17), PI],
+	["stalinka", Vector3(32, 0, -34), -0.7],
+	["tower_block", Vector3(-33, 0, -33), 0.7],
+	["brick_khrushchevka", Vector3(-38, 0, 33), PI * 0.75],
+	["stalinka", Vector3(38, 0, 36), -PI * 0.75],
+	# Дальний горизонт.
+	["tower_block", Vector3(-95, 0, -60), 0.5],
+	["tower_block", Vector3(85, 0, 75), PI + 0.4],
+	["tower_block", Vector3(-40, 0, 110), PI],
+	["panel_ninestory", Vector3(10, 0, -85), 0.0],
+	["panel_ninestory", Vector3(-85, 0, 35), PI / 2],
+	["panel_ninestory", Vector3(95, 0, 5), -PI / 2],
+	["stalinka", Vector3(60, 0, -75), -0.4],
+	["khrushchevka", Vector3(-55, 0, -80), 0.3],
+	["tec_chimney", Vector3(140, 0, -120), 0.6],
+	["water_tower", Vector3(-120, 0, -10), 0.0],
+	["tower_crane", Vector3(-25, 0, 140), 1.0],
+	["tower_crane", Vector3(120, 0, -30), 2.0],
+]
+const EXTRA_TREES: Array[Vector3] = [
+	Vector3(-21, 0, 14), Vector3(8, 0, 17), Vector3(-12, 0, 18), Vector3(26, 0, -18),
+	Vector3(-27, 0, -20), Vector3(-48, 0, 12), Vector3(47, 0, 18), Vector3(19, 0, -24),
+	Vector3(-18, 0, -22), Vector3(30, 0, 13), Vector3(-30, 0, 24), Vector3(44, 0, -12),
+]
 
 ## Лавочки, под которые можно спрятаться (их Transform: +Z — сторона, куда вылезают).
 var benches: Array[Transform3D] = []
@@ -42,15 +77,35 @@ func _ready() -> void:
 
 
 func _build_surroundings() -> void:
-	_place(COURTYARD + "khrushchevka", Vector3(0, 0, -17.5) * S)
-	_place(COURTYARD + "khrushchevka", Vector3(-24, 0, -3.0) * S, PI / 2)
-	_place(COURTYARD + "khrushchevka", Vector3(24, 0, -3.0) * S, -PI / 2)
+	_build_far_ground()
+	for item: Array in SURROUNDINGS:
+		var spot: Vector3 = item[1]
+		_place(COURTYARD + String(item[0]), spot, float(item[2]))
 	for spot: Vector3 in [Vector3(-14, 0, 8.5), Vector3(13.5, 0, -9.5), Vector3(-13.5, 0, -10),
 			Vector3(14.5, 0, 6.0)]:
 		var model := "tree_birch" if spot.z > 0 else "tree_poplar"
 		_place(COURTYARD + model, spot * S, randf() * TAU)
+	for i in EXTRA_TREES.size():
+		_place(COURTYARD + ("tree_birch" if i % 3 == 0 else "tree_poplar"), EXTRA_TREES[i],
+			i * 1.7)
 	for x in [-12.5, 12.5]:
 		_place(COURTYARD + "lamp_post", Vector3(x, 0, 8.4) * S, PI)
+
+
+## Земля до горизонта: основной газон сцены — 90 × 90 м, дальше — большая плоскость чуть ниже
+## (под газоном её не видно), иначе за дальними домами был бы обрыв в небо.
+func _build_far_ground() -> void:
+	var ground := MeshInstance3D.new()
+	var plane := PlaneMesh.new()
+	plane.size = Vector2(600, 600)
+	ground.mesh = plane
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Color(0.37, 0.52, 0.28)
+	mat.roughness = 0.95
+	ground.material_override = mat
+	ground.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	ground.position.y = -0.03
+	add_child(ground)
 
 
 ## Низкий зелёный забор по периметру (секции по 2 м).
