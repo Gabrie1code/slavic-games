@@ -272,8 +272,7 @@ func _check_landing(delta: float, fall_speed: float) -> void:
 		var strength := clampf(fall_speed / 12.0, 0.2, 1.0)
 		_squash = -(0.45 + 0.55 * strength)
 		if fall_speed > 3.5 and _idle_time > 0.5: # не «тукать» всем сразу при появлении
-			JumpFx.dust(self, strength)
-			JumpFx.play(self, true, strength)
+			JumpFx.dust(self, strength) # звук приземления пока выключен (по просьбе владельца)
 	_air_time = 0.0 if on_floor else _air_time + delta
 	_was_on_floor = on_floor
 

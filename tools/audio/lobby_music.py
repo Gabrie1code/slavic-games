@@ -145,6 +145,29 @@ def melody(track, chords, motif, octave, voice, vol, key=60, start_bar=0, bars=N
                       vol)
 
 
+def bass_note(root):
+    """Бас всегда в одном удобном регистре (до 1-й — си 1-й октавы, 65–123 Гц): на низких аккордах
+    (соль, ми) бас уходил ниже 50 Гц и вместе с бочкой гудел — на слух как «перегруз»."""
+    note = root - 12
+    while note < 36:
+        note += 12
+    while note > 47:
+        note -= 12
+    return note
+
+
+def highpass(x, a=0.992):
+    """Срезать самый низ (меньше ~40 Гц): гул, который в колонках ноутбука хрипит."""
+    y = np.empty_like(x)
+    prev_x = 0.0
+    prev_y = 0.0
+    for i in range(len(x)):
+        prev_y = a * (prev_y + x[i] - prev_x)
+        prev_x = x[i]
+        y[i] = prev_y
+    return y
+
+
 def lowpass(x, a):
     y = np.empty_like(x)
     acc = 0.0
@@ -175,11 +198,12 @@ def style_disco():
     for bar in range(32):
         root, kind = chords[bar % 16]
         b = bar * 4
+        low = bass_note(root)
         for beat in range(4):
-            tr.put(b + beat, kick(), 0.55)
+            tr.put(b + beat, kick(), 0.45)
             tr.put(b + beat + 0.5, noise_hit(0.08, 45, "high"), 0.07)       # хэт на слабую долю
-            tr.put(b + beat + 0.5, bass(hz(root - 12 + 12), 0.2), 0.22)    # октавный бас
-            tr.put(b + beat, bass(hz(root - 12), 0.22), 0.3)
+            tr.put(b + beat + 0.5, bass(hz(low + 12), 0.2), 0.18)          # октавный бас
+            tr.put(b + beat, bass(hz(low), 0.22), 0.26)
         for beat in (1, 3):
             tr.put(b + beat, clap(), 0.11)
         for k, n in enumerate(chord_notes(root + 12, kind)):
@@ -271,7 +295,7 @@ def style_chip():
 
 track, softness = {"disco": style_disco, "bossa": style_bossa, "funk": style_funk,
                    "chip": style_chip}[STYLE]()
-mix = room(lowpass(track.buf, softness))       # тёплый, не режущий звук + немного комнаты
+mix = room(highpass(lowpass(track.buf, softness)))  # тёплый звук без гула + немного комнаты
 # Без «сжатия» (tanh давал хрип-перегруз на громких местах) — просто ровная громкость.
 mix = mix / (np.max(np.abs(mix)) + 1e-9) * 0.85
 with wave.open(OUT, "wb") as w:
