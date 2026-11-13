@@ -6,7 +6,9 @@ extends Node3D
 ## и «висела в воздухе», когда табурет падал.
 
 const COLORS: Array[Color] = [Color("992018"), Color("cc9918"), Color("26262e"),
-	Color("4d8c99"), Color("e8dcc0"), Color("2a6a2a"), Color("b85a1a")]
+	Color("4d8c99"), Color("e8dcc0"), Color("2a6a2a"), Color("b85a1a"), Color("8c0d33"),
+	Color("0d5959"), Color("d9bf73"), Color("59330f"), Color("3373bf"), Color("bf738c"),
+	Color("737f26"), Color("999ea1"), Color("e64d33"), Color("1a1a59"), Color("f2e659")]
 const PAGES := Color("f2ead2")
 
 
@@ -20,7 +22,7 @@ func build(count: int, support: Tippable, seed_value: int = 33) -> void:
 		var size := Vector3(rng.randf_range(0.17, 0.24), rng.randf_range(0.038, 0.05),
 			rng.randf_range(0.12, 0.16))
 		var book := Tippable.new()
-		book.setup_model(_book_model(size, COLORS[(i * 3) % COLORS.size()]), size,
+		book.setup_model(_book_model(size, COLORS[rng.randi() % COLORS.size()]), size,
 			size.y / 2.0, 0.4)
 		book.support = support
 		book.position = Vector3(rng.randf_range(-0.02, 0.02), y, rng.randf_range(-0.02, 0.02))

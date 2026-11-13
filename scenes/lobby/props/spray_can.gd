@@ -18,7 +18,7 @@ const LOOSE_LIFE := 15.0
 ## 8 цветов краски (7 ярких и белый; переключаются по кругу).
 const COLORS: Array[Color] = [
 	Color("ff2a2a"), Color("ff8c1a"), Color("ffe11a"), Color("2ecc40"),
-	Color("1ac8ff"), Color("2a5cff"), Color("b33cff"), Color("ffffff"),
+	Color("1ac8ff"), Color("2a5cff"), Color("b33cff"), Color("ffffff"), Color("151515"),
 ]
 const SPLAT := preload("res://assets/textures/fx/paint_splat.png")
 ## Распылитель (в координатах баллончика) и сколько следов краски всего хранится в мире.

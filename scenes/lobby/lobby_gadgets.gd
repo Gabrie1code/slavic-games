@@ -14,7 +14,7 @@ const LOOK_ANGLE := 50.0
 const GRAMOPHONE_RADIUS := 1.4
 const LAMP_RADIUS := 1.2
 const SWITCH_RADIUS := 0.8
-const RADIO_RADIUS := 1.4
+const RADIO_RADIUS := 1.0
 const SIDEBOARD_RADIUS := 1.1
 const SIDEBOARD_GLASS_RADIUS := 1.3
 const ARCADE_RADIUS := 1.1
@@ -694,7 +694,8 @@ func _light_hint(p: PlayerData) -> Array[Dictionary]:
 ## Целое радио на полке, на которое смотрит игрок.
 func _near_radio(p: PlayerData) -> bool:
 	var radio := apartment.radio_music.radio
-	return not radio.is_broken() and _near(p, radio.global_position, RADIO_RADIUS)
+	return not radio.is_broken() and _near(p, radio.global_position, RADIO_RADIUS) \
+		and facing(characters[p.id], radio.global_position, 25.0) # только если смотришь на радио
 
 
 ## Выключатель люстры, к которому подошли лицом (null — нет рядом).
