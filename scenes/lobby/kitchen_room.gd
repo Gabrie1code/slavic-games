@@ -100,6 +100,12 @@ func _build_walls() -> void:
 	for span: Vector2 in [Vector2(X0, DOOR_X0), Vector2(DOOR_X1, X1)]:
 		_faces_z(span, Z0 + 0.005, 0.0, HEIGHT)
 	_faces_z(Vector2(DOOR_X0, DOOR_X1), Z0 + 0.005, DOOR_TOP, HEIGHT)
+	# Откосы проёма со стороны кухни (половина толщины стены) и откосы окна — та же отделка:
+	# кафель, коричневая полоса, обои (раньше там были голые обои и полоса обрывалась на углу).
+	_reveal(DOOR_X0 + 0.005, 3.6, Z0 + 0.012, 0.0, DOOR_TOP)
+	_reveal(DOOR_X1 - 0.005, 3.6, Z0 + 0.012, 0.0, DOOR_TOP)
+	_reveal(wx0 + 0.005, Z1 - 0.012, Z1 + 0.06, WINDOW_Y0, WINDOW_Y1)
+	_reveal(wx1 - 0.005, Z1 - 0.012, Z1 + 0.06, WINDOW_Y0, WINDOW_Y1)
 	# Потолок: виден от первого лица, твёрдый для всех.
 	_fp_only(Vector3(width + 0.4, 0.1, depth), Vector3((X0 + X1) / 2.0, HEIGHT + 0.05, mid_z),
 		_mat(Color("e8e2d2"), 0.9))
@@ -132,6 +138,22 @@ func _faces_z(span: Vector2, z: float, y0: float, y1: float) -> void:
 		_fp_only(Vector3(w, y1 - paper_y0, 0.01), Vector3(cx, (paper_y0 + y1) / 2.0, z), _paper_mat)
 	if y0 < TILE_H and y1 > TILE_H: # коричневая полоса по кромке кафеля — по всему периметру
 		_fp_only(Vector3(w, 0.03, 0.014), Vector3(cx, TILE_H, z), _mat(Color("8a6a48"), 0.5))
+
+
+## Откос (боковая грань проёма) в плоскости x на глубину z0..z1, высоты y0..y1 — от 1-го лица.
+func _reveal(x: float, z0: float, z1: float, y0: float, y1: float) -> void:
+	var depth := z1 - z0
+	var mid := (z0 + z1) / 2.0
+	var tile_top := minf(y1, TILE_H)
+	if tile_top > y0:
+		_fp_only(Vector3(0.01, tile_top - y0, depth), Vector3(x, (y0 + tile_top) / 2.0, mid), _tile_mat)
+	var paper_y0 := maxf(y0, TILE_H)
+	if y1 > paper_y0:
+		_fp_only(Vector3(0.01, y1 - paper_y0, depth), Vector3(x, (paper_y0 + y1) / 2.0, mid),
+			_paper_mat)
+	if y0 < TILE_H and y1 > TILE_H:
+		_fp_only(Vector3(0.014, 0.03, depth + 0.004), Vector3(x, TILE_H, mid),
+			_mat(Color("8a6a48"), 0.5))
 
 
 ## Кусок дальней стены (span по X, высоты y0..y1): сама стена и отделка внутри.
