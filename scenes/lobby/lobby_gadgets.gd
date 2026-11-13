@@ -18,8 +18,9 @@ const TOILET_RADIUS := 1.2
 const SINK_RADIUS := 1.0
 const NIGHTSTAND_RADIUS := 1.1
 const CAN_RADIUS := 1.0
-## Как далеко долетает краска из баллончика.
+## Как далеко долетает краска из баллончика и дотягивается губка.
 const SPRAY_REACH := 3.5
+const SPONGE_REACH := 1.6
 ## Через сколько граммофон можно завести снова (секунды).
 const TUNE_TIME := 3.0
 const NOTE := preload("res://assets/textures/fx/note_pixel.png")
@@ -30,6 +31,9 @@ var characters: Dictionary
 var _tune_until := 0.0
 ## Кто держит баллончик: PlayerData.id -> SprayCan.
 var _held_cans: Dictionary = {}
+## Губки в руках и «губки в кадре» у камер: PlayerData.id -> Sponge / Node3D.
+var _held_sponges: Dictionary = {}
+var _view_sponges: Dictionary = {}
 var _player: AudioStreamPlayer3D
 
 
@@ -119,21 +123,164 @@ func process_can_holder(p: PlayerData, camera: Camera3D, view_can: Node3D) -> vo
 	if not p.input.is_pressed("attack"):
 		can.stop_spray()
 		return
-	var from := character.global_position + Vector3.UP * 1.3
-	var direction := -character.global_basis.z
-	if camera:
-		from = camera.global_position
-		direction = -camera.global_basis.z
-	# Луч видит стены, мебель и игроков (слой 1) и посуду (Breakable.PAINT_LAYER).
-	var query := PhysicsRayQueryParameters3D.create(from, from + direction * SPRAY_REACH,
-		1 | Breakable.PAINT_LAYER, [character.get_rid()])
-	var hit := apartment.get_world_3d().direct_space_state.intersect_ray(query)
+	var hit := _aim_hit(character, camera, SPRAY_REACH)
 	if hit.is_empty():
-		can.spray_at(from + direction * SPRAY_REACH, Vector3.UP, false,
-			apartment.get_process_delta_time())
+		var far := _aim_end(character, camera, SPRAY_REACH)
+		can.spray_at(far, Vector3.UP, false, apartment.get_process_delta_time())
 	else:
 		can.spray_at(hit["position"], hit["normal"], true, apartment.get_process_delta_time(),
 			hit["collider"])
+
+
+## Куда смотрит прицел: от камеры (от первого лица) или от головы вперёд (вид сверху).
+## Луч видит стены, мебель и игроков (слой 1) и посуду (Breakable.PAINT_LAYER).
+func _aim_hit(character: PlayerCharacter, camera: Camera3D, reach: float) -> Dictionary:
+	var from := camera.global_position if camera else character.global_position + Vector3.UP * 1.3
+	var query := PhysicsRayQueryParameters3D.create(from, _aim_end(character, camera, reach),
+		1 | Breakable.PAINT_LAYER, [character.get_rid()])
+	return apartment.get_world_3d().direct_space_state.intersect_ray(query)
+
+
+func _aim_end(character: PlayerCharacter, camera: Camera3D, reach: float) -> Vector3:
+	if camera:
+		return camera.global_position - camera.global_basis.z * reach
+	return character.global_position + Vector3.UP * 1.3 - character.global_basis.z * reach
+
+
+# ---------------- Рука: баллончик или губка ----------------
+
+## В руке что-то есть (баллончик или губка) — второе не взять, кулаком не бьёт.
+func hand_busy(p: PlayerData) -> bool:
+	return holds_can(p) or holds_sponge(p)
+
+
+func holds_sponge(p: PlayerData) -> bool:
+	return _held_sponges.has(p.id)
+
+
+## Каждый кадр для того, у кого что-то в руке.
+func process_hand(p: PlayerData, camera: Camera3D, view_can: Node3D) -> void:
+	if holds_can(p):
+		process_can_holder(p, camera, view_can)
+	elif holds_sponge(p):
+		_process_sponge(p, camera)
+
+
+## Бросить всё из руки (игрок ушёл из лобби).
+func release_hand(p: PlayerData) -> void:
+	release_can(p)
+	release_sponge(p)
+
+
+## Подсказки тому, у кого что-то в руке.
+func hand_hint(p: PlayerData) -> Array[Dictionary]:
+	if holds_can(p):
+		return can_holder_hint(p)
+	if not holds_sponge(p):
+		return _no_hint()
+	var result: Array[Dictionary] = [entry(attack_key(p), "Оттирать (зажать)"),
+		entry(drop_key(p), "Бросить губку")]
+	var sink := _near_sink(p)
+	if sink and sink.sponge == null:
+		result.append(entry(confirm_key(p), "Положить губку"))
+	return result
+
+
+## Удар у раковины, пока рука свободна, — взять губку (вместо удара кулаком). true — взял.
+func try_attack_use(p: PlayerData) -> bool:
+	var sink := _near_sink(p)
+	if hand_busy(p) or sink == null or sink.sponge == null:
+		return false
+	_hold_sponge(p, sink.take_sponge())
+	return true
+
+
+## Губка: G — бросить; зажат удар — оттирать то, что под прицелом (до 1.6 м).
+func _process_sponge(p: PlayerData, camera: Camera3D) -> void:
+	var sponge: Sponge = _held_sponges[p.id]
+	var character: PlayerCharacter = characters[p.id]
+	_show_view_sponge(p, camera)
+	if p.input.is_just_pressed("drop"):
+		release_sponge(p)
+		return
+	if not p.input.is_pressed("attack"):
+		sponge.stop_scrub()
+		return
+	var hit := _aim_hit(character, camera, SPONGE_REACH)
+	if hit.is_empty():
+		sponge.stop_scrub()
+		return
+	sponge.scrub_at(hit["position"], apartment.toilet_room.toilet)
+	# Рука ходит туда-сюда, как будто трёт.
+	character.arm_pose_x = 0.9 + sin(Time.get_ticks_msec() * 0.02) * 0.25
+
+
+## Губка «в кадре» у камеры от первого лица (создаётся, когда взяли; убирается, когда бросили).
+func _show_view_sponge(p: PlayerData, camera: Camera3D) -> void:
+	if camera == null or _view_sponges.has(p.id):
+		return
+	var model := Sponge.make_model()
+	model.position = Vector3(0.24, -0.26, -0.42)
+	model.rotation = Vector3(0.4, 0.3, 0.0)
+	model.scale = Vector3.ONE * 1.3
+	_set_layers(model, 1 << (p.slot + 10)) # слой «в кадре» этого игрока
+	camera.add_child(model)
+	_view_sponges[p.id] = model
+
+
+func _hold_sponge(p: PlayerData, sponge: Sponge) -> void:
+	_held_sponges[p.id] = sponge
+	sponge.hold(p, characters[p.id])
+
+
+## Бросить губку (G или ушёл из лобби).
+func release_sponge(p: PlayerData) -> void:
+	if _view_sponges.has(p.id):
+		(_view_sponges[p.id] as Node).queue_free()
+		_view_sponges.erase(p.id)
+	if not _held_sponges.has(p.id):
+		return
+	var sponge: Sponge = _held_sponges[p.id]
+	_held_sponges.erase(p.id)
+	if is_instance_valid(sponge) and characters.has(p.id):
+		sponge.drop(characters[p.id], apartment)
+
+
+## «Подтвердить»: у раковины с губкой в руке — положить её; рядом брошенная губка — подобрать.
+func _use_sponge(p: PlayerData) -> bool:
+	var sink := _near_sink(p)
+	if holds_sponge(p):
+		if sink == null or sink.sponge != null:
+			return false
+		var sponge: Sponge = _held_sponges[p.id]
+		release_sponge_quietly(p)
+		sink.return_sponge(sponge)
+		characters[p.id].set_arm_angle(PlayerCharacter.ARM_DOWN, 0.2)
+		return true
+	if hand_busy(p):
+		return false
+	for node in apartment.get_tree().get_nodes_in_group("sponge"):
+		var loose := node as Sponge
+		if loose and loose.state == Sponge.State.LOOSE \
+				and _near(p, loose.global_position, CAN_RADIUS):
+			_hold_sponge(p, loose)
+			return true
+	return false
+
+
+## Убрать губку из руки без броска (её кладут на раковину).
+func release_sponge_quietly(p: PlayerData) -> void:
+	if _view_sponges.has(p.id):
+		(_view_sponges[p.id] as Node).queue_free()
+		_view_sponges.erase(p.id)
+	_held_sponges.erase(p.id)
+
+
+func _set_layers(node: Node, layer: int) -> void:
+	if node is VisualInstance3D:
+		(node as VisualInstance3D).layers = layer
+	for child in node.get_children():
+		_set_layers(child, layer)
 
 
 ## Бросить баллончик (G или игрок ушёл из лобби).
@@ -156,8 +303,8 @@ func can_holder_hint(p: PlayerData) -> Array[Dictionary]:
 
 ## Тумбочка и брошенные баллончики: открыть ящик, взять баллончик.
 func _use_cans(p: PlayerData, character: PlayerCharacter) -> bool:
-	if holds_can(p):
-		return false # одна рука — один баллончик
+	if hand_busy(p):
+		return false # одна рука — одна вещь
 	var loose := _near_loose_can(p)
 	var stand := apartment.nightstand
 	var near_stand := _near(p, stand.front_point(), NIGHTSTAND_RADIUS)
@@ -177,7 +324,7 @@ func _use_cans(p: PlayerData, character: PlayerCharacter) -> bool:
 
 
 func _can_hint(p: PlayerData) -> Array[Dictionary]:
-	if holds_can(p):
+	if hand_busy(p):
 		return _no_hint()
 	if _near_loose_can(p):
 		return [entry(confirm_key(p), "Подобрать баллончик")]
@@ -240,7 +387,8 @@ func try_interact(p: PlayerData) -> bool:
 	if _near_tippable(p, apartment.gramophone, GRAMOPHONE_RADIUS) and _gramophone_ready():
 		_play_gramophone()
 		return true
-	if _use_switch(p) or _use_cans(p, character):
+	# Губка первой: с губкой в руке у раковины «подтвердить» — положить её, а не мыть руки.
+	if _use_sponge(p) or _use_switch(p) or _use_cans(p, character):
 		return true
 	if _near_cat(p) and apartment.cat.pet():
 		# Персонаж тянет руку к коту.
@@ -301,7 +449,7 @@ func _furniture_hint(p: PlayerData) -> Array[Dictionary]:
 	var can_entries := _can_hint(p)
 	if not can_entries.is_empty():
 		return can_entries
-	if _near_sink(p):
+	if _near_sink(p) and not holds_sponge(p): # с губкой в руке — подсказки руки («Положить»)
 		return _sink_hint(p)
 	if _near_toilet(p):
 		return _toilet_hint(p)
@@ -311,11 +459,15 @@ func _furniture_hint(p: PlayerData) -> Array[Dictionary]:
 ## Рукомойник: помыть руки (смывает краску) — каждому раз в 15 сек.
 func _sink_hint(p: PlayerData) -> Array[Dictionary]:
 	var sink := apartment.toilet_room.sink
+	var wash := entry(confirm_key(p), "Помыть руки")
 	if sink.busy:
-		return [entry(confirm_key(p), "Вода течёт…", true)]
-	if not sink.can_use(p):
-		return [entry(confirm_key(p), "Помыть руки (через %d с)" % ceili(sink.cooldown_left(p)), true)]
-	return [entry(confirm_key(p), "Помыть руки")]
+		wash = entry(confirm_key(p), "Вода течёт…", true)
+	elif not sink.can_use(p):
+		wash = entry(confirm_key(p), "Помыть руки (через %d с)" % ceili(sink.cooldown_left(p)), true)
+	var result: Array[Dictionary] = [wash]
+	if sink.sponge != null and not hand_busy(p):
+		result.append(entry(attack_key(p), "Взять губку"))
+	return result
 
 
 ## Рукомойник, к кранам которого игрок подошёл лицом (null — далеко).

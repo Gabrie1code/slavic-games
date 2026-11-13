@@ -259,6 +259,19 @@ func _grow_puddle(point: Vector3, delta: float) -> void:
 	_puddles[-1][1] = _time
 
 
+## Оттереть губкой лужи рядом с точкой (раньше, чем высохнут сами).
+func scrub(point: Vector3, radius: float) -> void:
+	for i in range(_puddles.size() - 1, -1, -1):
+		var puddle: MeshInstance3D = _puddles[i][0]
+		var flat := Vector2(puddle.global_position.x - point.x, puddle.global_position.z - point.z)
+		var close := flat.length() < radius + puddle.scale.x * 0.5
+		if close and absf(puddle.global_position.y - point.y) < 0.3:
+			if puddle == _puddle:
+				_puddle = null
+			puddle.queue_free()
+			_puddles.remove_at(i)
+
+
 func _dry_puddles() -> void:
 	for i in range(_puddles.size() - 1, -1, -1):
 		var puddle: MeshInstance3D = _puddles[i][0]

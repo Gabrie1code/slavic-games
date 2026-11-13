@@ -239,11 +239,11 @@ func _process(delta: float) -> void:
 		# Пробел должен погладить кота, а не подбросить персонажа.
 		if character:
 			character.can_jump = _prompt_for(p, character).is_empty()
-		if _gadgets.holds_can(p):
+		if _gadgets.hand_busy(p):
 			var view: Dictionary = _views.get(p.id, {})
-			_gadgets.process_can_holder(p, view.get("camera"), view.get("can")) # G, ПКМ, удар
-		elif p.input.is_just_pressed("attack"):
-			_punch(p)
+			_gadgets.process_hand(p, view.get("camera"), view.get("can")) # баллончик / губка
+		elif p.input.is_just_pressed("attack") and not _gadgets.try_attack_use(p):
+			_punch(p) # у раковины удар берёт губку (try_attack_use), иначе — кулак
 		if p.input.is_just_pressed("confirm") and _gadgets.can_use_toilet(p):
 			_open_room(p, ToiletScreen.new().setup_for(p, character, _apartment.toilet_room.toilet))
 			continue
@@ -722,7 +722,7 @@ func _update_first_person(delta: float) -> void:
 		camera.global_transform = Transform3D(
 			Basis.from_euler(Vector3(character.fp_pitch, character.rotation.y, 0.0)), eye)
 		var entries := _prompt_for(p, character)
-		entries.append_array(_gadgets.can_holder_hint(p))
+		entries.append_array(_gadgets.hand_hint(p))
 		var prompt: KeyPrompt = _views[id]["prompt"]
 		prompt.set_entries(entries)
 		# Во время отсчёта кнопка «Отменить «Готов»» — по центру под надписью «Начинаем через…».
@@ -731,7 +731,7 @@ func _update_first_person(delta: float) -> void:
 		prompt.position = prompt.get_parent_control().size / 2.0 + shift # размер не меняется
 		var on_phone := _gadgets.holds_phone(p)
 		var holds_can := _gadgets.holds_can(p)
-		(_views[id]["fist"] as Node3D).visible = not on_phone and not holds_can
+		(_views[id]["fist"] as Node3D).visible = not on_phone and not _gadgets.hand_busy(p)
 		(_views[id]["can"] as Node3D).visible = holds_can
 		(_views[id]["handset"] as Node3D).visible = on_phone
 		if on_phone: # провод «в кадре» — к своей трубке у камеры
@@ -880,7 +880,7 @@ func _place_bot(p: PlayerData, character: PlayerCharacter) -> void:
 
 func _on_player_left(p: PlayerData) -> void:
 	_seated.erase(p.id)
-	_gadgets.release_can(p)
+	_gadgets.release_hand(p)
 	if _apartment.phone.user == p:
 		_apartment.phone.hang_up()
 	_remove_view(p)

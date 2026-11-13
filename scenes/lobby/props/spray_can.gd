@@ -169,6 +169,17 @@ func spray_at(target: Vector3, normal: Vector3, hit: bool, delta: float,
 		_place_splat(target, normal, collider)
 
 
+## Стереть следы краски рядом с точкой (губка): и на стенах, и на людях, и на посуде.
+static func erase_near(point: Vector3, radius: float) -> void:
+	for i in range(_splats.size() - 1, -1, -1):
+		var decal := _splats[i]
+		if not is_instance_valid(decal):
+			_splats.remove_at(i)
+		elif decal.global_position.distance_to(point) < radius:
+			decal.queue_free()
+			_splats.remove_at(i)
+
+
 ## Смыть всю краску с персонажа (раковина в туалете).
 static func clear_paint(node: Node) -> void:
 	for child in node.get_children():

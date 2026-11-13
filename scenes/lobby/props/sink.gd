@@ -15,8 +15,13 @@ const WATER_HIGH := 0.85
 const WATER_WIDE := 2.4
 ## Где встаёт моющий руки (перед раковиной).
 const STAND := Vector3(0, 0, 0.75)
+## Губка лежит на краю раковины; взяли и не вернули — новая появится через SPONGE_BACK сек.
+const SPONGE_SPOT := Vector3(-0.17, 0.882, 0.33)
+const SPONGE_BACK := 15.0
 
 var busy := false
+## Губка на раковине (null — её взяли).
+var sponge: Sponge
 
 var _tap_hot: Node3D
 var _tap_cold: Node3D
@@ -54,6 +59,7 @@ func _ready() -> void:
 	_stream.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_stream.visible = false
 	add_child(_stream)
+	_restock_sponge()
 
 
 func _process(_delta: float) -> void:
@@ -72,6 +78,32 @@ func can_use(p: PlayerData) -> bool:
 
 func cooldown_left(p: PlayerData) -> float:
 	return maxf(0.0, float(_ready_at.get(p.id, 0.0)) - Time.get_ticks_msec() / 1000.0)
+
+
+## Взять губку с раковины (через SPONGE_BACK сек на её месте появится новая, если не вернут).
+func take_sponge() -> Sponge:
+	var taken := sponge
+	sponge = null
+	if taken:
+		get_tree().create_timer(SPONGE_BACK).timeout.connect(_restock_sponge)
+	return taken
+
+
+## Положить губку обратно (если место свободно).
+func return_sponge(item: Sponge) -> bool:
+	if sponge != null:
+		return false
+	sponge = item
+	item.store_in(self, SPONGE_SPOT)
+	return true
+
+
+func _restock_sponge() -> void:
+	if sponge != null:
+		return # вернули сами
+	sponge = Sponge.new()
+	add_child(sponge)
+	sponge.store_in(self, SPONGE_SPOT)
 
 
 ## Куда смотреть/подходить (перед кранами).
