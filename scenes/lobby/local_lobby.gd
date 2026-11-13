@@ -332,19 +332,9 @@ func _is_near(p: PlayerData, point: Vector3, radius: float) -> bool:
 ## Зона на полу (круг) и над ней — компактная «кнопка»-значок (assets/ui/prompts/<badge>.png),
 ## которая плавно покачивается. Какую клавишу жать — подсказка у прицела игрока (KeyPrompt).
 func _build_zone(pos: Vector3, radius: float, color: Color, badge: String) -> void:
-	var zone := MeshInstance3D.new()
-	var zone_mesh := CylinderMesh.new()
-	zone_mesh.top_radius = radius
-	zone_mesh.bottom_radius = radius
-	zone_mesh.height = 0.02
-	zone_mesh.radial_segments = 24
-	zone.mesh = zone_mesh
-	var zone_mat := StandardMaterial3D.new()
-	zone_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	zone_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	zone_mat.albedo_color = Color(color, 0.3)
-	zone.material_override = zone_mat
-	zone.position = pos + Vector3.UP * 0.04
+	# Мягкое свечение на полу, поменьше самой зоны (сплошной круг был слишком широким и ярким).
+	var zone := GroundGlow.new().setup(color, radius * 0.75, 0.35)
+	zone.position = pos + Vector3.UP * 0.03
 	add_child(zone)
 	var badge_node := ZoneBadge.new().setup(badge, 2.25)
 	badge_node.position += pos

@@ -16,10 +16,17 @@ var _title: Label
 var _refresh_left := 0.0
 
 
-func _ready() -> void:
-	# Именно «якоря И отступы»: set_anchors_preset внутри дерева сохраняет старый размер (0×0),
-	# и меню оставалось в левом верхнем углу.
-	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+func _init() -> void:
+	# Растянуть на весь экран ещё ДО добавления в сцену (как BotDialog): если делать это в _ready,
+	# Godot сохраняет прежний размер 0×0, и меню оставалось в левом верхнем углу.
+	anchor_left = 0.0
+	anchor_top = 0.0
+	anchor_right = 1.0
+	anchor_bottom = 1.0
+	offset_left = 0.0
+	offset_top = 0.0
+	offset_right = 0.0
+	offset_bottom = 0.0
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var panel := PanelContainer.new()
 	panel.custom_minimum_size = Vector2(620, 0)
@@ -108,8 +115,11 @@ func _row(slot: int, p: PlayerData) -> Control:
 	var name_box := VBoxContainer.new()
 	name_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	name_box.add_theme_constant_override("separation", 0)
-	name_box.add_child(_label(p.display_name, 21, Color.WHITE))
-	name_box.add_child(_label(p.device_label(), 14, Color(1, 1, 1, 0.6)))
+	if p.is_bot():
+		name_box.add_child(_label("%s (бот)" % p.display_name, 21, Color.WHITE))
+	else:
+		name_box.add_child(_label(p.display_name, 21, Color.WHITE))
+		name_box.add_child(_label(p.device_label(), 14, Color(1, 1, 1, 0.6)))
 	line.add_child(name_box)
 	if not p.is_bot():
 		line.add_child(_label("%d ₽" % PlayerManager.wallet(p), 19, Color("f6c343")))

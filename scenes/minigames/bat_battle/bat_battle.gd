@@ -383,15 +383,19 @@ func _spawn_boost(type: Boost) -> void:
 		model = SUPER_BAT_SCENE.instantiate()
 		model.rotation_degrees.z = 90.0
 		model.position = Vector3(0.4, 0.7, 0)
-		label.text = "СУПЕР-БИТА"
+		label.text = "СУПЕР-БИТА · %d с" % int(SUPER_TIME)
 		label.modulate = Color("ff6b5a")
 	else:
 		model = CAN_SCENE.instantiate()
 		model.scale = Vector3.ONE * 4.0
 		model.position.y = 0.25
-		label.text = "«ЯГУАРР»"
+		label.text = "«ЯГУАРР» · %d с" % int(DRINK_TIME)
 		label.modulate = Color("ffb52e")
 	root.add_child(model)
+	# Подсветка на земле цветом надписи — видно, где лежит буст.
+	var glow := GroundGlow.new().setup(label.modulate, 1.0, 0.6)
+	glow.position.y = 0.03
+	root.add_child(glow)
 	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	label.font_size = 36
 	label.outline_size = 10
