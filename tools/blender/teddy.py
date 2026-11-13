@@ -92,22 +92,61 @@ def rod(a, b, r, m):
 # Пропорции сверены с исходником владельца (bears.fbx — только как образец, в игру не идёт):
 # голова крупнее тела, мордочка — овальная «площадка» вперёд, ушки-«чашечки», руки толще и
 # длиннее (до бёдер), ноги разведены в стороны носками наружу.
-P = [ball(0.076, (0, 0, 0.098), FUR, scale=(1, 0.88, 1.1)),               # тело-«груша»
-     ball(0.083, (0, 0.006, 0.066), FUR, scale=(1, 0.9, 0.8)),              # низ тела шире
-     ball(0.083, (0, -0.012, 0.235), FUR, scale=(1.06, 0.95, 0.96)),        # голова (крупная)
-     ball(0.036, (0, -0.074, 0.208), FUR_L, scale=(1.2, 0.72, 0.8)),        # мордочка-овал
+# Тело, голова, плечи, руки и ноги сливаются в одну поверхность (MONO → voxel remesh): без швов
+# в местах, где шары пересекаются (плечи, шея, бёдра). Мордочка, нос, глаза, ушки — отдельно.
+MONO = [ball(0.076, (0, 0, 0.098), FUR, scale=(1, 0.88, 1.1)),            # тело-«груша»
+        ball(0.083, (0, 0.006, 0.066), FUR, scale=(1, 0.9, 0.8)),           # низ тела шире
+        ball(0.083, (0, -0.012, 0.235), FUR, scale=(1.06, 0.95, 0.96))]     # голова (крупная)
+P = [ball(0.036, (0, -0.074, 0.208), FUR_L, scale=(1.2, 0.72, 0.8)),        # мордочка-овал
      ball(0.013, (0, -0.1, 0.217), NOSE, scale=(1.45, 0.7, 0.85), segs=20, rings=10),
      rod((0, -0.1, 0.21), (0, -0.098, 0.192), 0.0018, NOSE)]                # шов-ротик
 for s in (-1, 1):
     P += [ball(0.0085, (s * 0.032, -0.08, 0.25), EYE, segs=16, rings=8),     # блестящий глаз
           ball(0.03, (s * 0.066, 0.004, 0.298), FUR, scale=(1, 0.5, 1)),     # ухо
-          ball(0.02, (s * 0.066, -0.009, 0.296), FUR_D, scale=(1, 0.3, 1), segs=20, rings=10),
-          # Рука растёт из плеча (круглое плечо вливается в тело) и идёт вниз-вперёд к бедру.
-          ball(0.02, (s * 0.066, -0.01, 0.162), FUR),                           # плечо (небольшое)
-          limb((s * 0.076, -0.012, 0.163), (s * 0.1, -0.048, 0.072), 0.031, FUR, flat=0.95),
-          ball(0.047, (s * 0.052, -0.054, 0.044), FUR, scale=(0.95, 1.42, 0.88),  # бедро
-               rot=(0, 0, math.radians(s * -14))),
-          ball(0.042, (s * 0.068, -0.11, 0.046), FUR, scale=(0.92, 0.72, 1.05))]  # ступня
+          ball(0.02, (s * 0.066, -0.009, 0.296), FUR_D, scale=(1, 0.3, 1), segs=20, rings=10)]
+    MONO += [ball(0.02, (s * 0.066, -0.01, 0.162), FUR),                    # плечо
+             limb((s * 0.076, -0.012, 0.163), (s * 0.1, -0.048, 0.072), 0.031, FUR, flat=0.95),
+             ball(0.0376, (s * 0.052, -0.054, 0.042), FUR, scale=(0.95, 1.5, 0.88),  # бедро
+                  rot=(0, 0, math.radians(s * -14))),
+             ball(0.0336, (s * 0.068, -0.106, 0.04), FUR, scale=(0.92, 0.72, 1.05))]  # ступня
+
+
+def merge_smooth(objs, voxel=0.0045):
+    """Слить шары в одну гладкую поверхность (voxel remesh) и сгладить. Узор вязки переносится с
+    исходных шаров (их UV, Data Transfer): петли лежат рядами, как раньше, а шва формы нет."""
+    bpy.ops.object.select_all(action="DESELECT")
+    for o in objs:
+        o.select_set(True)
+    bpy.context.view_layer.objects.active = objs[0]
+    bpy.ops.object.join()
+    body = bpy.context.object
+    source = body.copy()                       # исходные шары с их UV — источник узора
+    source.data = body.data.copy()
+    bpy.context.scene.collection.objects.link(source)
+    mod = body.modifiers.new("R", "REMESH")
+    mod.mode = "VOXEL"
+    mod.voxel_size = voxel
+    bpy.ops.object.modifier_apply(modifier="R")
+    sm = body.modifiers.new("S", "SMOOTH")
+    sm.factor = 0.6
+    sm.iterations = 4
+    bpy.ops.object.modifier_apply(modifier="S")
+    body.data.uv_layers.new(name="UVMap")
+    tr = body.modifiers.new("T", "DATA_TRANSFER")
+    tr.object = source
+    tr.use_loop_data = True
+    tr.data_types_loops = {"UV"}
+    tr.loop_mapping = "POLYINTERP_NEAREST"
+    bpy.ops.object.modifier_apply(modifier="T")
+    bpy.data.objects.remove(source)
+    body.data.materials.clear()
+    body.data.materials.append(FUR)
+    for poly in body.data.polygons:
+        poly.use_smooth = True
+    return body
+
+
+P.append(merge_smooth(MONO))
 bpy.ops.object.select_all(action="DESELECT")
 for o in P:
     o.select_set(True)
