@@ -197,7 +197,7 @@ func _build_rooms() -> void:
 
 func _build_living_room() -> void:
 	# «Стенка» у задней стены: сервант с хрусталём — телевизор — книжная секция с радио.
-	var sideboard_pos := Vector3(-4.85, 0, -3.72)
+	var sideboard_pos := Vector3(-4.85, 0, -3.68) # не влезает в плинтус и стену
 	_solid(_model("sideboard"), Vector3(2.0, 2.2, 0.5), 1.1, sideboard_pos)
 	# В серванте — фарфоровый сервиз (белый с кобальтом и золотом), бьётся по одной вещи.
 	var shelf_heights := [0.97, 1.365, 1.765]
@@ -221,7 +221,8 @@ func _build_living_room() -> void:
 	tv.scale = Vector3.ONE * 1.3
 	tv.add_child(TvScreen.new()) # картинка «▶ ИГРАТЬ» прямо на выпуклом стекле
 	_solid(tv, Vector3(1.3, 1.5, 1.0), 0.75, TV_POS)
-	var shelf_pos := Vector3(-0.7, 0, -3.75)
+	# Задняя стенка шкафа — в 7 см от стены (раньше влезала в плинтус и мерцала со стеной).
+	var shelf_pos := Vector3(-0.7, 0, -3.7)
 	_solid(_model("bookshelf"), Vector3(1.3, 2.3, 0.45), 1.15, shelf_pos)
 	# Радио и ряды книг бьются, как хрусталь, и через время появляются снова.
 	var radio := _breakable("radio", shelf_pos + Vector3(-0.3, 0.935, 0.02),

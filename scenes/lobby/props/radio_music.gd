@@ -8,8 +8,8 @@ extends AudioStreamPlayer
 
 const STREAM_PATH := "res://assets/audio/radio_music.wav"
 const LOUD_DB := -6.0
-## Общая громкость музыки: 10% от прежней (−20 дБ).
-const VOLUME := 0.1
+## Общая громкость музыки: была 10% от первой, потом ещё в 1.5 раза тише.
+const VOLUME := 0.1 / 1.5
 ## Ближе NEAR м — в полную силу, дальше FAR м — не слышно.
 const NEAR := 1.5
 const FAR := 12.0

@@ -26,6 +26,10 @@ const SPLAT := preload("res://assets/textures/fx/paint_splat.png")
 ## Распылитель (в координатах баллончика) и сколько следов краски всего хранится в мире.
 const NOZZLE := Vector3(0, 0.19, -0.012)
 const MAX_SPLATS := 350
+## Краска держится PAINT_LIFE сек, потом плавно пропадает (за PAINT_FADE сек). Пятна исчезают
+## в том же порядке, в каком их рисовали, — рисунок «стирается» с того места, откуда начал.
+const PAINT_LIFE := 20.0
+const PAINT_FADE := 1.5
 const SPLAT_STEP := 0.05
 const STREAM_TIME := 0.25
 
@@ -211,6 +215,9 @@ func _place_splat(point: Vector3, normal: Vector3, collider: Object) -> void:
 	x = x.normalized().rotated(y, randf() * TAU)
 	decal.global_transform = Transform3D(Basis(x, y, x.cross(y)), point)
 	_splats.append(decal)
+	var fade := decal.create_tween()
+	fade.tween_property(decal, "modulate:a", 0.0, PAINT_FADE).set_delay(PAINT_LIFE)
+	fade.tween_callback(decal.queue_free)
 	if _splats.size() > MAX_SPLATS:
 		var old: Decal = _splats.pop_front()
 		if is_instance_valid(old):
