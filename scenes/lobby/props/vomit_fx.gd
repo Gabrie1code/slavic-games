@@ -1,25 +1,43 @@
 class_name VomitFx
 extends RefCounted
 ## Рвота (перепил из бутылки): персонаж сгибается вперёд, голова вниз, изо рта бьёт жёлто-зелёная
-## струя (частицы), на полу остаётся лужа, которая через PUDDLE_TIME сек тает. Видно всем, и
-## самому от первого лица (камера наклоняется вместе с корпусом — local_lobby._view_wobble).
+## струя (частицы), на полу остаётся лужа, которая через PUDDLE_TIME сек тает. Другие видят
+## струю изо рта; сам игрок от первого лица — снизу из-за края экрана (своя струя у камеры,
+## на его слое «в кадре»), камера наклоняется вместе с корпусом (local_lobby._view_wobble).
 
 const TIME := 2.2
 const PUDDLE_TIME := 10.0
 const COLOR := Color(0.62, 0.66, 0.2)
 
 
-static func play(character: PlayerCharacter, world: Node3D) -> void:
+static func play(character: PlayerCharacter, world: Node3D, camera: Camera3D = null,
+		view_layer: int = 0) -> void:
 	var bend := character.create_tween()
 	bend.tween_property(character, "lean", 0.75, 0.3).set_trans(Tween.TRANS_BACK)
 	bend.parallel().tween_property(character, "head_tilt", -0.35, 0.3)
 	bend.tween_interval(TIME)
 	bend.tween_property(character, "lean", 0.0, 0.5).set_trans(Tween.TRANS_SINE)
 	bend.parallel().tween_property(character, "head_tilt", 0.0, 0.5)
+	# Изо рта — на слое тела (свою голову игрок от первого лица не видит, остальные — видят).
 	var stream := _stream()
 	character.attach_to_part("Head", stream)
-	stream.layers = 1 # видно всем, в том числе самому от первого лица
 	stream.position = Vector3(0, 0.1, -0.2) # у рта
+	_run(character, stream)
+	if camera and is_instance_valid(camera):
+		# Сам игрок: струя из-под нижнего края экрана, «от лица», вперёд и вниз.
+		var own := _stream()
+		own.layers = view_layer
+		camera.add_child(own)
+		own.position = Vector3(0, -0.32, -0.12)
+		own.direction = Vector3(0, -0.2, -1)
+		_run(character, own)
+	character.get_tree().create_timer(0.9).timeout.connect(func() -> void:
+		if is_instance_valid(character) and is_instance_valid(world):
+			_puddle(world, character.global_position - character.global_basis.z * 0.55))
+
+
+## Включить струю через 0.3 сек (согнулся), выключить через TIME, убрать, когда капли упали.
+static func _run(character: PlayerCharacter, stream: CPUParticles3D) -> void:
 	character.get_tree().create_timer(0.3).timeout.connect(func() -> void:
 		if is_instance_valid(stream):
 			stream.emitting = true)
@@ -27,9 +45,6 @@ static func play(character: PlayerCharacter, world: Node3D) -> void:
 		if is_instance_valid(stream):
 			stream.emitting = false
 			stream.get_tree().create_timer(1.0).timeout.connect(stream.queue_free))
-	character.get_tree().create_timer(0.9).timeout.connect(func() -> void:
-		if is_instance_valid(character) and is_instance_valid(world):
-			_puddle(world, character.global_position - character.global_basis.z * 0.55))
 
 
 static func _stream() -> CPUParticles3D:

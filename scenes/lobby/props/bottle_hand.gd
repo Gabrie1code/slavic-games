@@ -23,6 +23,8 @@ var _views: Dictionary = {}
 ## PlayerData.id -> когда снова можно пить (сек) / времена глотков (Array[float]).
 var _ready_at: Dictionary = {}
 var _sips: Dictionary = {}
+## PlayerData.id -> камера от первого лица (для своей струи «из-за экрана»).
+var _cams: Dictionary = {}
 
 
 func _init(room: KitchenRoom, chars: Dictionary, apartment: Node) -> void:
@@ -79,6 +81,7 @@ func try_take(p: PlayerData) -> bool:
 func process(p: PlayerData, camera: Camera3D) -> void:
 	var bottle: KitchenBottle = _held[p.id]
 	var character: PlayerCharacter = characters[p.id]
+	_cams[p.id] = camera
 	var view: Node3D = _views.get(p.id) if is_instance_valid(_views.get(p.id)) else null
 	if camera and view == null:
 		view = HandHold.make_view(KitchenBottle.make_model(), 1 << (p.slot + 10),
@@ -134,7 +137,8 @@ func _after_sip(p: PlayerData) -> void:
 			var bottle: KitchenBottle = _held[p.id]
 			_let_go(p)
 			bottle.vanish(character)
-		VomitFx.play(character, world as Node3D)
+		var cam: Camera3D = _cams.get(p.id) if is_instance_valid(_cams.get(p.id)) else null
+		VomitFx.play(character, world as Node3D, cam, 1 << (p.slot + 10))
 	elif recent > DRUNK_COUNT:
 		character.drunk_left = maxf(character.drunk_left, DRUNK_TIME)
 
