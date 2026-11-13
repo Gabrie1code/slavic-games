@@ -99,6 +99,12 @@ func _ready() -> void:
 	_views_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	views_layer.add_child(_views_root)
 	_sun.rotation_degrees = Vector3(-55, -35, 0)
+	# Тени «прилипают» к вещам: со стандартными сдвигами тень отъезжала от ножек дивана и кресла
+	# и они казались висящими в воздухе. Квартира небольшая — тени считаем только на 30 м.
+	_sun.shadow_bias = 0.02
+	_sun.shadow_normal_bias = 0.6
+	_sun.directional_shadow_max_distance = 30.0
+	_sun.directional_shadow_blend_splits = true
 	_gadgets = LobbyGadgets.new(_apartment, _characters)
 	_build_ui()
 	_build_zone(Apartment.TV_ZONE, TV_ZONE_RADIUS, Color(0.56, 0.84, 0.58),

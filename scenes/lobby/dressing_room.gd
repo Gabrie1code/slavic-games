@@ -414,6 +414,9 @@ func _refresh() -> void:
 	_refresh_buy_all(wallet)
 	_message_label.text = _message
 	_message_label.add_theme_color_override("font_color", _message_color)
+	# Пустые надписи не занимают места — иначе «Готово» уезжала к самому низу окна.
+	_shortage_label.visible = not _shortage_label.text.is_empty()
+	_message_label.visible = not _message_label.text.is_empty()
 	_hint_label.text = ("↑↓ — что меняем (внизу — цвет и кнопки)   ←→ — листать\n"
 		+ "Подтвердить — купить / готово   Отмена — выйти   Мышь (зажать) — повернуть")
 

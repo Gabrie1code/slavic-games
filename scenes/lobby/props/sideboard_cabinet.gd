@@ -49,9 +49,9 @@ func _ready() -> void:
 	var body := AnimatableBody3D.new()
 	var shape := CollisionShape3D.new()
 	var box := BoxShape3D.new()
-	box.size = Vector3(0.95, 0.8, 0.03)
+	box.size = Vector3(0.98, 0.8, 0.03)
 	shape.shape = box
-	shape.position = Vector3(-0.475, 0.0, 0.0)
+	shape.position = Vector3(-0.48, 0.0, 0.0)
 	body.add_child(shape)
 	_door.add_child(body)
 	_build_glass()

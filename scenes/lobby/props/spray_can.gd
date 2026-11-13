@@ -48,6 +48,8 @@ var _view_stream: CPUParticles3D
 ## Слой модели держащего: общую струю (из руки) он сам от первого лица не видит.
 var _owner_layer := 1
 var _last_splat := Vector3.INF
+## Где лежит в ящике (в координатах ящика) — держим там каждый кадр, см. _process.
+var _stored_at := Transform3D.IDENTITY
 var _splat_time := 0.0
 
 
@@ -80,6 +82,11 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
+	if state == State.STORED:
+		# Замороженное физическое тело не всегда едет за выдвигаемым ящиком (физика возвращала
+		# его на старое место — баллончик оставался у задней стенки). Ставим его сами.
+		transform = _stored_at
+		return
 	if state == State.HELD:
 		HandHold.follow(self, 0.09) # ровно в кулаке, как бы ни была повёрнута рука
 		return
@@ -102,6 +109,7 @@ func store_in(parent: Node3D, pos: Vector3, rot: Vector3) -> void:
 	_move_to(parent)
 	position = pos
 	rotation = rot
+	_stored_at = transform
 
 
 ## Взять в руку персонажа.

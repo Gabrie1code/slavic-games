@@ -30,7 +30,7 @@ const CHASER_HEAD_START := 2.0
 const TOUCH_DISTANCE := 1.1
 ## Разморозка идёт сама, пока свободный игрок стоит ближе половины зоны караула (кнопку не жать).
 const UNFREEZE_RADIUS := 1.5 # = ZONE_RADIUS / 2
-const UNFREEZE_TIME := 2.0
+const UNFREEZE_TIME := 1.4 # было 2.0 — разморозка союзника на 30% быстрее
 ## После разморозки нельзя сразу заморозить снова.
 const IMMUNE_TIME := 1.5
 const ZONE_RADIUS := 3.0
