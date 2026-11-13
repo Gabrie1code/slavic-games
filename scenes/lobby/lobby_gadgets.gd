@@ -317,13 +317,9 @@ func _process_sponge(p: PlayerData, camera: Camera3D) -> void:
 func _show_view_sponge(p: PlayerData, camera: Camera3D) -> void:
 	if camera == null or _has_view(_view_sponges, p.id):
 		return
-	# Губка «в кадре»: кулак (слой «в кадре» этого игрока) держит её снизу, губка крупно перед
-	# ним, жёсткой зелёной стороной вперёд — ей и трут (раньше губка пряталась внутри кулака).
-	var sponge_model := Sponge.make_model()
-	var model := HandHold.make_view(p.color, sponge_model, 0.0, 1 << (p.slot + 10), 0.0)
-	sponge_model.scale = Vector3.ONE * 1.5
-	sponge_model.rotation = Vector3(-PI / 2.0 + 0.25, 0.35, 0.0) # зелёным от себя
-	sponge_model.position = Vector3(-0.01, 0.055, -0.045)
+	# Губка «в кадре» — одна губка, без руки (слой «в кадре» этого игрока).
+	var model := HandHold.make_view(Sponge.make_model(), 1 << (p.slot + 10),
+		Vector3(0.24, -0.26, -0.42), Vector3(0.4, 0.3, 0.0))
 	camera.add_child(model)
 	_view_sponges[p.id] = model
 
@@ -420,15 +416,14 @@ func _use_remote(p: PlayerData) -> bool:
 func _process_remote(p: PlayerData, camera: Camera3D) -> void:
 	var character: PlayerCharacter = characters[p.id]
 	if camera and not _has_view(_view_remotes, p.id):
-		var remote_model := TvRemote.make_model()
-		var model := HandHold.make_view(p.color, remote_model, 0.01, 1 << (p.slot + 10), 0.1)
-		remote_model.position.z = -0.03 # кнопки видны впереди кулака
+		var model := HandHold.make_view(TvRemote.make_model(), 1 << (p.slot + 10),
+			Vector3(0.22, -0.24, -0.4), Vector3(0.5, 0.25, 0.0)) # один пульт, без руки
 		camera.add_child(model)
 		_view_remotes[p.id] = model
 	if p.input.is_just_pressed("attack"): # ЛКМ — нажать красную кнопку (просто щёлкает)
 		apartment.tv_remote.press()
 		if _has_view(_view_remotes, p.id):
-			TvRemote.press_button(_view_remotes[p.id]) # ищет кнопку внутри (кулак + пульт)
+			TvRemote.press_button(_view_remotes[p.id]) # ищет кнопку внутри модели
 	if not p.input.is_just_pressed("drop"):
 		return
 	_hide_view_remote(p)
@@ -480,23 +475,12 @@ func _process_hammer(p: PlayerData, camera: Camera3D) -> void:
 		_release_hammer(p, look_dir(characters[p.id], camera))
 
 
-## Молоток «в кадре»: кулак персонажа (его цвета) сжимает рукоятку, боёк — вверху. Взмах —
-## поворот всего кулака с молотком (точка поворота — кулак).
+## Молоток «в кадре» — только молоток, без руки: рукоятка внизу, боёк вверху. Взмах —
+## поворот всего молотка вокруг низа рукоятки.
 func _make_view_hammer(p: PlayerData) -> Node3D:
 	var root := Node3D.new()
 	root.position = Vector3(0.36, -0.42, -0.62) # кулак справа внизу (подсказки — слева от прицела)
-	var fist := MeshInstance3D.new()
-	var fist_mesh := SphereMesh.new()
-	fist_mesh.radius = 0.06
-	fist_mesh.height = 0.11
-	fist_mesh.radial_segments = 8
-	fist_mesh.rings = 4
-	fist.mesh = fist_mesh
-	var fist_mat := StandardMaterial3D.new()
-	fist_mat.albedo_color = p.color
-	fist.material_override = fist_mat
-	root.add_child(fist)
-	var model := Hammer.make_model()
+	var model := Hammer.make_model() # только молоток, без руки
 	# Ручка из кулака вверх, чуть влево и от камеры; гвоздодёр — вправо-назад, ударная часть —
 	# влево-вперёд (базис задаём осями: так не ошибиться с порядком поворотов).
 	var up := Vector3(-0.25, 1.0, -0.35).normalized()
