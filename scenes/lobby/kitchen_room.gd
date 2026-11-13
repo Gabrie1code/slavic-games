@@ -5,9 +5,12 @@ extends Node3D
 ## Стены: внизу белый кафель, выше — светлые обои; пол — линолеум в клетку с ромбиками.
 ## Сверху (общая камера смотрит спереди) не закрывает квартиру: передняя (дальняя) стена,
 ## стена с проёмом и потолок — только от первого лица; боковые стены — до 2.4 м видны всем.
-## Внутри: холодильник, газовая плита с чайником, мойка под окном, навесной шкафчик, стол с
-## клеёнкой и табуретки, радиоточка, отрывной календарь (сегодняшняя дата), абажур над столом
-## с выключателем у двери. Модели — tools/blender/kitchen.py.
+## Внутри: холодильник, газовая плита с чайником, мойка под окном (KitchenSink — моет руки и
+## смывает краску, как рукомойник в туалете), навесной шкафчик (KitchenCabinet — правая дверца
+## открывается, внутри стопки и батон), стол с клеёнкой и табуретки, радиоточка, отрывной
+## календарь (сегодняшняя дата), абажур над столом с выключателем у двери. За окном — тот же
+## 3D-двор, что за окном гостиной (WindowView), стекло бьётся молотком (WindowGlass).
+## Модели — tools/blender/kitchen.py.
 
 const DIR := "res://assets/models/kitchen/"
 const APT := "res://assets/models/apartment/"
@@ -28,18 +31,20 @@ const WINDOW_Y1 := 2.25
 const WINDOW_W := 1.0
 const LINOLEUM := preload("res://assets/textures/kitchen/linoleum.png")
 const TILES := preload("res://assets/textures/kitchen/tiles.png")
-const WINDOW_VIEW := preload("res://assets/textures/window_view.png")
 const MONTHS: Array[String] = ["ЯНВАРЯ", "ФЕВРАЛЯ", "МАРТА", "АПРЕЛЯ", "МАЯ", "ИЮНЯ", "ИЮЛЯ",
 	"АВГУСТА", "СЕНТЯБРЯ", "ОКТЯБРЯ", "НОЯБРЯ", "ДЕКАБРЯ"]
 const WEEKDAYS: Array[String] = ["ВОСКРЕСЕНЬЕ", "ПОНЕДЕЛЬНИК", "ВТОРНИК", "СРЕДА", "ЧЕТВЕРГ",
 	"ПЯТНИЦА", "СУББОТА"]
 
-## Квартира (её выключатели, тени под мебелью, время суток за окном).
+## Квартира (её выключатели, тени под мебелью).
 var apartment: Apartment
+## Мойка, навесной шкафчик, стёкла окна (их ищет лобби: подсказки, удар молотком).
+var sink: KitchenSink
+var cabinet: KitchenCabinet
+var window_glass: WindowGlass
 
 var _tile_mat: StandardMaterial3D
 var _paper_mat: StandardMaterial3D
-var _view_mat: StandardMaterial3D
 
 
 func _ready() -> void:
@@ -55,13 +60,6 @@ func _ready() -> void:
 	_build_furniture()
 	_build_lamp()
 	_build_calendar()
-
-
-func _process(_delta: float) -> void:
-	# Вид за окном темнеет вечером вместе с двором за окном гостиной.
-	if _view_mat and apartment and apartment.window_view:
-		var day := apartment.window_view.daylight()
-		_view_mat.albedo_color = Color(0.12, 0.13, 0.22).lerp(Color.WHITE, day)
 
 
 # ---------------- Пол и стены ----------------
@@ -131,6 +129,8 @@ func _faces_z(span: Vector2, z: float, y0: float, y1: float) -> void:
 	var paper_y0 := maxf(y0, TILE_H)
 	if y1 > paper_y0:
 		_fp_only(Vector3(w, y1 - paper_y0, 0.01), Vector3(cx, (paper_y0 + y1) / 2.0, z), _paper_mat)
+	if y0 < TILE_H and y1 > TILE_H: # коричневая полоса по кромке кафеля — по всему периметру
+		_fp_only(Vector3(w, 0.03, 0.014), Vector3(cx, TILE_H, z), _mat(Color("8a6a48"), 0.5))
 
 
 ## Кусок дальней стены (span по X, высоты y0..y1): сама стена и отделка внутри.
@@ -143,37 +143,30 @@ func _far_piece(span: Vector2, y0: float, y1: float) -> void:
 
 # ---------------- Окно ----------------
 
-## Окно над мойкой: белая рама с переплётом и форточкой, подоконник, за стеклом — двор
-## (картинка, вечером темнеет). Всё — от первого лица (сверху дальней стены нет).
+## Окно над мойкой — как в гостиной: рама с подоконником (kitchen_window), за ней настоящий
+## 3D-двор (WindowView: хрущёвки, деревья, голуби, небо по времени суток, свет в окнах ночью),
+## 4 стекла бьются молотком (WindowGlass) и через 20 сек проявляются снова.
+## Всё — от первого лица (сверху дальней стены нет).
 func _build_window() -> void:
-	var frame := _mat(Color("f2efe6"), 0.6)
-	var cy := (WINDOW_Y0 + WINDOW_Y1) / 2.0
-	var h := WINDOW_Y1 - WINDOW_Y0
-	var z := Z1 + 0.06
-	for x: float in [WINDOW_X - WINDOW_W / 2.0 + 0.03, WINDOW_X, WINDOW_X + WINDOW_W / 2.0 - 0.03]:
-		_fp_only(Vector3(0.06, h, 0.08), Vector3(x, cy, z), frame)
-	for y: float in [WINDOW_Y0 + 0.03, WINDOW_Y1 - 0.03, WINDOW_Y1 - 0.32]:
-		_fp_only(Vector3(WINDOW_W, 0.06, 0.08), Vector3(WINDOW_X, y, z), frame)
-	_fp_only(Vector3(WINDOW_W + 0.2, 0.04, 0.22), Vector3(WINDOW_X, WINDOW_Y0 - 0.02, Z1 - 0.06),
-		frame) # подоконник
-	var glass := _mat(Color(0.82, 0.92, 0.96, WindowGlass.ALPHA), 0.05)
-	glass.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	_fp_only(Vector3(WINDOW_W, h, 0.006), Vector3(WINDOW_X, cy, z), glass)
-	_view_mat = StandardMaterial3D.new()
-	_view_mat.albedo_texture = WINDOW_VIEW
-	_view_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	var view := MeshInstance3D.new()
-	var quad := QuadMesh.new()
-	quad.size = Vector2(WINDOW_W + 0.4, h + 0.4)
-	view.mesh = quad
-	view.material_override = _view_mat
-	view.position = Vector3(WINDOW_X, cy, Z1 + 0.25)
-	view.rotation.y = PI # лицом в кухню
-	_make_fp_only(view)
-	add_child(view)
-	# Кактус на подоконнике.
-	_breakable(APT + "cactus_pot.glb", Vector3(WINDOW_X + 0.35, WINDOW_Y0, Z1 - 0.08),
-		[Color("2f7a2f"), Color("a0522d")], 0.35)
+	var frame := _model("kitchen_window")
+	frame.position = Vector3(WINDOW_X, WINDOW_Y0, Z1 + 0.1)
+	frame.rotation.y = PI # подоконник — в кухню
+	_make_fp_only(frame)
+	add_child(frame)
+	# Подоконник твёрдый: на него можно запрыгнуть.
+	_collider(Vector3(WINDOW_W + 0.2, 0.04, 0.3), Vector3(WINDOW_X, WINDOW_Y0 - 0.02, Z1 - 0.07))
+	window_glass = WindowGlass.new()
+	window_glass.panes = [
+		Vector4(-0.25, WINDOW_Y0 + 0.4175, 0.44, 0.715), Vector4(0.25, WINDOW_Y0 + 0.4175, 0.44, 0.715),
+		Vector4(-0.25, WINDOW_Y0 + 0.9325, 0.44, 0.215), Vector4(0.25, WINDOW_Y0 + 0.9325, 0.44, 0.215),
+	]
+	window_glass.position = Vector3(WINDOW_X, 0, Z1 + 0.1)
+	window_glass.rotation.y = PI # осколки летят в кухню
+	add_child(window_glass)
+	var outside := WindowView.new()
+	outside.position = Vector3(WINDOW_X, 0, Z1 + 0.2)
+	outside.rotation.y = PI # двор — за дальней стеной кухни
+	add_child(outside)
 
 
 # ---------------- Мебель ----------------
@@ -184,8 +177,13 @@ func _build_furniture() -> void:
 	var stove := _furniture("kitchen_stove", Vector3(X0 + 0.3, 0, 5.0), PI / 2,
 		Vector3(0.58, 0.88, 0.5))
 	# Под окном — мойка (лицом от окна, −Z), правее — навесной шкафчик.
-	_furniture("kitchen_sink", Vector3(WINDOW_X, 0, Z1 - 0.31), PI, Vector3(1.0, 0.87, 0.62))
-	var cabinet := _model("kitchen_cabinet")
+	sink = KitchenSink.new()
+	sink.position = Vector3(WINDOW_X, 0, Z1 - 0.31)
+	sink.rotation.y = PI
+	add_child(sink)
+	if apartment:
+		sink.add_child(apartment.contact_shadow(Vector2(1.0, 0.62)))
+	cabinet = KitchenCabinet.new()
 	cabinet.position = Vector3(-1.9, 1.5, Z1 - 0.16)
 	cabinet.rotation.y = PI
 	add_child(cabinet)

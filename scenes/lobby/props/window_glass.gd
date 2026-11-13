@@ -14,14 +14,17 @@ const PANES: Array[Vector4] = [
 	Vector4(-0.36, 2.2075, 0.65, 0.355), Vector4(0.36, 2.2075, 0.65, 0.355),
 ]
 
+## Створки этого окна (по умолчанию — окно гостиной; у кухни свои — задать до add_child).
+var panes: Array[Vector4] = PANES
+
 var _panes: Array[MeshInstance3D] = []
-var _broken: Array[bool] = [false, false, false, false]
+var _broken: Array[bool] = []
 var _time := 0.0
 var _restore_at := -1.0
 
 
 func _ready() -> void:
-	for rect in PANES:
+	for rect in panes:
 		var mat := StandardMaterial3D.new()
 		mat.albedo_color = Color(0.82, 0.92, 0.96, ALPHA)
 		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
@@ -38,6 +41,7 @@ func _ready() -> void:
 		pane.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		add_child(pane)
 		_panes.append(pane)
+		_broken.append(false)
 
 
 func _process(delta: float) -> void:
@@ -63,8 +67,8 @@ func pane_hit(origin: Vector3, dir: Vector3, reach: float) -> int:
 	if t < 0.0 or t > reach:
 		return -1
 	var hit := Vector2(o.x + d.x * t, o.y + d.y * t)
-	for i in PANES.size():
-		var rect := PANES[i]
+	for i in panes.size():
+		var rect := panes[i]
 		var inside_x := absf(hit.x - rect.x) <= rect.z / 2.0 + 0.04
 		if inside_x and absf(hit.y - rect.y) <= rect.w / 2.0 + 0.04:
 			return i
@@ -78,7 +82,7 @@ func break_pane(index: int) -> bool:
 	_broken[index] = true
 	_panes[index].visible = false
 	_restore_at = _time + RESTORE
-	var rect := PANES[index]
+	var rect := panes[index]
 	var shards := CPUParticles3D.new()
 	shards.one_shot = true
 	shards.amount = 30

@@ -2,8 +2,11 @@
 Все вещи стоят на полу (z = 0), лицом к −Y Blender (= +Z Godot), центр — посередине основания.
   kitchen_stove     — газовая плита «как у всех»: эмаль, 4 конфорки, духовка с окошком, ручки;
   kitchen_fridge    — пузатый белый холодильник со скруглённым верхом и хромированной ручкой;
-  kitchen_sink      — тумба с мойкой: столешница с вырезом, стальная чаша, смеситель;
-  kitchen_cabinet   — навесной шкафчик (низ — в z = 0, вешается кодом на стену);
+  kitchen_sink      — тумба с мойкой: глубокая стальная чаша с сеточкой слива, смеситель;
+                      отдельные объекты TapHot / TapCold / SinkWater (как у рукомойника Sink);
+  kitchen_cabinet   — навесной шкафчик (низ — в z = 0), полый: внутри стопки и батон;
+  kitchen_cabinet_door — его правая дверца (начало — на петле), открывается в игре;
+  kitchen_window    — рама окна 1.0 × 1.1 с подоконником;
   kitchen_table     — стол на ножках с клеёнкой (assets/textures/kitchen/oilcloth.png);
   kitchen_kettle    — эмалированный красный чайник со свистком;
   kitchen_glass     — стакан чая в подстаканнике;
@@ -123,6 +126,31 @@ def export(name, parts):
     return obj
 
 
+def join(name, parts, origin=(0, 0, 0)):
+    """Склеить части в один объект name с началом в точке origin (для подвижных частей —
+    на оси вращения / в центре)."""
+    bpy.ops.object.select_all(action="DESELECT")
+    for o in parts:
+        o.select_set(True)
+    bpy.context.view_layer.objects.active = parts[0]
+    bpy.ops.object.join()
+    obj = bpy.context.object
+    obj.name = name
+    bpy.context.scene.cursor.location = origin
+    bpy.ops.object.origin_set(type="ORIGIN_CURSOR")
+    return obj
+
+
+def export_objects(name, objs):
+    """Несколько отдельных объектов (с именами) — в один .glb: в игре их находят по имени."""
+    bpy.ops.object.select_all(action="DESELECT")
+    for o in objs:
+        o.select_set(True)
+    bpy.ops.export_scene.gltf(filepath=os.path.join(OUT, name + ".glb"), use_selection=True,
+                              export_format="GLB")
+    print("EXPORTED", name)
+
+
 ENAMEL = mat("Enamel", (0.92, 0.91, 0.86), 0.25)
 BLACK = mat("BlackIron", (0.06, 0.06, 0.07), 0.6)
 CHROME = mat("Chrome", (0.75, 0.77, 0.8), 0.15, 0.8)
@@ -177,7 +205,18 @@ P.append(box((0.5, 0.02, 0.08), (0, -0.28, 0.06), mat("FridgeGrille", (0.35, 0.3
 export("kitchen_fridge", P)
 
 # ---------------- Тумба с мойкой ----------------
-P = [box((1.0, 0.56, 0.82), (0, 0.02, 0.41), CABINET, bevel=0.006)]
+# Как рукомойник в туалете (Sink): отдельные объекты TapHot / TapCold (вентили, крутятся вокруг
+# вертикальной оси), SinkWater (вода, поднимается в чаше) и KitchenSinkBody (всё остальное).
+RED_CAP = mat("TapRed", (0.85, 0.1, 0.08), 0.3)
+BLUE_CAP = mat("TapBlue", (0.1, 0.3, 0.85), 0.3)
+WATER = mat("SinkWater", (0.55, 0.75, 0.9), 0.05)
+# Корпус тумбы — до 0.62, выше только стенки по краям: раньше сплошной корпус доходил до 0.82
+# и «заливал» чашу изнутри — дно казалось у самого верха, слива не было видно.
+P = [box((1.0, 0.56, 0.62), (0, 0.02, 0.31), CABINET, bevel=0.006)]
+P.append(box((1.0, 0.02, 0.21), (0, -0.25, 0.725), CABINET))
+P.append(box((1.0, 0.02, 0.21), (0, 0.29, 0.725), CABINET))
+for x in (-0.49, 0.49):
+    P.append(box((0.02, 0.56, 0.21), (x, 0.02, 0.725), CABINET))
 for x in (-0.25, 0.25):
     P.append(box((0.47, 0.02, 0.66), (x, -0.265, 0.45), CABINET, bevel=0.008))
     P.append(box((0.02, 0.025, 0.12), (x + (0.18 if x < 0 else -0.18), -0.285, 0.62), CAB_EDGE))
@@ -185,34 +224,101 @@ P.append(box((0.96, 0.02, 0.08), (0, -0.255, 0.05), CAB_EDGE))                  
 # Столешница вокруг выреза под чашу (чаша: x −0.36..0.06, y −0.2..0.16).
 SX0, SX1, SY0, SY1 = -0.36, 0.06, -0.2, 0.16
 TZ = 0.845
+BOTTOM = 0.64                                                                      # дно чаши (глубже)
 P.append(box((SX0 + 0.51, 0.62, 0.03), ((SX0 - 0.51) / 2, 0.0, TZ), WORKTOP))
 P.append(box((0.51 - SX1, 0.62, 0.03), ((SX1 + 0.51) / 2, 0.0, TZ), WORKTOP))
 P.append(box((SX1 - SX0, SY0 + 0.31, 0.03), ((SX0 + SX1) / 2, (SY0 - 0.31) / 2, TZ), WORKTOP))
 P.append(box((SX1 - SX0, 0.31 - SY1, 0.03), ((SX0 + SX1) / 2, (SY1 + 0.31) / 2, TZ), WORKTOP))
-# Чаша: дно и стенки из стали, ниже столешницы.
-P.append(box((SX1 - SX0, SY1 - SY0, 0.01), ((SX0 + SX1) / 2, (SY0 + SY1) / 2, 0.69), STEEL))
+# Чаша: дно и стенки из стали, ниже столешницы (глубина 20 см).
+DEEP = TZ - BOTTOM
+P.append(box((SX1 - SX0, SY1 - SY0, 0.01), ((SX0 + SX1) / 2, (SY0 + SY1) / 2, BOTTOM), STEEL))
 for x in (SX0 + 0.005, SX1 - 0.005):
-    P.append(box((0.01, SY1 - SY0, 0.16), (x, (SY0 + SY1) / 2, 0.77), STEEL))
+    P.append(box((0.01, SY1 - SY0, DEEP), (x, (SY0 + SY1) / 2, BOTTOM + DEEP / 2), STEEL))
 for y in (SY0 + 0.005, SY1 - 0.005):
-    P.append(box((SX1 - SX0, 0.01, 0.16), ((SX0 + SX1) / 2, y, 0.77), STEEL))
-P.append(cyl(0.022, 0.004, ((SX0 + SX1) / 2, 0.0, 0.697), BLACK, verts=12))     # слив
-# Смеситель: стойка сзади, «гусак» вперёд, два вентиля.
-TX = (SX0 + SX1) / 2
+    P.append(box((SX1 - SX0, 0.01, DEEP), ((SX0 + SX1) / 2, y, BOTTOM + DEEP / 2), STEEL))
+# Слив с сеточкой-фильтром: тёмная дыра, хромированное кольцо, решётка из прутиков.
+DX, DY = (SX0 + SX1) / 2, (SY0 + SY1) / 2
+P.append(cyl(0.032, 0.004, (DX, DY, BOTTOM + 0.006), BLACK, verts=20))
+bpy.ops.mesh.primitive_torus_add(major_radius=0.032, minor_radius=0.004, major_segments=20,
+                                 minor_segments=6, location=(DX, DY, BOTTOM + 0.009))
+P.append(finish(bpy.context.object, CHROME))
+for k in range(-2, 3):
+    P.append(box((0.004, 0.058 - abs(k) * 0.012, 0.003), (DX + k * 0.011, DY, BOTTOM + 0.01), CHROME))
+P.append(box((0.058, 0.004, 0.003), (DX, DY, BOTTOM + 0.011), CHROME))
+# Смеситель: стойка сзади, «гусак» вперёд.
+TX = DX
 P.append(cyl(0.016, 0.2, (TX, 0.24, 0.96), CHROME, verts=12))
 P.append(cyl(0.012, 0.2, (TX, 0.14, 1.06), CHROME, verts=12, rot=(math.radians(90), 0, 0)))
 P.append(cyl(0.012, 0.05, (TX, 0.045, 1.04), CHROME, verts=12))
 for dx in (-0.07, 0.07):
-    P.append(cyl(0.01, 0.06, (TX + dx, 0.24, 0.89), CHROME, verts=8))
-    P.append(box((0.05, 0.012, 0.012), (TX + dx, 0.24, 0.925), CHROME))
-export("kitchen_sink", P)
+    P.append(cyl(0.01, 0.04, (TX + dx, 0.24, 0.88), CHROME, verts=8))           # ножки вентилей
+body = join("KitchenSinkBody", P)
+
+
+def tap(name, dx, cap):
+    """Вентиль-«крестовина» с цветной меткой сверху (красная — горячая, синяя — холодная)."""
+    x = TX + dx
+    parts = [cyl(0.009, 0.03, (x, 0.24, 0.915), CHROME, verts=8),
+             box((0.06, 0.012, 0.012), (x, 0.24, 0.93), CHROME),
+             box((0.012, 0.06, 0.012), (x, 0.24, 0.93), CHROME),
+             cyl(0.011, 0.008, (x, 0.24, 0.94), cap, verts=12)]
+    return join(name, parts, origin=(x, 0.24, 0.9))
+
+
+hot = tap("TapHot", -0.07, RED_CAP)
+cold = tap("TapCold", 0.07, BLUE_CAP)
+water = box((SX1 - SX0 - 0.012, SY1 - SY0 - 0.012, 0.006), (DX, DY, BOTTOM + 0.02), WATER)
+water = join("SinkWater", [water], origin=(DX, DY, BOTTOM + 0.02))
+export_objects("kitchen_sink", [body, hot, cold, water])
 
 # ---------------- Навесной шкафчик ----------------
-P = [box((1.0, 0.3, 0.6), (0, 0.0, 0.3), CABINET, bevel=0.006)]
-for x in (-0.25, 0.25):
-    P.append(box((0.47, 0.02, 0.56), (x, -0.155, 0.3), CABINET, bevel=0.008))
-    P.append(box((0.02, 0.025, 0.1), (x + (0.18 if x < 0 else -0.18), -0.175, 0.1), CAB_EDGE))
+# Полый: левая дверца — часть корпуса, правая — отдельная модель kitchen_cabinet_door (петля —
+# справа), открывается. В правой половине: наверху стопки-стаканчики, внизу — батон (не трогаются).
+GLASS_CUP = mat("CupGlass", (0.8, 0.9, 0.93), 0.05)
+BREAD = mat("Bread", (0.6, 0.33, 0.12), 0.7)                     # румяная корочка
+CRUST = mat("BreadCut", (0.93, 0.8, 0.55), 0.8)
+INSIDE = mat("CabinetInside", (0.85, 0.8, 0.62), 0.6)
+P = [box((1.0, 0.02, 0.6), (0, 0.14, 0.3), INSIDE)]                                # задняя стенка
+for x in (-0.49, 0.49):
+    P.append(box((0.02, 0.3, 0.6), (x, 0.0, 0.3), CABINET))                       # бока
+for z in (0.01, 0.59):
+    P.append(box((1.0, 0.3, 0.02), (0, 0.0, z), CABINET))                        # дно и верх
+P.append(box((0.02, 0.28, 0.58), (0.0, 0.0, 0.3), CABINET))                       # перегородка
+P.append(box((0.47, 0.27, 0.015), (0.245, 0.005, 0.3), INSIDE))                   # полка справа
+P.append(box((0.47, 0.02, 0.56), (-0.25, -0.155, 0.3), CABINET, bevel=0.008))    # левая дверца
+P.append(box((0.02, 0.025, 0.1), (-0.07, -0.175, 0.1), CAB_EDGE))
 P.append(box((1.02, 0.32, 0.02), (0, 0.0, 0.61), CAB_EDGE))                      # карниз
+for k in range(4):                                                                 # стопки
+    x = 0.08 + k * 0.1
+    P.append(cyl(0.022, 0.07, (x, 0.0, 0.3075 + 0.035), GLASS_CUP, verts=8, r2=0.026))
+# Батон: вытянутый, скруглённый, с косыми надрезами.
+bpy.ops.mesh.primitive_uv_sphere_add(segments=16, ring_count=10, radius=1.0, location=(0.245, 0.0, 0.065))
+loaf = bpy.context.object
+loaf.scale = (0.17, 0.06, 0.045)
+bpy.ops.object.transform_apply(scale=True, location=False)
+P.append(finish(loaf, BREAD, smooth=True))
+for k in range(4):
+    P.append(box((0.012, 0.09, 0.006), (0.15 + k * 0.065, 0.0, 0.106), CRUST, rot=(0, 0, math.radians(35))))
 export("kitchen_cabinet", P)
+# Правая дверца: петля — правый край (x = 0.49, y = −0.155), открывается наружу.
+P = [box((0.47, 0.02, 0.56), (0.25, -0.155, 0.3), CABINET, bevel=0.008),
+     box((0.02, 0.025, 0.1), (0.07, -0.175, 0.1), CAB_EDGE)]
+for o in P:
+    o.location -= Vector((0.49, -0.155, 0.0))
+    bpy.context.view_layer.update()
+export("kitchen_cabinet_door", P)
+
+# ---------------- Окно ----------------
+# Рама окна под проём 1.0 × 1.1 (низ — z = 0): по контуру, стойка посередине, форточки сверху,
+# подоконник в комнату. Рама — в плоскости стены (y = 0), подоконник выступает к −Y.
+FRAME = mat("WindowFrame", (0.95, 0.94, 0.9), 0.5)
+W, H = 1.0, 1.1
+P = [box((W, 0.1, 0.06), (0, 0, 0.03), FRAME), box((W, 0.1, 0.06), (0, 0, H - 0.03), FRAME)]
+for x in (-W / 2 + 0.03, 0.0, W / 2 - 0.03):
+    P.append(box((0.06, 0.1, H), (x, 0, H / 2), FRAME))
+P.append(box((W, 0.08, 0.05), (0, 0, H - 0.3), FRAME))                           # форточки
+P.append(box((W + 0.2, 0.3, 0.04), (0, -0.17, -0.02), FRAME, bevel=0.006))       # подоконник
+export("kitchen_window", P)
 
 # ---------------- Стол с клеёнкой ----------------
 def cloth(size, loc):
@@ -285,7 +391,7 @@ if not RENDER:
     sys.exit(0)
 
 # ---------------- Превью ----------------
-layout = {"kitchen_fridge": (-1.6, 0), "kitchen_stove": (-0.95, 0), "kitchen_sink": (-0.1, 0),
+layout = {"kitchen_fridge": (-1.6, 0), "kitchen_stove": (-0.95, 0), "KitchenSinkBody": (-0.1, 0),
           "kitchen_table": (1.3, -0.3), "kitchen_lamp": (1.3, -0.3)}
 for o in list(bpy.context.scene.objects):
     if o.name in layout:

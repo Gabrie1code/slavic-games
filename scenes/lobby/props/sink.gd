@@ -22,6 +22,20 @@ const STAND := Vector3(0, 0, 0.75)
 const SPONGE_SPOT := Vector3(-0.17, 0.882, 0.33)
 const SPONGE_BACK := 15.0
 
+## Настройки конкретной раковины (по умолчанию — рукомойник туалета; KitchenSink меняет их).
+var model_scene: PackedScene = MODEL
+var nozzle := NOZZLE
+var water_low := WATER_LOW
+var water_high := WATER_HIGH
+## Чаша-воронка (вода расширяется кверху) — у рукомойника; у кухонной мойки чаша прямая.
+var funnel := true
+var front_offset := Vector3(0, 0.9, 0.3)
+var stand_offset := STAND
+var body_size := Vector3(0.52, 0.88, 0.42)
+var body_center := Vector3(0, 0.44, 0.21)
+## Есть ли место для губки (у кухонной мойки — нет).
+var has_sponge := true
+
 var busy := false
 ## Губка на раковине (null — её взяли).
 var sponge: Sponge
@@ -36,7 +50,7 @@ var _ready_at: Dictionary = {}
 
 
 func _ready() -> void:
-	var model := MODEL.instantiate() as Node3D
+	var model := model_scene.instantiate() as Node3D
 	add_child(model)
 	_tap_hot = model.find_child("TapHot", true, false) as Node3D
 	_tap_cold = model.find_child("TapCold", true, false) as Node3D
@@ -50,9 +64,9 @@ func _ready() -> void:
 	(_water as MeshInstance3D).material_override = water_mat
 	var shape := CollisionShape3D.new()
 	var box := BoxShape3D.new()
-	box.size = Vector3(0.52, 0.88, 0.42)
+	box.size = body_size
 	shape.shape = box
-	shape.position = Vector3(0, 0.44, 0.21)
+	shape.position = body_center
 	add_child(shape)
 	_stream = MeshInstance3D.new()
 	_stream_mesh = CylinderMesh.new()
@@ -68,11 +82,12 @@ func _ready() -> void:
 	_stream.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_stream.visible = false
 	add_child(_stream)
-	_restock_sponge()
+	if has_sponge:
+		_restock_sponge()
 
 
 func _process(_delta: float) -> void:
-	if _water.visible:
+	if _water.visible and funnel:
 		# Ширина воды — по стенкам воронки на этой высоте (+чуть-чуть, чтобы не было белой
 		# каймы: иначе на дне вода выглядела «шайбой»).
 		var k := clampf((_water.position.y - BOWL_BOTTOM) / (WATER_RIM_Y - BOWL_BOTTOM), 0.0, 1.0)
@@ -80,10 +95,10 @@ func _process(_delta: float) -> void:
 		_water.scale = Vector3(wide, 1.0, wide)
 	if _stream.visible:
 		# Струя — от носика до воды (вода поднимается — струя короче).
-		var bottom := _water.position.y if _water.visible else WATER_LOW
-		var length := maxf(0.01, NOZZLE.y - bottom)
+		var bottom := _water.position.y if _water.visible else water_low
+		var length := maxf(0.01, nozzle.y - bottom)
 		_stream_mesh.height = length
-		_stream.position = Vector3(NOZZLE.x, NOZZLE.y - length / 2.0, NOZZLE.z)
+		_stream.position = Vector3(nozzle.x, nozzle.y - length / 2.0, nozzle.z)
 		_stream.scale.x = 1.0 + sin(Time.get_ticks_msec() * 0.05) * 0.1 # чуть дрожит
 
 
@@ -104,9 +119,14 @@ func take_sponge() -> Sponge:
 	return taken
 
 
+## Можно положить сюда губку (место для неё есть и оно свободно).
+func accepts_sponge() -> bool:
+	return has_sponge and sponge == null
+
+
 ## Положить губку обратно (если место свободно).
 func return_sponge(item: Sponge) -> bool:
-	if sponge != null:
+	if not accepts_sponge():
 		return false
 	sponge = item
 	item.store_in(self, SPONGE_SPOT)
@@ -123,11 +143,11 @@ func _restock_sponge() -> void:
 
 ## Куда смотреть/подходить (перед кранами).
 func front_point() -> Vector3:
-	return to_global(Vector3(0, 0.9, 0.3))
+	return to_global(front_offset)
 
 
 func stand_point() -> Vector3:
-	return to_global(STAND)
+	return to_global(stand_offset)
 
 
 ## Помыть руки: краны, струя, вода; на середине — краска с персонажа смывается.
@@ -138,7 +158,7 @@ func use(p: PlayerData, character: PlayerCharacter) -> void:
 	_ready_at[p.id] = Time.get_ticks_msec() / 1000.0 + COOLDOWN
 	if character:
 		character.set_arm_pose(0.2, 1.1, 0.25) # руки под кран
-	_water.position.y = WATER_LOW
+	_water.position.y = water_low
 	_water.scale = Vector3.ONE
 	_water.visible = true
 	var tween := create_tween()
@@ -147,7 +167,7 @@ func use(p: PlayerData, character: PlayerCharacter) -> void:
 	tween.parallel().tween_property(_tap_cold, "rotation:y", 1.5, 1.0).set_trans(Tween.TRANS_SINE)
 	tween.tween_callback(func() -> void: _stream.visible = true)
 	# Чаша наполняется; с персонажа смывается краска.
-	tween.tween_property(_water, "position:y", WATER_HIGH, 2.6)
+	tween.tween_property(_water, "position:y", water_high, 2.6)
 	tween.parallel().tween_callback(func() -> void:
 		if is_instance_valid(character):
 			SprayCan.clear_paint(character)).set_delay(1.2)
@@ -155,7 +175,7 @@ func use(p: PlayerData, character: PlayerCharacter) -> void:
 	tween.tween_callback(func() -> void: _stream.visible = false)
 	tween.tween_property(_tap_hot, "rotation:y", 0.0, 0.7)
 	tween.parallel().tween_property(_tap_cold, "rotation:y", 0.0, 0.7)
-	tween.parallel().tween_property(_water, "position:y", WATER_LOW, 1.4)
+	tween.parallel().tween_property(_water, "position:y", water_low, 1.4)
 	tween.tween_callback(func() -> void:
 		_water.visible = false
 		busy = false

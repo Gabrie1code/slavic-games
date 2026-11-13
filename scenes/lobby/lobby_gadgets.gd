@@ -266,7 +266,7 @@ func hand_hint(p: PlayerData) -> Array[Dictionary]:
 	var result: Array[Dictionary] = [entry(attack_key(p), "Оттирать (зажать)"),
 		entry(drop_key(p), "Бросить губку")]
 	var sink := _near_sink(p)
-	if sink and sink.sponge == null:
+	if sink and sink.accepts_sponge():
 		result.append(entry(confirm_key(p), "Положить губку"))
 	return result
 
@@ -346,7 +346,7 @@ func _release_sponge(p: PlayerData, dir: Vector3 = Vector3.ZERO) -> void:
 func _use_sponge(p: PlayerData) -> bool:
 	var sink := _near_sink(p)
 	if _holds_sponge(p):
-		if sink == null or sink.sponge != null:
+		if sink == null or not sink.accepts_sponge():
 			return false
 		var sponge: Sponge = _held_sponges[p.id]
 		_release_sponge_quietly(p)
@@ -463,10 +463,10 @@ func swing_hammer(p: PlayerData, camera: Camera3D = null) -> bool:
 	if pane >= 0 and not apartment.sideboard.pane_broken(pane):
 		return apartment.sideboard.break_pane(pane)
 	# Окно гостиной: 4 створки, с наклоном головы (верхние — если смотреть вверх).
-	var window := apartment.window_glass.pane_hit(eye, look_dir(character, camera),
-		SIDEBOARD_GLASS_RADIUS)
-	if window >= 0:
-		return apartment.window_glass.break_pane(window)
+	for glass: WindowGlass in [apartment.window_glass, apartment.kitchen_room.window_glass]:
+		var window := glass.pane_hit(eye, look_dir(character, camera), SIDEBOARD_GLASS_RADIUS)
+		if window >= 0:
+			return glass.break_pane(window)
 	var arcade := _near_arcade(p)
 	if arcade:
 		arcade.smash()
@@ -532,6 +532,20 @@ func _use_sideboard(p: PlayerData) -> bool:
 	if near and cabinet.can_close():
 		cabinet.close()
 		return true
+	return _use_kitchen_cabinet(p)
+
+
+## Навесной шкафчик на кухне: открыть правую дверцу / закрыть. true — нажатие использовано.
+func _use_kitchen_cabinet(p: PlayerData) -> bool:
+	var kitchen := apartment.kitchen_room.cabinet
+	if not _near(p, kitchen.front_point(), SIDEBOARD_RADIUS):
+		return false
+	if kitchen.can_open():
+		kitchen.open()
+		return true
+	if kitchen.can_close():
+		kitchen.close()
+		return true
 	return false
 
 
@@ -549,6 +563,12 @@ func _sideboard_hint(p: PlayerData) -> Array[Dictionary]:
 			result.append(entry(confirm_key(p), "Открыть тумбу"))
 		elif cabinet.can_close():
 			result.append(entry(confirm_key(p), "Закрыть тумбу"))
+	elif _near(p, apartment.kitchen_room.cabinet.front_point(), SIDEBOARD_RADIUS):
+		var kitchen := apartment.kitchen_room.cabinet
+		if kitchen.can_open():
+			result.append(entry(confirm_key(p), "Открыть шкафчик"))
+		elif kitchen.can_close():
+			result.append(entry(confirm_key(p), "Закрыть шкафчик"))
 	return result
 
 
@@ -810,7 +830,7 @@ func _furniture_hint(p: PlayerData) -> Array[Dictionary]:
 
 ## Рукомойник: помыть руки (смывает краску) — каждому раз в 15 сек.
 func _sink_hint(p: PlayerData) -> Array[Dictionary]:
-	var sink := apartment.toilet_room.sink
+	var sink := _near_sink(p)
 	var wash := entry(confirm_key(p), "Помыть руки")
 	if sink.busy:
 		wash = entry(confirm_key(p), "Вода течёт…", true)
@@ -822,10 +842,13 @@ func _sink_hint(p: PlayerData) -> Array[Dictionary]:
 	return result
 
 
-## Рукомойник, к кранам которого игрок подошёл лицом (null — далеко).
+## Рукомойник в туалете или мойка на кухне, к кранам которых игрок подошёл лицом
+## (null — далеко).
 func _near_sink(p: PlayerData) -> Sink:
-	var sink := apartment.toilet_room.sink
-	return sink if _near(p, sink.front_point(), SINK_RADIUS) else null
+	for sink: Sink in [apartment.toilet_room.sink, apartment.kitchen_room.sink]:
+		if sink and _near(p, sink.front_point(), SINK_RADIUS):
+			return sink
+	return null
 
 
 func _arcade_hint(p: PlayerData) -> Array[Dictionary]:
