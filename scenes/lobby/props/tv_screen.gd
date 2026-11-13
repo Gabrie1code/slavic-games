@@ -18,6 +18,9 @@ const MID_Z := 0.435
 const TOP_Z := 0.445
 const GAP := 0.004
 const PIXELS := Vector2i(540, 440)
+## Цвет стекла модели вокруг картинки: тёмная бирюза, как край фона картинки
+## (раньше светящееся стекло модели давало светлый контур по краю экрана).
+const GLASS_EDGE := Color8(20, 56, 54)
 
 
 func _ready() -> void:
@@ -34,6 +37,25 @@ func _ready() -> void:
 	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
 	material_override = mat
 	cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_darken_model_glass.call_deferred()
+
+
+## Стекло самой модели («Screen») выглядывает по краю картинки — красим его в тёмный цвет фона.
+func _darken_model_glass() -> void:
+	var tv := get_parent()
+	if tv == null:
+		return
+	var glass := StandardMaterial3D.new()
+	glass.albedo_color = GLASS_EDGE
+	glass.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	for node in tv.find_children("*", "MeshInstance3D", true, false):
+		var mesh_instance := node as MeshInstance3D
+		if mesh_instance == self or mesh_instance.mesh == null:
+			continue
+		for i in mesh_instance.mesh.get_surface_count():
+			var surface := mesh_instance.mesh.surface_get_material(i)
+			if surface and surface.resource_name.begins_with("Screen"):
+				mesh_instance.set_surface_override_material(i, glass)
 
 
 ## Сетка как у модели: внешнее кольцо → кольцо поменьше → вершина в центре.
