@@ -141,10 +141,39 @@ P.append(box((0.74, 0.14, 0.2), (0, -0.26, 1.65), PANEL, bevel=0.01))
 export("arcade_cabinet", P)
 
 # ---------------- Лампа над столом (верх в z = 3: крепится к потолку) ----------------
-SHADE = mat("RubgameShade", (0.1, 0.4, 0.2), 0.5)
+# Как настоящая лампа над игорным столом: полый гладкий абажур из зелёной эмали (внутри
+# белый — отражает свет на сукно), латунный ободок снизу и колпачок сверху, патрон и лампочка
+# внутри, латунная трубка к потолку. Раньше — плоский шестигранник со светящимся диском.
+SHADE = mat("RubgameShade", (0.04, 0.26, 0.12), 0.25)
+SHADE_IN = mat("RubgameShadeInside", (0.95, 0.93, 0.86), 0.6)
 BULB = mat("RubgameBulb", (1.0, 0.9, 0.6), 0.3, 0, 2.0)
-P = [cyl(0.008, 1.0, (0, 0, 2.5), BRASS, verts=6)]
-P.append(cyl(0.6, 0.18, (0, 0, 1.95), SHADE, verts=6, r2=0.25))
-P.append(cyl(0.18, 0.04, (0, 0, 1.86), BULB, verts=12))
+P = [cyl(0.009, 0.98, (0, 0, 2.51), BRASS, verts=8)]                              # трубка к потолку
+P.append(cyl(0.05, 0.015, (0, 0, 2.993), BRASS, verts=16))                        # чашка у потолка
+bpy.ops.mesh.primitive_cone_add(vertices=40, radius1=0.46, radius2=0.11, depth=0.26,
+                                location=(0, 0, 1.92), end_fill_type="NOTHING")
+shade = bpy.context.object
+shade.data.materials.append(SHADE)
+shade.data.materials.append(SHADE_IN)
+mod = shade.modifiers.new("Solidify", "SOLIDIFY")
+mod.thickness = 0.01
+mod.offset = -1.0
+mod.material_offset = 1
+bpy.ops.object.modifier_apply(modifier="Solidify")
+for poly in shade.data.polygons:
+    poly.use_smooth = True
+P.append(shade)
+bpy.ops.mesh.primitive_torus_add(major_radius=0.46, minor_radius=0.012, major_segments=40,
+                                 minor_segments=8, location=(0, 0, 1.79))         # ободок снизу
+rim = bpy.context.object
+rim.data.materials.append(BRASS)
+P.append(rim)
+P.append(cyl(0.12, 0.04, (0, 0, 2.06), BRASS, verts=24, r2=0.05))                 # колпачок
+P.append(cyl(0.03, 0.08, (0, 0, 1.99), BRASS, verts=12))                          # патрон
+bpy.ops.mesh.primitive_uv_sphere_add(segments=16, ring_count=10, radius=0.065, location=(0, 0, 1.9))
+bulb = bpy.context.object
+bulb.data.materials.append(BULB)
+for poly in bulb.data.polygons:
+    poly.use_smooth = True
+P.append(bulb)
 export("rubgame_lamp", P)
 print("DONE")
