@@ -12,6 +12,12 @@ const JUMP_VELOCITY := 7.0
 const GRAVITY_SCALE := 2.2
 ## Сила, с которой персонаж толкает незакреплённые вещи (стулья, торшер).
 const PUSH_FORCE := 0.5
+## «Разгон»: копится, пока персонаж идёт быстрее RUN_UP_SPEED в одну сторону. Чтобы разбить
+## или уронить вещь в лобби, нужен разгон (чем больше вещь, тем больше); подошёл аккуратно
+## (с места, присев, медленно) — вещь цела. Бег (Shift) копит быстрее.
+const RUN_UP_SPEED := 4.5
+## Удар с разгоном по вещи, которую можно уронить: сила (на кг массы и м/с скорости).
+const BUMP_FORCE := 0.35
 ## Поза сидя: насколько опустить модель и поднять ноги вперёд.
 const SIT_DROP := 0.0
 const SIT_LEGS := 1.45
@@ -68,10 +74,17 @@ var crouching := false
 var run_bonus := 0.0
 ## От первого лица: true — A/D шагают вбок (поворот мышью/стиком), false — A/D поворачивают.
 var fp_strafe := false
+## Разгон в секундах (как будто шёл обычным шагом столько секунд): см. RUN_UP_SPEED.
+var run_up := 0.0
 ## Наклон взгляда вверх/вниз (для камеры от первого лица).
 var fp_pitch := 0.0
 
 var _knockback := Vector3.ZERO
+## Направление и скорость бега до столкновения (для разгона и толчка вещей).
+var _run_dir := Vector2.ZERO
+var _impact_speed := 0.0
+## Когда последний раз толкнули вещь с разгоном: id вещи -> время (не толкать каждый кадр).
+var _bumped: Dictionary = {}
 var _gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity")
 var _arm_tween: Tween
 var _right_arm_busy := false
@@ -170,6 +183,7 @@ func _physics_process(delta: float) -> void:
 		var yaw := atan2(-dir.x, -dir.z)
 		rotation.y = lerp_angle(rotation.y, yaw, TURN_SPEED * delta)
 
+	_update_run_up(delta)
 	move_and_slide()
 	# Защита от «катапульты»: персонаж не взлетает быстрее MAX_RISE_SPEED, что бы его ни подбросило
 	# (раньше удар по полке с хрусталём мог запустить персонажа под потолок и выше).
@@ -234,15 +248,39 @@ func stand_up() -> void:
 	set_physics_process(true)
 
 
-## Толкнуть незакреплённые вещи, в которые упёрся персонаж.
+## Разгон: идёт быстро и не сворачивает резко — копится; медленно — быстро пропадает.
+func _update_run_up(delta: float) -> void:
+	var flat := Vector2(velocity.x, velocity.z)
+	_impact_speed = flat.length()
+	if _impact_speed < RUN_UP_SPEED:
+		run_up = maxf(0.0, run_up - delta * 4.0)
+		return
+	var dir := flat / _impact_speed
+	if _run_dir.dot(dir) < 0.9: # резко свернул — разгон заново
+		run_up = 0.0
+	_run_dir = dir
+	run_up += delta * pow(_impact_speed / 6.0, 2.0) # бегом (Shift) копится быстрее
+
+
+## Толкнуть незакреплённые вещи, в которые упёрся персонаж. Мебель (Tippable) падает только
+## от удара с разгоном (Tippable.run_up_needed), иначе персонаж просто упирается в неё.
 func _push_bodies() -> void:
+	var now := Time.get_ticks_msec() / 1000.0
 	for i in get_slide_collision_count():
 		var hit := get_slide_collision(i)
 		var body := hit.get_collider() as RigidBody3D
-		if body and not body.freeze:
-			var push := -hit.get_normal()
-			push.y = 0.0
-			body.apply_impulse(push * PUSH_FORCE, hit.get_position() - body.global_position)
+		if body == null or body.freeze:
+			continue
+		var push := -hit.get_normal()
+		push.y = 0.0
+		var offset := hit.get_position() - body.global_position
+		var tippable := body as Tippable
+		if tippable == null:
+			body.apply_impulse(push * PUSH_FORCE, offset)
+		elif run_up >= tippable.run_up_needed \
+				and now - float(_bumped.get(body.get_instance_id(), -10.0)) > 0.5:
+			_bumped[body.get_instance_id()] = now
+			body.apply_impulse(push * body.mass * _impact_speed * BUMP_FORCE, offset)
 
 
 ## Удар рукой: правая рука резко выбрасывается вперёд и возвращается.

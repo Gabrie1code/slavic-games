@@ -29,6 +29,9 @@ var _model: Node3D
 var _colors: Array[Color] = []
 var _shard_size := 0.07
 var _broken := false
+## Разгон, нужный чтобы разбить вещь телом (PlayerCharacter.run_up): маленькую — с небольшого
+## разбега, большую — с длинного; подошёл аккуратно — цела. Кулаком бьётся всегда.
+var _run_up_needed := 0.3
 
 
 ## scene — модель вещи, colors — цвета осколков, reach — радиус зоны задевания.
@@ -70,6 +73,7 @@ func _add_paint_target() -> void:
 		first = false
 	if first:
 		return
+	_run_up_needed = clampf(0.1 + maxf(box.size.x, maxf(box.size.y, box.size.z)) * 1.2, 0.25, 1.3)
 	var body := StaticBody3D.new()
 	body.collision_layer = PAINT_LAYER
 	body.collision_mask = 0
@@ -89,6 +93,8 @@ func is_broken() -> bool:
 func _on_body_entered(body: Node3D) -> void:
 	if _broken or not body is PlayerCharacter:
 		return
+	if (body as PlayerCharacter).run_up < _run_up_needed:
+		return # подошёл аккуратно, без разгона
 	var now := Time.get_ticks_msec() / 1000.0
 	if now - float(_last_touch.get(body.get_instance_id(), -10.0)) < TOUCH_GAP:
 		return

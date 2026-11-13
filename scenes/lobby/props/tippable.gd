@@ -5,6 +5,10 @@ extends RigidBody3D
 
 const RESET_TIME := 12.0
 
+## Какой разгон нужен персонажу, чтобы уронить вещь (PlayerCharacter.run_up): чем больше вещь,
+## тем больше. Аккуратно подошёл — просто упёрся.
+var run_up_needed := 0.4
+
 var _home: Transform3D
 var _model: Node3D
 var _away_time := 0.0
@@ -22,6 +26,7 @@ func setup(scene: PackedScene, size: Vector3, center_y: float, body_mass: float 
 	shape.position.y = center_y
 	add_child(shape)
 	mass = body_mass
+	run_up_needed = clampf(0.15 + maxf(size.x, maxf(size.y, size.z)) * 0.6, 0.3, 1.4)
 	# Центр масс пониже — чтобы вещь падала, но не кувыркалась бесконечно.
 	center_of_mass_mode = RigidBody3D.CENTER_OF_MASS_MODE_CUSTOM
 	center_of_mass = Vector3(0, center_y * 0.6, 0)
