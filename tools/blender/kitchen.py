@@ -563,7 +563,10 @@ def tumbler(name, fill, depth=0.05):
     mod.thickness = 0.002
     bpy.ops.object.modifier_apply(modifier="S")
     parts.append(wall)                                                              # грани
-    parts.append(cyl(0.0365, 0.012, (0, 0, 0.108), TUMBLER, verts=32, smooth=True))  # ободок
+    # Ободок — кольцо, а не сплошной диск (диск закрывал стакан сверху — не видно, что налито).
+    bpy.ops.mesh.primitive_torus_add(major_radius=0.0355, minor_radius=0.0025, major_segments=32,
+                                     minor_segments=8, location=(0, 0, 0.104))
+    parts.append(finish(bpy.context.object, TUMBLER, smooth=True))
     if fill:
         # Жидкость заметно уже стенки (раньше её край выходил на стекло — казалось, что снаружи),
         # и стоит на дне стакана (дно — до 0.012).
