@@ -335,7 +335,8 @@ func _build_living_room() -> void:
 	balm.rotation.y = 0.4
 	add_child(balm)
 	var balm_colors: Array[Color] = [Color("9e0a10"), Color("e8be3c"), Color("1e7846")]
-	balm.setup(load("res://assets/models/kitchen/balm_tin.glb") as PackedScene, balm_colors, 0.25, 0.02)
+	var balm_model := load("res://assets/models/kitchen/balm_tin.glb") as PackedScene
+	balm.setup(balm_model, balm_colors, 0.25, 0.02)
 
 	# Банки с заготовками (огурцы, варенье) — в ряд вдоль левой стены у серванта.
 	for i in 3:
