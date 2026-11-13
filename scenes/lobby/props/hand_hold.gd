@@ -25,7 +25,8 @@ static func place(item: Node3D, grip: float) -> void:
 ## Каждый кадр, пока вещь в руке: держать её ровно по миру — вверх (с наклоном вперёд tilt рад)
 ## по повороту персонажа, в кулаке. Так поза не зависит от того, как сейчас повёрнута рука
 ## (раньше вещь в зеркале торчала вбок / лежала горизонтально).
-static func follow(item: Node3D, grip: float, tilt: float = 0.0) -> void:
+## forward — вынести вещь вперёд из кулака на столько метров (губка: иначе прячется в кисти).
+static func follow(item: Node3D, grip: float, tilt: float = 0.0, forward: float = 0.0) -> void:
 	var arm := item.get_parent() as Node3D
 	var character := _character_of(item)
 	if arm == null or character == null:
@@ -35,7 +36,8 @@ static func follow(item: Node3D, grip: float, tilt: float = 0.0) -> void:
 	var up := (Vector3.UP * cos(tilt) + fwd * sin(tilt)).normalized()
 	var back := right.cross(up).normalized()
 	var hand := arm.to_global(HAND)
-	item.global_transform = Transform3D(Basis(up.cross(back), up, back), hand - up * grip)
+	item.global_transform = Transform3D(Basis(up.cross(back), up, back),
+		hand - up * grip + fwd * forward)
 
 
 static func _character_of(node: Node) -> PlayerCharacter:

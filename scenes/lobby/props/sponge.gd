@@ -63,7 +63,7 @@ static func make_model() -> Node3D:
 
 func _process(delta: float) -> void:
 	if state == State.HELD:
-		HandHold.follow(self, 0.02) # ровно в кулаке, как бы ни была повёрнута рука
+		HandHold.follow(self, 0.0, 0.0, 0.09) # перед кистью, а не внутри неё
 		return
 	if state != State.LOOSE:
 		return

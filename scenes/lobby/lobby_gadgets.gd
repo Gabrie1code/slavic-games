@@ -315,8 +315,13 @@ func _process_sponge(p: PlayerData, camera: Camera3D) -> void:
 func _show_view_sponge(p: PlayerData, camera: Camera3D) -> void:
 	if camera == null or _has_view(_view_sponges, p.id):
 		return
-	# Губка в кулаке «в кадре» (слой «в кадре» этого игрока).
-	var model := HandHold.make_view(p.color, Sponge.make_model(), 0.02, 1 << (p.slot + 10), 0.3)
+	# Губка «в кадре»: кулак (слой «в кадре» этого игрока) держит её снизу, губка крупно перед
+	# ним, жёсткой зелёной стороной вперёд — ей и трут (раньше губка пряталась внутри кулака).
+	var sponge_model := Sponge.make_model()
+	var model := HandHold.make_view(p.color, sponge_model, 0.0, 1 << (p.slot + 10), 0.0)
+	sponge_model.scale = Vector3.ONE * 1.5
+	sponge_model.rotation = Vector3(-PI / 2.0 + 0.25, 0.35, 0.0) # зелёным от себя
+	sponge_model.position = Vector3(-0.01, 0.055, -0.045)
 	camera.add_child(model)
 	_view_sponges[p.id] = model
 
