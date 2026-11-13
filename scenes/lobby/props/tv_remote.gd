@@ -27,11 +27,13 @@ func _ready() -> void:
 	add_child(_model)
 	var shape := CollisionShape3D.new()
 	var box := BoxShape3D.new()
-	box.size = SIZE
+	# Форма толще самого пульта: тонкая коробка на скорости проскакивала в пол.
+	box.size = SIZE + Vector3(0.02, 0.03, 0.0)
 	shape.shape = box
 	shape.position.y = SIZE.y / 2.0
 	add_child(shape)
 	mass = 0.15
+	continuous_cd = true # быстрый бросок не «пролетает» сквозь пол
 	angular_damp = 1.5
 	var surface := PhysicsMaterial.new()
 	surface.friction = 0.8

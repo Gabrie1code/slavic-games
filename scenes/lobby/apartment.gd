@@ -103,6 +103,7 @@ var _lamp_back_at := 0.0
 var _night_lamp: Breakable
 var _night_light: OmniLight3D
 var _night_bulb_mat: StandardMaterial3D
+var _night_bulb: MeshInstance3D
 var _time := 0.0
 ## Модель окна гостиной (у неё прячем «небо», чтобы видеть вид за проёмом).
 var _last_window: Node3D
@@ -235,10 +236,9 @@ func _build_living_room() -> void:
 	_last_window = _place(_model("window"), window_pos)
 	_build_window_view(window_pos)
 	_place(_model("curtains"), window_pos + Vector3(0, 0, 0.12))
-	for i in 3:
-		var pot := "cactus_pot" if i != 1 else "aloe_pot"
-		_breakable(pot, Vector3(window_pos.x - 0.5 + i * 0.5, 0.885, window_pos.z + 0.14),
-			[CLAY, PLANT], 0.35)
+	# На подоконнике один кактус (три горшка закрывали вид за окном).
+	_breakable("cactus_pot", Vector3(window_pos.x - 0.5, 0.885, window_pos.z + 0.14),
+		[CLAY, PLANT], 0.35)
 	_tippable("dumbbell", Vector3(0.34, 0.12, 0.12), 0.06, Vector3(1.2, 0, -3.3), 3.0, 15.0)
 	_tippable("dumbbell", Vector3(0.34, 0.12, 0.12), 0.06, Vector3(1.55, 0, -3.15), 3.0, -10.0)
 
@@ -252,10 +252,10 @@ func _build_living_room() -> void:
 		var seat_pos := SOFA_POS + Vector3(local_x, 0.1, 0.12).rotated(Vector3.UP, SOFA_YAW)
 		seats.append({"pos": seat_pos, "yaw": SOFA_YAW + PI, "approach": seat_pos + front * 0.9,
 			"name": "Сесть на диван"})
-	# Пульт — посередине дивана, между местами для сидения.
+	# Пульт — посередине дивана, между подушками, вдоль сиденья: смотрит на телевизор.
 	tv_remote = TvRemote.new()
 	tv_remote.home_position = SOFA_POS + Vector3(0, 0.6, 0.15).rotated(Vector3.UP, SOFA_YAW)
-	tv_remote.home_yaw = SOFA_YAW + 0.4
+	tv_remote.home_yaw = 0.0
 	tv_remote.set_meta("home_parent", self)
 	add_child(tv_remote)
 	var table_pos := Vector3(-2.6, 0, -0.25)
@@ -339,7 +339,8 @@ func _process(delta: float) -> void:
 	_lamp_glow_mat.albedo_color = Color(0.3, 0.27, 0.22).lerp(Color(1.0, 0.92, 0.7), _lamp_level)
 	var night_lit := not _night_lamp.is_broken()
 	_night_light.visible = night_lit
-	_night_bulb_mat.albedo_color = Color(1.0, 0.92, 0.7) if night_lit else Color(0.3, 0.27, 0.22)
+	# Разбитый ночник — лампочки нет совсем (раньше в воздухе оставался серый кружок).
+	_night_bulb.visible = night_lit
 
 
 ## Торшер горит в полную силу (только тогда его можно выключить).
@@ -371,7 +372,9 @@ func _build_night_light() -> void:
 	bulb.material_override = _night_bulb_mat
 	bulb.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	bulb.position = Vector3(0, 0.29, 0)
+	_night_bulb_mat.albedo_color = Color(1.0, 0.92, 0.7)
 	_night_lamp.add_child(bulb)
+	_night_bulb = bulb
 
 
 ## Лампочка под абажуром торшера: тёплый свет и светящийся шарик.
