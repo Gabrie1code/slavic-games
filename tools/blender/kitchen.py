@@ -572,19 +572,58 @@ def tumbler(name, fill):
 tumbler("kitchen_tumbler", None)
 tumbler("kitchen_tumbler_wine", WINE)
 
-# ---------------- Мусорное ведро с педалью (для туалета) ----------------
-# Эмалированное ведро цвета слоновой кости, закрытое крышкой-куполом с ободком, педаль спереди
-# (−Y Blender = +Z Godot), петля крышки сзади. Начало — на полу, в центре.
-BIN = mat("BinEnamel", (0.85, 0.82, 0.72), 0.3)
-BIN_DARK = mat("BinDark", (0.18, 0.18, 0.2), 0.5)
-P = [lathe("BinBody", [(0.0, 0.0), (0.105, 0.0), (0.112, 0.01), (0.122, 0.3), (0.0, 0.3)], BIN, segs=28)]
-P.append(lathe("BinBase", [(0.0, 0.0), (0.108, 0.0), (0.108, 0.02), (0.0, 0.02)], BIN_DARK, segs=28))
-P.append(lathe("BinLid", [(0.0, 0.3), (0.128, 0.3), (0.128, 0.31), (0.115, 0.325), (0.07, 0.345),
-                          (0.0, 0.35)], BIN, segs=28))
-P.append(lathe("BinRim", [(0.124, 0.296), (0.13, 0.296), (0.13, 0.312), (0.124, 0.312)], BIN_DARK, segs=28))
-P.append(box((0.07, 0.06, 0.012), (0, -0.14, 0.03), BIN_DARK))                      # педаль
-P.append(box((0.04, 0.03, 0.02), (0, -0.115, 0.03), BIN_DARK))
-P.append(box((0.06, 0.02, 0.025), (0, 0.125, 0.305), BIN_DARK))                     # петля
+# ---------------- Дырчатая мусорная корзина (для туалета) ----------------
+# Открытая чёрная пластиковая корзина, шире кверху: стенка — с овальными дырами (текстура
+# basket.png с прозрачностью, двусторонняя), сплошное дно, толстая кромка сверху. Внутри —
+# скомканная бумага. Начало — на полу, в центре.
+BASKET = mat("BasketWall", (1, 1, 1), 0.5, image="assets/textures/kitchen/basket.png")
+BASKET.blend_method = "CLIP"
+BASKET.use_backface_culling = False
+tex = [n for n in BASKET.node_tree.nodes if n.type == "TEX_IMAGE"][0]
+BASKET.node_tree.links.new(tex.outputs["Alpha"], BASKET.node_tree.nodes["Principled BSDF"].inputs["Alpha"])
+BASKET_DARK = mat("BasketRim", (0.03, 0.03, 0.035), 0.45)
+PAPER = mat("CrumpledPaper", (0.9, 0.88, 0.82), 0.9)
+R0, R1, BH = 0.105, 0.14, 0.3
+
+
+def basket_wall():
+    """Стенка-конус с развёрткой: u — по окружности (0..1), v — снизу вверх."""
+    bm = bmesh.new()
+    uv = bm.loops.layers.uv.new()
+    segs = 32
+    bottom = [bm.verts.new((R0 * math.cos(2 * math.pi * i / segs), R0 * math.sin(2 * math.pi * i / segs), 0.008))
+              for i in range(segs + 1)]
+    top = [bm.verts.new((R1 * math.cos(2 * math.pi * i / segs), R1 * math.sin(2 * math.pi * i / segs), BH))
+           for i in range(segs + 1)]
+    for i in range(segs):
+        f = bm.faces.new((bottom[i], bottom[i + 1], top[i + 1], top[i]))
+        for loop, (u, v) in zip(f.loops, ((i / segs, 0), ((i + 1) / segs, 0), ((i + 1) / segs, 1), (i / segs, 1))):
+            loop[uv].uv = (u, v)
+    bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=0.0)  # шов по геометрии не склеиваем (uv свои)
+    me = bpy.data.meshes.new("BasketWall")
+    bm.to_mesh(me)
+    o = bpy.data.objects.new("BasketWall", me)
+    bpy.context.scene.collection.objects.link(o)
+    return finish(o, BASKET, smooth=True)
+
+
+P = [basket_wall()]
+P.append(cyl(R0, 0.008, (0, 0, 0.004), BASKET_DARK, verts=32))                   # дно
+bpy.ops.mesh.primitive_torus_add(major_radius=R1 + 0.004, minor_radius=0.008, major_segments=32,
+                                 minor_segments=8, location=(0, 0, BH))
+P.append(finish(bpy.context.object, BASKET_DARK, smooth=True))                     # кромка
+bpy.ops.mesh.primitive_torus_add(major_radius=R0 + 0.002, minor_radius=0.005, major_segments=32,
+                                 minor_segments=6, location=(0, 0, 0.012))
+P.append(finish(bpy.context.object, BASKET_DARK, smooth=True))                     # ободок у дна
+rnd = __import__("random").Random(7)
+for (x, y, z, r) in ((0.03, 0.02, 0.05, 0.045), (-0.04, -0.01, 0.06, 0.05), (0.0, -0.05, 0.1, 0.042),
+                     (-0.02, 0.05, 0.13, 0.044), (0.04, -0.02, 0.17, 0.046), (-0.03, 0.0, 0.21, 0.048),
+                     (0.03, 0.04, 0.25, 0.043), (-0.01, -0.03, 0.29, 0.045)):
+    bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=2, radius=r, location=(x, y, z))
+    ball = bpy.context.object
+    for v in ball.data.vertices:                                                    # скомкана
+        v.co *= rnd.uniform(0.7, 1.15)
+    P.append(finish(ball, PAPER, smooth=False))
 export("trash_bin", P)
 
 # ---------------- Мухобойка (лежит на холодильнике) ----------------

@@ -215,19 +215,18 @@ func _build_paper_holder() -> void:
 
 
 ## Рукомойник с краном на правой стене у двери, над ним зеркало.
-## Мусорное ведро с педалью в углу у двери и задней стены (модель — tools/blender/kitchen.py).
+## Дырчатая мусорная корзина со скомканной бумагой в углу у двери (tools/blender/kitchen.py).
 func _build_trash_bin() -> void:
 	var bin := StaticBody3D.new()
 	bin.add_child((load("res://assets/models/kitchen/trash_bin.glb") as PackedScene).instantiate())
 	var shape := CollisionShape3D.new()
 	var cylinder := CylinderShape3D.new()
-	cylinder.radius = 0.13
-	cylinder.height = 0.35
+	cylinder.radius = 0.14
+	cylinder.height = 0.31
 	shape.shape = cylinder
-	shape.position.y = 0.175
+	shape.position.y = 0.155
 	bin.add_child(shape)
 	bin.position = Vector3(X0 + WALL_T / 2.0 + 0.17, 0, Z0 + 0.17)
-	bin.rotation.y = PI * 0.25 # педалью в комнату, по диагонали угла
 	add_child(bin)
 
 
