@@ -15,7 +15,14 @@ const W := 96
 const H := 72
 const OFF_TIME := 8.0
 const SMASH_TIME := 10.0
-const CRACKS := preload("res://assets/textures/fx/glass_cracks.png")
+## Три варианта трещин (tools/textures/glass_cracks.py) — при каждом ударе случайный, поровну.
+const CRACKS: Array[Texture2D] = [
+	preload("res://assets/textures/fx/glass_cracks_1.png"),
+	preload("res://assets/textures/fx/glass_cracks_2.png"),
+	preload("res://assets/textures/fx/glass_cracks_3.png"),
+]
+## Насколько заметны трещины (1 — во всю яркость): приглушены, чтобы не слепили.
+const CRACKS_ALPHA := 0.7
 
 var _game: PixelGame
 var _mat: StandardMaterial3D
@@ -67,6 +74,7 @@ func smash() -> void:
 		return
 	_smashed_until = _time + SMASH_TIME
 	_cracks.visible = true
+	_cracks_mat.albedo_texture = CRACKS.pick_random()
 	# Каждый раз трещины по-другому: картинку отражаем по горизонтали/вертикали (не поворачиваем —
 	# иначе углы вылезали за экран).
 	_cracks_mat.uv1_scale = Vector3(1.0 if randf() < 0.5 else -1.0, 1.0 if randf() < 0.5 else -1.0,
@@ -108,7 +116,7 @@ func _process_smash() -> void:
 	if left <= 0.0:
 		_cracks.visible = false
 		return
-	_cracks_mat.albedo_color.a = clampf(left / 0.6, 0.0, 1.0)
+	_cracks_mat.albedo_color.a = CRACKS_ALPHA * clampf(left / 0.6, 0.0, 1.0)
 
 
 func _build_cracks(size: Vector2) -> void:
@@ -117,7 +125,6 @@ func _build_cracks(size: Vector2) -> void:
 	quad.size = size # ровно по экрану
 	_cracks.mesh = quad
 	_cracks_mat = StandardMaterial3D.new()
-	_cracks_mat.albedo_texture = CRACKS
 	_cracks_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	_cracks_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	_cracks.material_override = _cracks_mat

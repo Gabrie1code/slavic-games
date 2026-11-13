@@ -1,5 +1,8 @@
-"""Трещины разбитого стекла (для экрана игрового автомата после удара молотком): белые
-ломаные лучи от точки удара и кольца-«паутинка», прозрачный фон.
+"""Трещины разбитого стекла (экран игрового автомата после удара молотком): тонкие приглушённые
+лучи от точки удара и кольца-«паутинка», прозрачный фон. Три разных варианта — в игре случайный.
+  glass_cracks_1.png — удар чуть левее центра, много лучей, густая паутинка;
+  glass_cracks_2.png — удар в углу сверху справа, длинные лучи через весь экран;
+  glass_cracks_3.png — удар снизу, мало лучей, пара отдельных трещин.
 
 Запуск (Python с Pillow):
     python3 tools/textures/glass_cracks.py assets/textures/fx
@@ -13,30 +16,49 @@ from PIL import Image, ImageDraw, ImageFilter
 
 OUT = sys.argv[1] if len(sys.argv) > 1 else "."
 os.makedirs(OUT, exist_ok=True)
-random.seed(4)
 S = 512
-img = Image.new("RGBA", (S, S), (255, 255, 255, 0))
-d = ImageDraw.Draw(img)
-cx, cy = S * 0.46, S * 0.42
-rays = []
-for i in range(14):
-    a = i / 14 * math.tau + random.uniform(-0.15, 0.15)
-    pts = [(cx, cy)]
-    r = 0
-    while r < S:
-        r += random.uniform(25, 60)
-        a += random.uniform(-0.25, 0.25)
-        pts.append((cx + math.cos(a) * r, cy + math.sin(a) * r))
-    rays.append(pts)
-    d.line(pts, fill=(235, 245, 255, 230), width=3)
-for ring_r in (45, 95, 160):                           # «паутинка» между лучами
-    for k in range(len(rays)):
-        p1 = min(rays[k], key=lambda p: abs(math.dist(p, (cx, cy)) - ring_r))
-        p2 = min(rays[(k + 1) % len(rays)], key=lambda p: abs(math.dist(p, (cx, cy)) - ring_r))
-        if random.random() < 0.8:
-            d.line([p1, p2], fill=(235, 245, 255, 190), width=2)
-d.ellipse((cx - 14, cy - 14, cx + 14, cy + 14), fill=(255, 255, 255, 200))   # место удара
-glow = img.filter(ImageFilter.GaussianBlur(2))
-img = Image.alpha_composite(glow, img)
-img.save(os.path.join(OUT, "glass_cracks.png"))
+LINE = (200, 215, 225)          # приглушённый серо-голубой (было почти белое и яркое)
+
+
+def cracks(name, seed, center, rays_n, rings, alpha, extra):
+    random.seed(seed)
+    img = Image.new("RGBA", (S, S), (255, 255, 255, 0))
+    d = ImageDraw.Draw(img)
+    cx, cy = center[0] * S, center[1] * S
+    rays = []
+    for i in range(rays_n):
+        a = i / rays_n * math.tau + random.uniform(-0.2, 0.2)
+        pts = [(cx, cy)]
+        r = 0
+        while r < S * 1.3:
+            r += random.uniform(25, 65)
+            a += random.uniform(-0.25, 0.25)
+            pts.append((cx + math.cos(a) * r, cy + math.sin(a) * r))
+        rays.append(pts)
+        d.line(pts, fill=LINE + (alpha,), width=2)
+    for ring_r in rings:
+        for k in range(len(rays)):
+            p1 = min(rays[k], key=lambda p: abs(math.dist(p, (cx, cy)) - ring_r))
+            p2 = min(rays[(k + 1) % len(rays)], key=lambda p: abs(math.dist(p, (cx, cy)) - ring_r))
+            if random.random() < 0.75:
+                d.line([p1, p2], fill=LINE + (int(alpha * 0.75),), width=1)
+    for _ in range(extra):                                # отдельные трещины в стороне
+        x, y = random.uniform(0, S), random.uniform(0, S)
+        a = random.uniform(0, math.tau)
+        pts = [(x, y)]
+        for _ in range(5):
+            a += random.uniform(-0.4, 0.4)
+            x += math.cos(a) * 40
+            y += math.sin(a) * 40
+            pts.append((x, y))
+        d.line(pts, fill=LINE + (int(alpha * 0.8),), width=1)
+    d.ellipse((cx - 9, cy - 9, cx + 9, cy + 9), fill=LINE + (alpha,))  # место удара
+    glow = img.filter(ImageFilter.GaussianBlur(1.5))
+    img = Image.alpha_composite(glow, img)
+    img.save(os.path.join(OUT, name + ".png"))
+
+
+cracks("glass_cracks_1", 4, (0.46, 0.42), 14, (45, 95, 160), 150, 0)
+cracks("glass_cracks_2", 9, (0.78, 0.2), 9, (60, 150), 140, 2)
+cracks("glass_cracks_3", 17, (0.4, 0.82), 7, (55,), 140, 4)
 print("DONE")
