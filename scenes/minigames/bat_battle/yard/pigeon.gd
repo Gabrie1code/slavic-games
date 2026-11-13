@@ -61,10 +61,12 @@ func fly_away(from: Vector3) -> void:
 		queue_free())
 
 
-## Прилететь издалека и сесть в точку spot.
-func land_at(spot: Vector3) -> void:
+## Прилететь издалека и сесть в точку spot. far — откуда прилетает (направление по земле;
+## по умолчанию с −Z мира; двор за окном кухни развёрнут — передаёт своё «вдаль»).
+func land_at(spot: Vector3, far: Vector3 = Vector3.FORWARD) -> void:
 	flying = true
-	var start := spot + Vector3(randf_range(-10, 10), 9.0, randf_range(-12, -6))
+	var side := far.cross(Vector3.UP).normalized()
+	var start := spot + side * randf_range(-10, 10) + Vector3.UP * 9.0 + far * randf_range(6, 12)
 	global_position = start
 	look_at(Vector3(spot.x, start.y, spot.z), Vector3.UP)
 	var tween := create_tween()

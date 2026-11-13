@@ -128,7 +128,9 @@ func _update_pigeons(delta: float) -> void:
 		if not walking and randf() < delta * 0.5:
 			_walk(pigeon)
 		elif randf() < delta * 0.025:
-			pigeon.fly_away(pigeon.global_position + Vector3(randf_range(-1, 1), 0, 1))
+			# Улетают вглубь двора (по осям двора: у кухонного окна он развёрнут — раньше голуби
+			# улетали прямо через квартиру).
+			pigeon.fly_away(pigeon.global_position - _far() + global_basis.x * randf_range(-1, 1))
 
 
 func _build_sky() -> void:
@@ -410,7 +412,7 @@ func _spawn_pigeon(fly_in: bool) -> void:
 	_pigeons.append(pigeon)
 	var spot := _random_spot()
 	if fly_in:
-		pigeon.land_at(spot)
+		pigeon.land_at(spot, _far()) # прилетают из глубины двора, а не через квартиру
 	else:
 		pigeon.global_position = spot
 		pigeon.rotation.y = randf() * TAU
@@ -436,6 +438,13 @@ func _walk(pigeon: YardPigeon) -> void:
 	var tween := pigeon.create_tween()
 	tween.tween_property(pigeon, "global_position", target, from.distance_to(target) / 0.5)
 	tween.tween_callback(func() -> void: pigeon.set_meta("walking", false))
+
+
+## «Вдаль» от окна по земле (в мире): у гостиной −Z, у развёрнутого двора кухни — +Z.
+func _far() -> Vector3:
+	var far := -global_basis.z
+	far.y = 0.0
+	return far.normalized()
 
 
 func _random_spot() -> Vector3:
