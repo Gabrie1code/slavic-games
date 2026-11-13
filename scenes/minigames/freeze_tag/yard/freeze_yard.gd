@@ -3,7 +3,7 @@ extends Node3D
 ## Двор 90-х для «Морожки»: разные дома вокруг на все 360° (хрущёвки, девятиэтажка, сталинка,
 ## башни, гаражи; вдали труба ТЭЦ, водокачка, краны), забор, лавочки, открытая песочница
 ## с «грибком», деревья, фонари и площадка — горка, качели, карусель (см. их скрипты),
-## у краёв — шведская стенка, «глобус» и дуга-лесенка (препятствия).
+## у краёв — шведская стенка, «глобус» и дуга-лесенка (препятствия); облака разных видов.
 ## Площадка игры — X −15.75..15.75, Z −9.75..9.75 (в 1.5 раза больше прежней; забор-столкновения
 ## в сцене, здесь — модели). В песочнице — ведёрко, лопатка и формочка.
 
@@ -49,15 +49,29 @@ const EXTRA_TREES: Array[Vector3] = [
 	Vector3(-18, 0, -22), Vector3(30, 0, 13), Vector3(-30, 0, 24), Vector3(44, 0, -12),
 ]
 
+## Облака вокруг на 360° (tools/textures/sky_clouds.py): вид — [картинка, высота над горизонтом
+## от и до (градусы)]; перистые выше всех, слоистые ниже. Ниже ~20° облака закрыты домами.
+const SKY := "res://assets/textures/sky/"
+const CLOUD_KINDS: Array = [
+	["cloud_cumulus_a", 24.0, 40.0], ["cloud_cumulus_b", 20.0, 34.0], ["cloud_cumulus_a", 34.0, 52.0],
+	["cloud_cirrus", 45.0, 65.0], ["cloud_stratus", 18.0, 26.0], ["cloud_tower", 22.0, 30.0],
+	["cloud_cumulus_b", 40.0, 58.0],
+]
+const CLOUD_COUNT := 44
+## Облака медленно плывут по кругу (рад/сек).
+const CLOUD_DRIFT := 0.004
+
 ## Лавочки, под которые можно спрятаться (их Transform: +Z — сторона, куда вылезают).
 var benches: Array[Transform3D] = []
 var slide: PlaygroundSlide
 var swing: PlaygroundSwing
 var carousel: PlaygroundCarousel
+var _clouds: Node3D
 
 
 func _ready() -> void:
 	_build_surroundings()
+	_build_clouds()
 	_build_fence()
 	_solid(PLAYGROUND + "sandbox", Vector3(3.0, 0.3, 3.0), SANDBOX)
 	_build_sand_toys()
@@ -112,6 +126,34 @@ func _build_far_ground() -> void:
 	ground.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	ground.position.y = -0.03
 	add_child(ground)
+
+
+func _process(delta: float) -> void:
+	if _clouds:
+		_clouds.rotation.y += CLOUD_DRIFT * delta
+
+
+## Облака разных видов по кругу (seed постоянный — каждый раз одинаково): плоские картинки,
+## всегда повёрнутые к игроку, в 260–420 м, на разной высоте над горизонтом.
+func _build_clouds() -> void:
+	_clouds = Node3D.new()
+	add_child(_clouds)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 1990
+	for i in CLOUD_COUNT:
+		var kind: Array = CLOUD_KINDS[rng.randi() % CLOUD_KINDS.size()]
+		var angle := TAU * i / CLOUD_COUNT + rng.randf_range(-0.08, 0.08)
+		var dist := rng.randf_range(260.0, 420.0)
+		var elevation := deg_to_rad(rng.randf_range(float(kind[1]), float(kind[2])))
+		var cloud := Sprite3D.new()
+		cloud.texture = load(SKY + String(kind[0]) + ".png") as Texture2D
+		cloud.billboard = BaseMaterial3D.BILLBOARD_FIXED_Y
+		cloud.shaded = false
+		cloud.pixel_size = dist * rng.randf_range(0.0008, 0.0014)
+		cloud.flip_h = rng.randf() < 0.5
+		cloud.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		cloud.position = Vector3(cos(angle) * dist, tan(elevation) * dist, sin(angle) * dist)
+		_clouds.add_child(cloud)
 
 
 ## Низкий зелёный забор по периметру (секции по 2 м).

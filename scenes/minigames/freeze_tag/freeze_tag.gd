@@ -14,7 +14,9 @@ extends Node3D
 ## Вид от первого лица (FreezeViews): у каждого живого игрока своя часть экрана; на качелях,
 ## горке и под лавочкой камера плавно отъезжает назад (вид от третьего лица).
 ## Туман: водящий (если он живой игрок) видит площадку только рядом с собой — радиус
-## FOG_RADIUS = 1.2 × зона караула. Бегущим туман не мешает.
+## FOG_RADIUS = 1.2 × зона караула. Дальше — чёрная пелена FOG_START (80%), каждые FOG_STEP_TIME
+## сек она на FOG_STEP (10%) прозрачнее: водящему всё проще. Бегущим туман не мешает.
+## Спринт водящего — только с CHASER_SPRINT_DELAY сек (до этого «перезарядка»).
 ## Площадка: горка (неуязвим, пока едешь, на выходе ускорение), качели (толкать; сесть на
 ## 2–10 сек — неуязвим), лавочки (залезть под лавочку на 2–10 сек — неуязвим),
 ## карусель (только раскручивать).
@@ -26,6 +28,8 @@ const RUNNER_SPEED := 6.0
 const CHASER_SPEED := 6.6
 ## Спринт водящего слабее, чем у бегущих: +15% (у бегущих +50%).
 const CHASER_SPRINT := 0.15
+## Спринт водящему доступен только с 20-й секунды раунда (у бегущих — сразу).
+const CHASER_SPRINT_DELAY := 20.0
 ## Водящий «считает до трёх»: стоит на месте после старта.
 const CHASER_HEAD_START := 2.0
 const TOUCH_DISTANCE := 1.1
@@ -50,7 +54,10 @@ const ARENA_HALF := Vector2(15.75, 9.75) # двор увеличен в 1.5 ра
 const FOG_RADIUS := ZONE_RADIUS * 1.2
 const FOG_LAYER := 1 << 17
 const HUD_LAYER := 1 << 16
-const FOG_SHADER := preload("res://scenes/minigames/freeze_tag/chaser_fog.gdshader")
+## Пелена вне радиуса: 80% черноты на старте, каждые 8 сек на 10% меньше.
+const FOG_START := 0.8
+const FOG_STEP := 0.1
+const FOG_STEP_TIME := 8.0
 const RUNNER_SPAWNS: Array[Vector3] = [
 	Vector3(-12.75, 0.3, -6.75), Vector3(12.75, 0.3, -6.75), Vector3(-12.75, 0.3, 6.75),
 	Vector3(12.75, 0.3, 6.75),
@@ -104,7 +111,9 @@ var _hud_bars: Dictionary = {}
 var _hud_bars_box: VBoxContainer
 var _zone_material: StandardMaterial3D
 var _yard: FreezeYard
-var _fog_material: ShaderMaterial
+## Своё окружение камеры водящего: туман по расстоянию от глаз (Environment, режим «глубина»).
+var _fog_env: Environment
+var _sky_color := Color.BLACK
 ## Виды от первого лица у живых игроков (FreezeViews).
 var _views: FreezeViews
 ## Кто прячется под лавочкой: PlayerData.id -> {"bench", "left", "racer"}.
@@ -182,6 +191,7 @@ func _spawn_racers() -> void:
 		if r.is_chaser:
 			_chaser = r
 			r.sprint.bonus = CHASER_SPRINT
+			r.sprint.cooldown = CHASER_SPRINT_DELAY # рывок — только с 20-й секунды
 			r.status.text = "ВОДЯЩИЙ"
 			r.status.modulate = Color("ff6b5a")
 			_put_on_chaser_mask(r.character)
@@ -751,8 +761,6 @@ func _setup_views() -> void:
 	_camera.cull_mask &= ~FOG_LAYER
 	_views = FreezeViews.new()
 	add_child(_views)
-	if not _chaser.player.is_bot():
-		_add_fog()
 	for r in _racers:
 		if r.player.is_bot():
 			continue
@@ -761,7 +769,8 @@ func _setup_views() -> void:
 			mask = 0xFFFFF & ~HUD_LAYER & ~ZoneBadge.OVERHEAD_LAYER
 		var view := _views.add_view(r.player, r.character, mask)
 		if r.is_chaser:
-			var caption := _label("Ты водишь — видно только рядом · Shift — рывок", 24,
+			_add_chaser_fog(_views.camera_of(r.player.id))
+			var caption := _label("Ты водишь — вдали темно, с каждым мигом светлее · рывок с 20 с", 24,
 				Color("ff6b5a"))
 			caption.set_anchors_preset(Control.PRESET_CENTER_TOP)
 			caption.grow_horizontal = Control.GROW_DIRECTION_BOTH
@@ -774,22 +783,24 @@ func _setup_views() -> void:
 	_update_fog()
 
 
-## Экранный туман (см. chaser_fog.gdshader): квадрат 2×2 растягивается шейдером на весь экран.
-func _add_fog() -> void:
-	var fog := MeshInstance3D.new()
-	var quad := QuadMesh.new()
-	quad.size = Vector2(2, 2)
-	fog.mesh = quad
-	fog.custom_aabb = AABB(Vector3(-1000, -1000, -1000), Vector3(2000, 2000, 2000)) # не отсекать
-	_fog_material = ShaderMaterial.new()
-	_fog_material.shader = FOG_SHADER
-	_fog_material.set_shader_parameter("radius", FOG_RADIUS)
-	# Рисовать после всех прозрачных вещей (лёд, искры), иначе их видно сквозь туман.
-	_fog_material.render_priority = 100
-	fog.material_override = _fog_material
-	fog.layers = FOG_LAYER
-	fog.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	add_child(fog)
+## Туман водящего — своё окружение его камеры (копия окружения двора + туман): чёрная пелена
+## по расстоянию от глаз, от FOG_RADIUS − 1 до FOG_RADIUS м. От первого лица глаза — это и есть
+## водящий. (Раньше был экранный шейдер по буферу глубины — от первого лица сквозь него было
+## видно всё.) Небо (фон-цвет) затемняется отдельно, в _update_fog.
+func _add_chaser_fog(camera: Camera3D) -> void:
+	var world_env := get_node("WorldEnvironment") as WorldEnvironment
+	_sky_color = world_env.environment.background_color
+	_fog_env = world_env.environment.duplicate() as Environment
+	_fog_env.fog_enabled = true
+	_fog_env.fog_mode = Environment.FOG_MODE_DEPTH
+	_fog_env.fog_light_color = Color.BLACK
+	_fog_env.fog_sun_scatter = 0.0
+	_fog_env.fog_aerial_perspective = 0.0
+	_fog_env.fog_sky_affect = 1.0
+	_fog_env.fog_depth_begin = FOG_RADIUS - 1.0
+	_fog_env.fog_depth_end = FOG_RADIUS
+	_fog_env.fog_depth_curve = 1.0
+	camera.environment = _fog_env
 
 
 ## Водящий (живой игрок) не должен знать, что кого-то размораживают: полоски «Серёга
@@ -818,10 +829,14 @@ func _process(delta: float) -> void:
 	_views.update(delta, busy)
 
 
-## Дыра в тумане — вокруг водящего.
+## Плотность пелены: 80% на старте, каждые 8 сек на 10% меньше (до нуля).
 func _update_fog() -> void:
-	if _fog_material:
-		_fog_material.set_shader_parameter("center", _chaser.character.global_position)
+	if _fog_env == null:
+		return
+	var elapsed := ROUND_TIME - _time_left if _running else 0.0
+	var level := maxf(0.0, FOG_START - FOG_STEP * floorf(elapsed / FOG_STEP_TIME))
+	_fog_env.fog_density = level
+	_fog_env.background_color = _sky_color.lerp(Color.BLACK, level)
 
 
 # ---------------- Отображение ----------------

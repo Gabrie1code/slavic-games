@@ -83,6 +83,11 @@ func add_view(p: PlayerData, character: PlayerCharacter, mask: int) -> Control:
 	return container
 
 
+## Камера вида игрока с этим id (null — у него нет своего вида).
+func camera_of(id: int) -> Camera3D:
+	return views[id]["camera"] if views.has(id) else null
+
+
 func has_views() -> bool:
 	return not views.is_empty()
 
