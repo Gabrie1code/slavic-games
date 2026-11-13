@@ -41,9 +41,9 @@ const HIT_KNOCKBACK := 9.0
 const SUPER_RADIUS := 2.6
 const SUPER_DAMAGE := 34
 const SUPER_KNOCKBACK := 13.0
-const SUPER_TIME := 15.0
+const SUPER_TIME := 3.0
 ## Энергетик «Ягуарр»: быстрее атака + немного лечения.
-const DRINK_TIME := 8.0
+const DRINK_TIME := 5.0
 const DRINK_COOLDOWN := 0.4
 const DRINK_HEAL := 50
 
