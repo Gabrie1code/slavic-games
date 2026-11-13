@@ -244,6 +244,7 @@ func _place_splat(point: Vector3, normal: Vector3, collider: Object) -> void:
 	decal.modulate = color()
 	# Красим всё: и стены «только от первого лица» (передние), и персонажей; кроме кулаков в кадре.
 	decal.cull_mask = 0xFFFFF & ~(0b1111 << 10)
+	_cover_older(point, size, decal.modulate)
 	_splat_parent(point, collider).add_child(decal)
 	# Decal красит вдоль своей −Y: его +Y смотрит из поверхности.
 	var y := normal.normalized()
@@ -262,6 +263,22 @@ func _place_splat(point: Vector3, normal: Vector3, collider: Object) -> void:
 		var old: Variant = _splats.pop_front()
 		if is_instance_valid(old):
 			(old as Decal).queue_free()
+
+
+## Новый цвет всегда поверх: старые пятна ДРУГОГО цвета прямо под новым пятном убираем.
+## Иначе Godot смешивает наложенные следы как попало — получалась «каша» из цветов.
+## Пятна того же цвета не трогаем: свой цвет на свой и так выглядит ровно.
+static func _cover_older(point: Vector3, size: float, paint: Color) -> void:
+	for i in range(_splats.size() - 1, -1, -1):
+		var old: Variant = _splats[i]
+		if not is_instance_valid(old):
+			_splats.remove_at(i)
+			continue
+		var decal := old as Decal
+		var same := Color(decal.modulate, 1.0).is_equal_approx(Color(paint, 1.0))
+		if not same and decal.global_position.distance_to(point) < size * 0.45:
+			decal.queue_free()
+			_splats.remove_at(i)
 
 
 ## К чему прицепить след: к ближайшей части тела игрока, к посуде (Breakable) или к миру.

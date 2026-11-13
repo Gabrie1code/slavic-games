@@ -19,6 +19,19 @@ const PIGEON_AREA := Rect2(-5.0, 5.0, 10.0, 6.0)
 ## Небо (квадрат 600×320 м на 60 м от окна): высота верха и размер — для перевода в UV.
 const SKY_TOP := 260.0
 const SKY_SIZE := Vector2(600, 320)
+## Окна хрущёвок (tools/blender/courtyard.py): 12 окон в ряд на 5 этажах, лицевая сторона.
+const HOUSE_W := 28.0
+const HOUSE_FRONT := 5.6 # чуть впереди стекла (5.56), чтобы издалека не мерцало
+const HOUSE_FLOOR := 2.7
+const HOUSE_COLS := 12
+const HOUSE_FLOORS := 5
+## Ночью свет в окне горит столько секунд (у каждого окна своё случайное время)…
+const LIGHT_ON := Vector2(30.0, 120.0)
+## …а погасшее окно загорается снова через столько.
+const LIGHT_OFF := Vector2(5.0, 90.0)
+const LIGHT_FADE := 1.5
+const LIGHT_COLOR := Color(1.0, 0.8, 0.45)
+
 ## Время суток: ключевые точки привязаны к восходу и закату ЭТОГО дня (SunCalendar — Россия,
 ## по дате на компьютере): [от чего («0», «rise», «set», «24»), сдвиг в часах, верх неба,
 ## у горизонта, облака, «фильтр» двора, ночь 0..1]. Зимой день короче — всё сдвигается само.
@@ -48,6 +61,11 @@ var _sky_mat: ShaderMaterial
 ## Общий «фильтр» для всех вещей двора (material_overlay) — темнее ночью, теплее на закате.
 var _tint_mat: ShaderMaterial
 var _sky_quad: MeshInstance3D
+## Окна с огоньками: материал (яркость — его прозрачность), горит ли, сколько до смены.
+var _win_mats: Array[StandardMaterial3D] = []
+var _win_level := PackedFloat32Array()
+var _win_on := PackedByteArray()
+var _win_timer := PackedFloat32Array()
 ## Сколько ещё часов «промотать» плавно (F8 — час за 3 секунды, без рывка).
 var _skip_left := 0.0
 
@@ -76,6 +94,7 @@ func _process(delta: float) -> void:
 	hour = fmod(hour + delta / 3600.0 + skip, 24.0)
 	_apply_time()
 	_update_pigeons(delta)
+	_update_windows(delta)
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -201,9 +220,59 @@ func _build_ground() -> void:
 
 ## Хрущёвки напротив — настоящие 3D-модели, побольше (дом напротив видно высоким).
 func _build_houses() -> void:
-	_model("khrushchevka", Vector3(0, GROUND_Y, -32), 0.0, 1.35)
-	_model("khrushchevka", Vector3(-46, GROUND_Y, -42), 0.35, 1.35)
-	_model("khrushchevka", Vector3(46, GROUND_Y, -40), -0.4, 1.35)
+	_add_window_lights(_model("khrushchevka", Vector3(0, GROUND_Y, -32), 0.0, 1.35))
+	_add_window_lights(_model("khrushchevka", Vector3(-46, GROUND_Y, -42), 0.35, 1.35))
+	_add_window_lights(_model("khrushchevka", Vector3(46, GROUND_Y, -40), -0.4, 1.35))
+
+
+## Свет в окнах дома: тёплый прямоугольник на каждом стекле (две половинки — между ними рама).
+## Сам по себе невидим (прозрачный); ночью загорается в случайных окнах (_update_windows).
+func _add_window_lights(house: Node3D) -> void:
+	for f in HOUSE_FLOORS:
+		for c in HOUSE_COLS:
+			if f == 0 and c in [2, 6, 10]:
+				continue # подъезды
+			var x := -HOUSE_W / 2.0 + 1.2 + c * (HOUSE_W - 2.4) / (HOUSE_COLS - 1)
+			var y := 0.6 + f * HOUSE_FLOOR + 1.45
+			var mat := StandardMaterial3D.new()
+			mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+			mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+			mat.albedo_color = Color(LIGHT_COLOR, 0.0)
+			for side: float in [-1.0, 1.0]:
+				var quad := MeshInstance3D.new()
+				var mesh := QuadMesh.new()
+				mesh.size = Vector2(0.5, 1.15)
+				quad.mesh = mesh
+				quad.material_override = mat
+				quad.position = Vector3(x + side * 0.28, y, HOUSE_FRONT)
+				quad.layers = Apartment.FP_ONLY_LAYER # без «фильтра» двора: ночью свет яркий
+				quad.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+				house.add_child(quad)
+			_win_mats.append(mat)
+			_win_level.append(0.0)
+			_win_on.append(0)
+			# Сразу ночью уже горит примерно каждое третье окно, остальные загорятся позже.
+			_win_timer.append(randf_range(0.0, LIGHT_OFF.y))
+			if randf() < 0.35:
+				_win_on[_win_on.size() - 1] = 1
+				_win_timer[_win_timer.size() - 1] = randf_range(0.0, LIGHT_ON.y)
+
+
+## Ночью окна по одному плавно загораются и гаснут — каждое по своему случайному таймеру
+## (горит 30–120 сек). Днём свет во всех окнах плавно гаснет.
+func _update_windows(delta: float) -> void:
+	var night := is_dark()
+	for i in _win_mats.size():
+		_win_timer[i] -= delta
+		if _win_timer[i] <= 0.0:
+			_win_on[i] = 1 - _win_on[i]
+			var range_s := LIGHT_ON if _win_on[i] == 1 else LIGHT_OFF
+			_win_timer[i] = randf_range(range_s.x, range_s.y)
+		var target := 0.9 if night and _win_on[i] == 1 else 0.0
+		var level := move_toward(_win_level[i], target, delta / LIGHT_FADE)
+		if level != _win_level[i]:
+			_win_level[i] = level
+			_win_mats[i].albedo_color.a = level
 
 
 ## Деревья пониже и не в центре (не закрывают дом), кусты вдоль тропинки.
@@ -272,12 +341,13 @@ func _random_spot() -> Vector3:
 
 # ---------------- Помощники ----------------
 
-func _model(model_name: String, pos: Vector3, yaw: float, size: float) -> void:
+func _model(model_name: String, pos: Vector3, yaw: float, size: float) -> Node3D:
 	var node := (load(COURTYARD + model_name + ".glb") as PackedScene).instantiate() as Node3D
 	node.position = pos
 	node.rotation.y = yaw
 	node.scale = Vector3.ONE * size
 	_add(node)
+	return node
 
 
 func _box(size: Vector3, pos: Vector3, color: Color) -> void:
