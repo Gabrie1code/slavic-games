@@ -101,6 +101,13 @@ def part(name, pieces):
         for mod in list(o.modifiers):
             bpy.context.view_layer.objects.active = o
             bpy.ops.object.modifier_apply(modifier=mod.name)
+    # Повороты и масштаб кусков — в вершины: иначе склеенная часть наследует поворот первого куска,
+    # а игра ставит часть без поворота — вещь «улетает» (так было с круглыми очками и цепью).
+    bpy.ops.object.select_all(action="DESELECT")
+    for o in pieces:
+        o.select_set(True)
+    bpy.context.view_layer.objects.active = pieces[0]
+    bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
     bpy.ops.object.select_all(action="DESELECT")
     for o in pieces:
         o.select_set(True)
