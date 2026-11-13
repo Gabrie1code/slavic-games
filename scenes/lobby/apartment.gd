@@ -604,7 +604,7 @@ func _build_decor() -> void:
 	poster("home_kefir", size, Vector3(LEFT_X + 0.012, 1.65, -2.65), PI / 2)
 	poster("home_calendar", size, Vector3(5.75, 1.6, BACK_Z + 0.012), 0.0)
 	poster("home_hockey", size, Vector3(PARTITION_X + 0.085, 1.6, 0.65), PI / 2)
-	poster("home_energy", size, Vector3(-4.75, 1.65, LIVING_FRONT_Z - 0.012), PI)
+	poster("home_night", size, Vector3(-4.75, 1.65, LIVING_FRONT_Z - 0.012), PI)
 	# Ковровая дорожка к двери в спальню (заходить в спальню не стала — владельцу не понравилось).
 	_rug_floor(_place(_model("floor_runner"), Vector3(1.55, 0.004, -1.0)))
 

@@ -1,6 +1,6 @@
 """Плакаты для квартиры-лобби в духе советских плакатов (плоские цвета, крупные буквы,
 диагональ). Всё придуманное, без чужих брендов: «К звёздам!», календарь-1991 с котёнком,
-«Пейте кефир!», «Хоккей».
+«Пейте кефир!», «Хоккей», ночной «Тишина! Соседи спят».
 
 Запуск (Python с Pillow):
     python3 tools/textures/home_posters.py assets/textures/posters
@@ -137,28 +137,45 @@ big_text(d, "ХОККЕЙ", 610, 92, RED, DARK)
 d.text((W / 2, 672), "ТРУС НЕ ИГРАЕТ В ХОККЕЙ!", font=font(24), fill=DARK, anchor="mm")
 finish(img, "home_hockey")
 
-# 5. «БЕРЕГИ ЭЛЕКТРОЭНЕРГИЮ!» — жёлтый фон, большая лампочка, рука у выключателя.
-img = Image.new("RGB", (W, H), (245, 205, 70))
+# 5. «ТИШИНА! СОСЕДИ СПЯТ» — тёмный ночной плакат: синее небо, месяц, звёзды, хрущёвка
+# с парой горящих окон. (Был жёлтый «Береги электроэнергию» — слишком яркий для стены.)
+NIGHT = (14, 20, 46)
+img = Image.new("RGB", (W, H), NIGHT)
 d = ImageDraw.Draw(img)
-for k in range(12):                                                  # лучи от лампочки
-    a = math.radians(k * 30 + 15)
-    d.polygon([(256, 250), (256 + 330 * math.cos(a - 0.08), 250 + 330 * math.sin(a - 0.08)),
-               (256 + 330 * math.cos(a + 0.08), 250 + 330 * math.sin(a + 0.08))],
-              fill=(250, 222, 110))
-d.ellipse((166, 120, 346, 300), fill=(255, 250, 225), outline=DARK, width=6)   # колба
-d.polygon([(206, 285), (306, 285), (290, 330), (222, 330)], fill=(255, 250, 225), outline=DARK)
-for y in range(332, 380, 12):                                        # цоколь
-    d.rectangle((222, y, 290, y + 8), fill=(150, 150, 150), outline=DARK)
-d.line((236, 290, 246, 200, 256, 230, 266, 200, 276, 290), fill=(220, 120, 30), width=5)  # нить
-# Выключатель и палец, который его выключает.
-d.rounded_rectangle((330, 400, 410, 500), radius=10, fill=(240, 236, 226), outline=DARK, width=4)
-d.rectangle((358, 420, 382, 452), fill=RED)
-d.polygon([(470, 470), (395, 440), (380, 446), (386, 456), (470, 500)], fill=(240, 190, 150),
-          outline=DARK)
-big_text(d, "БЕРЕГИ", 560, 80, RED, DARK)
-big_text(d, "ЭЛЕКТРОЭНЕРГИЮ!", 630, 54, DARK)
-d.text((W / 2, 680), "УХОДЯ — ГАСИ СВЕТ", font=font(24), fill=DARK, anchor="mm")
-finish(img, "home_energy")
+for y in range(0, 470):                                              # небо светлеет к горизонту
+    k = y / 470
+    d.line((0, y, W, y), fill=(int(14 + 22 * k), int(20 + 26 * k), int(46 + 40 * k)))
+for _ in range(70):
+    x, y = random.randint(20, W - 20), random.randint(20, 380)
+    r = random.choice((1, 1, 2))
+    d.ellipse((x - r, y - r, x + r, y + r), fill=(235, 228, 200))
+d.ellipse((330, 70, 440, 180), fill=(242, 226, 160))                 # месяц: круг минус круг
+cut = Image.new("L", (W, H), 0)
+ImageDraw.Draw(cut).ellipse((306, 52, 416, 162), fill=255)
+sky = Image.new("RGB", (W, H))
+sd = ImageDraw.Draw(sky)
+for y in range(H):                                                   # то же небо, без звёзд
+    k = min(y, 470) / 470
+    sd.line((0, y, W, y), fill=(int(14 + 22 * k), int(20 + 26 * k), int(46 + 40 * k)))
+img.paste(sky, (0, 0), cut)
+d = ImageDraw.Draw(img)
+BLD = (8, 10, 24)
+d.rectangle((40, 250, 330, 470), fill=BLD)                           # хрущёвка
+d.rectangle((300, 300, 480, 470), fill=(11, 14, 32))                 # дом подальше
+lit = {(1, 2), (3, 0), (4, 3)}
+for row in range(5):
+    for col in range(6):
+        x, y = 62 + col * 44, 268 + row * 40
+        on = (row, col) in lit
+        d.rectangle((x, y, x + 22, y + 24), fill=(240, 190, 90) if on else (24, 30, 56))
+for row in range(4):
+    for col in range(4):
+        x, y = 318 + col * 40, 318 + row * 36
+        d.rectangle((x, y, x + 18, y + 20), fill=(220, 170, 80) if (row, col) == (2, 1) else (22, 28, 50))
+big_text(d, "ТИШИНА!", 540, 92, (242, 226, 160), BLD)
+big_text(d, "СОСЕДИ СПЯТ", 615, 50, (215, 222, 240))
+d.text((W / 2, 672), "ПОСЛЕ 23:00 — НЕ ШУМИ", font=font(24), fill=(170, 180, 210), anchor="mm")
+finish(img, "home_night")
 
 # 6. «БЕРЕГИ РАБОЧЕЕ ВРЕМЯ!» (на кухню) — зелёный фон, большие часы, красный рабочий с молотом.
 img = Image.new("RGB", (W, H), (38, 112, 88))
