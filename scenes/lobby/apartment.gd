@@ -769,9 +769,10 @@ func _solid(model: Node3D, size: Vector3, center_y: float, pos: Vector3,
 func _contact_shadow(footprint: Vector2) -> Decal:
 	if _shadow_tex == null:
 		var gradient := Gradient.new()
-		gradient.set_color(0, Color(0, 0, 0, 0.55))
+		gradient.set_color(0, Color(0, 0, 0, 0.6))
 		gradient.set_color(1, Color(0, 0, 0, 0.0))
-		gradient.add_point(0.6, Color(0, 0, 0, 0.4))
+		gradient.add_point(0.55, Color(0, 0, 0, 0.5))
+		gradient.add_point(0.8, Color(0, 0, 0, 0.18))
 		_shadow_tex = GradientTexture2D.new()
 		_shadow_tex.gradient = gradient
 		_shadow_tex.fill = GradientTexture2D.FILL_SQUARE
@@ -781,7 +782,9 @@ func _contact_shadow(footprint: Vector2) -> Decal:
 		_shadow_tex.height = 64
 	var decal := Decal.new()
 	decal.texture_albedo = _shadow_tex
-	decal.size = Vector3(footprint.x * 1.15, 0.24, footprint.y * 1.15)
+	# Тень выходит из-под мебели на ~35 см с каждой стороны и мягко тает: раньше выходила
+	# на 6–7 см и почти вся пряталась под самим диваном — сбоку её не было видно.
+	decal.size = Vector3(footprint.x + 0.7, 0.24, footprint.y + 0.7)
 	decal.position.y = 0.06 # от −0.06 до 0.18: пол, ковёр и низ ножек
 	decal.cull_mask = 1
 	decal.upper_fade = 0.6 # к верху ножек тень сходит на нет
