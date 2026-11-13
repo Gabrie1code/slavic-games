@@ -180,8 +180,8 @@ CORD = mat("Cord", (0.1, 0.1, 0.1), 0.6)
 # OvenBulb. Дверца — отдельная модель kitchen_oven_door (петля снизу), откидывается вниз.
 OVEN_IN = mat("OvenInside", (0.16, 0.16, 0.18), 0.4)
 DISH = mat("DishGlass", (0.75, 0.88, 0.92), 0.05)
-CHICKEN = mat("RoastChicken", (0.62, 0.3, 0.08), 0.3)
-CHICKEN_DARK = mat("RoastCrust", (0.42, 0.18, 0.05), 0.35)
+CHICKEN = mat("RoastChicken", (0.42, 0.11, 0.04), 0.3)
+CHICKEN_DARK = mat("RoastCrust", (0.16, 0.04, 0.015), 0.35)
 BONE = mat("Bone", (0.95, 0.92, 0.84), 0.5)
 OVEN_BULB = mat("OvenBulb", (1.0, 0.85, 0.5), 0.3, 0, 2.0)
 OZ0, OZ1 = 0.17, 0.67                                                              # проём духовки
@@ -206,12 +206,20 @@ dish = bpy.context.object
 dish.scale = (0.15, 0.11, 0.03)
 bpy.ops.object.transform_apply(scale=True, location=False)
 P.append(finish(dish, DISH, smooth=True))
-P.append(sphere(1.0, (0, 0.01, 0.385), CHICKEN, scale=(0.095, 0.07, 0.055), segs=20, rings=12))
-P.append(sphere(1.0, (0, 0.01, 0.42), CHICKEN_DARK, scale=(0.06, 0.045, 0.025)))  # румяная спинка
+# Курица как на фото владельца: пухлая вытянутая тушка, на одном конце — две толстые ножки
+# торчат вверх-назад с круглыми косточками; румяно-красноватая корочка с подпалинами.
+P.append(sphere(1.0, (0.02, 0.01, 0.388), CHICKEN, scale=(0.12, 0.08, 0.06), segs=24, rings=14))
+P.append(sphere(1.0, (0.05, 0.01, 0.415), CHICKEN_DARK, scale=(0.07, 0.05, 0.03)))  # подпалина
 for side in (-1, 1):
-    P.append(sphere(1.0, (side * 0.045, -0.07, 0.37), CHICKEN, scale=(0.03, 0.055, 0.03)))  # ножки
-    P.append(cyl(0.008, 0.03, (side * 0.05, -0.125, 0.375), BONE, verts=8, rot=(math.radians(90), 0, 0)))
-    P.append(sphere(1.0, (side * 0.09, 0.03, 0.38), CHICKEN_DARK, scale=(0.025, 0.04, 0.02)))  # крылья
+    y = 0.01 + side * 0.035
+    leg = sphere(1.0, (-0.105, y, 0.41), CHICKEN, scale=(0.06, 0.04, 0.04))
+    leg.rotation_euler = (0, math.radians(-35), 0)                                  # вверх-назад
+    bpy.context.view_layer.objects.active = leg
+    bpy.ops.object.transform_apply(rotation=True, location=False, scale=False)
+    P.append(leg)
+    P.append(cyl(0.009, 0.04, (-0.142, y, 0.448), CHICKEN_DARK, verts=8,
+                 rot=(0, math.radians(-35), 0), smooth=True))                       # косточка
+    P.append(sphere(0.013, (-0.155, y, 0.466), CHICKEN_DARK))                        # кончик
 P.append(sphere(0.022, (0.17, 0.2, OZ1 - 0.04), OVEN_BULB))                         # лампочка
 # Варочная поверхность, щиток, ручки (как было).
 P.append(box((0.48, 0.56, 0.012), (0, 0.005, 0.846), mat("Cooktop", (0.85, 0.84, 0.8), 0.3)))
@@ -228,14 +236,15 @@ for k in range(4):
 P.append(box((0.05, 0.022, 0.02), (0.19, -0.3, 0.79), BADGE))                    # шильдик
 P.append(box((0.46, 0.02, 0.1), (0, -0.295, 0.08), mat("Plinth", (0.3, 0.3, 0.32), 0.6)))
 export("kitchen_stove", P)
-# Дверца духовки: петля — нижний передний край (z = OZ0, y = −0.295), откидывается вниз.
-P = [box((0.44, 0.02, OZ1 - OZ0), (0, -0.295, (OZ0 + OZ1) / 2), ENAMEL, bevel=0.01),
+# Дверца духовки: петля — нижний передний край (z = OZ0 − 0.005, y = −0.3), откидывается вниз.
+# Дверца перекрывает проём с запасом (0.48 × 0.51) — раньше по краям были щели внутрь.
+P = [box((0.48, 0.02, OZ1 - OZ0 + 0.01), (0, -0.3, (OZ0 + OZ1) / 2), ENAMEL, bevel=0.01),
      box((0.28, 0.022, 0.16), (0, -0.3, 0.44), GLASS_DARK),                           # окошко
      cyl(0.01, 0.36, (0, -0.33, 0.645), CHROME, verts=8, rot=(0, math.radians(90), 0))]
 for x in (-0.17, 0.17):
     P.append(box((0.02, 0.04, 0.02), (x, -0.315, 0.645), CHROME))
 for o in P:
-    o.location -= Vector((0, -0.295, OZ0))
+    o.location -= Vector((0, -0.3, OZ0 - 0.005))
     bpy.context.view_layer.update()
 export("kitchen_oven_door", P)
 
@@ -366,7 +375,8 @@ export("kitchen_window", P)
 # ---------------- Стол с клеёнкой ----------------
 # Столешница — дерево, сверху клеёнка (только сверху), по кромке — тонкая красная полоса
 # (раньше клеёнка свисала по бокам, и на торцах была «шахматная доска»).
-HEM = mat("OilclothHem", (0.77, 0.16, 0.14), 0.4)
+# Цвет — как красная клетка клеёнки (196, 40, 36 в sRGB → линейный цвет Blender).
+HEM = mat("OilclothHem", (0.55, 0.021, 0.017), 0.35)
 P = [box((1.0, 0.7, 0.03), (0, 0, 0.735), WOOD)]
 bpy.ops.mesh.primitive_plane_add(size=1.0, location=(0, 0, 0.7505))
 top = bpy.context.object

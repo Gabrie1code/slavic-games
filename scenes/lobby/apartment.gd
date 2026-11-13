@@ -575,11 +575,11 @@ func _build_decor() -> void:
 	_wall_shelf(Vector3(-3.25, 1.55, LIVING_FRONT_Z), PI, front_shelf, FP_ONLY_LAYER)
 	# Плакаты.
 	var size := Vector2(0.5, 0.7)
-	_poster("home_space", size, Vector3(PARTITION_X - 0.085, 1.65, 0.65), -PI / 2)
-	_poster("home_kefir", size, Vector3(LEFT_X + 0.012, 1.65, -2.65), PI / 2)
-	_poster("home_calendar", size, Vector3(5.75, 1.6, BACK_Z + 0.012), 0.0)
-	_poster("home_hockey", size, Vector3(PARTITION_X + 0.085, 1.6, 0.65), PI / 2)
-	_poster("home_energy", size, Vector3(-4.75, 1.65, LIVING_FRONT_Z - 0.012), PI)
+	poster("home_space", size, Vector3(PARTITION_X - 0.085, 1.65, 0.65), -PI / 2)
+	poster("home_kefir", size, Vector3(LEFT_X + 0.012, 1.65, -2.65), PI / 2)
+	poster("home_calendar", size, Vector3(5.75, 1.6, BACK_Z + 0.012), 0.0)
+	poster("home_hockey", size, Vector3(PARTITION_X + 0.085, 1.6, 0.65), PI / 2)
+	poster("home_energy", size, Vector3(-4.75, 1.65, LIVING_FRONT_Z - 0.012), PI)
 	# Ковровая дорожка к двери в спальню (заходить в спальню не стала — владельцу не понравилось).
 	_rug_floor(_place(_model("floor_runner"), Vector3(1.55, 0.004, -1.0)))
 
@@ -716,16 +716,16 @@ func _build_rubgame() -> void:
 	# Неоновые вывески: в игровой и над дверью со стороны гостиной.
 	# Внутри комнаты вместо надписи — ретро-постеры игровых автоматов 80-х.
 	var poster_size := Vector2(0.75, 1.12)
-	_poster("poster_star_flight", poster_size, Vector3(-8.7, 1.75, RUBGAME_BACK_Z + 0.012), 0.0)
-	_poster("poster_race", poster_size, Vector3(-7.3, 1.75, RUBGAME_BACK_Z + 0.012), 0.0)
-	_poster("poster_sub_hunt", poster_size, Vector3(RUBGAME_LEFT_X + 0.012, 1.7, 0.6), PI / 2)
-	_poster("poster_air_battle", poster_size, Vector3(LEFT_X - 0.232, 1.7, -1.0), -PI / 2)
+	poster("poster_star_flight", poster_size, Vector3(-8.7, 1.75, RUBGAME_BACK_Z + 0.012), 0.0)
+	poster("poster_race", poster_size, Vector3(-7.3, 1.75, RUBGAME_BACK_Z + 0.012), 0.0)
+	poster("poster_sub_hunt", poster_size, Vector3(RUBGAME_LEFT_X + 0.012, 1.7, 0.6), PI / 2)
+	poster("poster_air_battle", poster_size, Vector3(LEFT_X - 0.232, 1.7, -1.0), -PI / 2)
 	var door_z := (RUBGAME_DOOR_FROM_Z + RUBGAME_DOOR_TO_Z) / 2
 	_neon("ИГРА\nНА РУБЛИ", Vector3(LEFT_X + 0.02, 2.7, door_z), PI / 2, 36)
 
 
 ## Постер на стене (картинка из tools/textures/posters.py), освещается как стена.
-func _poster(poster_name: String, size: Vector2, pos: Vector3, yaw: float) -> void:
+func poster(poster_name: String, size: Vector2, pos: Vector3, yaw: float) -> void:
 	var quad := MeshInstance3D.new()
 	var mesh := QuadMesh.new()
 	mesh.size = size

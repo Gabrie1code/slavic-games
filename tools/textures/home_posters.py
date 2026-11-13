@@ -159,3 +159,27 @@ big_text(d, "БЕРЕГИ", 560, 80, RED, DARK)
 big_text(d, "ЭЛЕКТРОЭНЕРГИЮ!", 630, 54, DARK)
 d.text((W / 2, 680), "УХОДЯ — ГАСИ СВЕТ", font=font(24), fill=DARK, anchor="mm")
 finish(img, "home_energy")
+
+# 6. «БЕРЕГИ РАБОЧЕЕ ВРЕМЯ!» (на кухню) — зелёный фон, большие часы, красный рабочий с молотом.
+img = Image.new("RGB", (W, H), (38, 112, 88))
+d = ImageDraw.Draw(img)
+big_text(d, "БЕРЕГИ РАБОЧЕЕ", 70, 46, (250, 236, 190), DARK)
+big_text(d, "ВРЕМЯ!", 128, 64, (250, 236, 190), DARK)
+cx, cy, r = 256, 360, 160
+d.ellipse((cx - r, cy - r, cx + r, cy + r), fill=(240, 226, 186), outline=DARK, width=8)   # циферблат
+for k in range(12):
+    a = math.radians(k * 30)
+    r0 = r - (34 if k % 3 == 0 else 22)
+    d.line((cx + r0 * math.sin(a), cy - r0 * math.cos(a), cx + (r - 10) * math.sin(a),
+            cy - (r - 10) * math.cos(a)), fill=DARK, width=8 if k % 3 == 0 else 4)
+d.line((cx, cy, cx - 70, cy - 95), fill=DARK, width=12)              # часовая — к десяти
+d.line((cx, cy, cx + 105, cy - 60), fill=DARK, width=8)              # минутная
+d.ellipse((cx - 12, cy - 12, cx + 12, cy + 12), fill=RED)
+# Красный рабочий с молотом перед часами (силуэт).
+d.ellipse((150, 420, 210, 480), fill=RED)                            # голова
+d.polygon([(120, 700), (130, 520), (175, 480), (230, 520), (240, 700)], fill=RED)
+d.line((215, 520, 300, 455), fill=RED, width=22)                     # рука
+d.line((290, 470, 330, 410), fill=(90, 50, 25), width=10)            # рукоять
+d.polygon([(305, 395), (365, 420), (355, 440), (295, 415)], fill=DARK)  # молот
+d.text((W / 2 + 70, 650), "МИНУТА ДОРОГА!", font=font(28), fill=(250, 236, 190), anchor="mm")
+finish(img, "kitchen_time")

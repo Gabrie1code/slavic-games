@@ -201,6 +201,9 @@ func _build_furniture() -> void:
 		Vector3(0.5, 0.88, 0.58))
 	oven = KitchenOven.new() # дверца духовки откидывается, внутри — курица
 	stove.add_child(oven)
+	# Над плитой — плакат «Береги рабочее время!» (часы и рабочий с молотом).
+	if apartment:
+		apartment.poster("kitchen_time", Vector2(0.5, 0.7), Vector3(X0 + 0.012, 1.95, 5.0), PI / 2)
 	# Под окном — мойка (лицом от окна, −Z), правее — навесной шкафчик.
 	sink = KitchenSink.new()
 	sink.position = Vector3(WINDOW_X, 0, Z1 - 0.31)

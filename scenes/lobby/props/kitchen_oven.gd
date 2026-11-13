@@ -1,13 +1,13 @@
 class_name KitchenOven
 extends HingedProp
-## Духовка газовой плиты: дверца откидывается вниз (петля снизу), внутри загорается свет —
+## Духовка газовой плиты: дверца откидывается вниз на 50° (петля снизу), внутри загорается свет —
 ## видно запечённую курицу на стеклянном блюде (часть модели плиты, не трогается).
 ## Закрывается рукой. Узел — дочерний у плиты, в её начале координат (плита смотрит на +Z).
 ## Модели — tools/blender/kitchen.py (kitchen_stove, kitchen_oven_door).
 
 const DOOR := preload("res://assets/models/kitchen/kitchen_oven_door.glb")
 ## Петля дверцы: нижний передний край проёма духовки (в координатах плиты).
-const HINGE := Vector3(0.0, 0.17, 0.295)
+const HINGE := Vector3(0.0, 0.165, 0.3)
 
 var _light: OmniLight3D
 var _bulb_mat: StandardMaterial3D
@@ -18,7 +18,7 @@ func _ready() -> void:
 	door.position = HINGE
 	add_child(door)
 	swing_x = true
-	open_angle = deg_to_rad(85.0)
+	open_angle = deg_to_rad(50.0) # не до конца, под углом — как у старых плит
 	open_text = "Открыть духовку"
 	close_text = "Закрыть духовку"
 	front_offset = Vector3(0.0, 0.4, 0.75)
