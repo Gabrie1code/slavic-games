@@ -59,11 +59,12 @@ def cyl(r, h, z, m, r2=None, verts=16, loc=(0, 0), rot=(0, 0, 0)):
     return smooth(bpy.context.object, m)
 
 
-def ball(r, loc, m, scale=(1, 1, 1)):
+def ball(r, loc, m, scale=(1, 1, 1), rot=(0, 0, 0)):
     bpy.ops.mesh.primitive_uv_sphere_add(segments=12, ring_count=8, radius=r, location=loc)
     o = bpy.context.object
     o.scale = scale
     bpy.ops.object.transform_apply(scale=True)
+    o.rotation_euler = rot
     return smooth(o, m)
 
 
@@ -124,14 +125,18 @@ for s in (-1, 1):
     P.append(ring(0.02, 0.005, 0.07, WHITE, loc=(s * 0.055, 0), rot=(math.pi / 2, 0, 0)))
 made.append(export("china_sugar", P))
 
-# Плюшевый мишка (сидит).
+# Плюшевый мишка (сидит). Глаза — на поверхности головы (с бликом), лапы растут из плеч
+# и лежат на животе (раньше висели отдельными шарами сбоку).
 P = [ball(0.075, (0, 0, 0.08), FUR, scale=(1, 0.85, 1.1)), ball(0.045, (0, -0.045, 0.08), FUR_L, scale=(1, 0.5, 1.2)),
      ball(0.06, (0, -0.01, 0.2), FUR), ball(0.025, (0, -0.06, 0.19), FUR_L, scale=(1.2, 1, 0.9)),
      ball(0.009, (0, -0.083, 0.195), EYE)]
 for s in (-1, 1):
     P += [ball(0.022, (s * 0.045, 0.0, 0.25), FUR), ball(0.012, (s * 0.045, -0.012, 0.25), FUR_L),
-          ball(0.009, (s * 0.022, -0.052, 0.215), EYE),
-          ball(0.03, (s * 0.08, -0.02, 0.1), FUR, scale=(1, 1, 1.6)),
+          ball(0.011, (s * 0.025, -0.062, 0.222), EYE),                          # глаз
+          ball(0.004, (s * 0.022, -0.071, 0.226), WHITE),                        # блик
+          ball(0.03, (s * 0.08, -0.03, 0.105), FUR, scale=(1, 1, 1.7),            # лапа от плеча
+               rot=(math.radians(30), math.radians(s * 20), 0)),
+          ball(0.018, (s * 0.088, -0.062, 0.062), FUR_L, scale=(1, 0.7, 1)),     # подушечка
           ball(0.035, (s * 0.05, -0.07, 0.03), FUR, scale=(1, 1.4, 0.8))]
 P.append(ring(0.05, 0.008, 0.155, RIBBON))
 made.append(export("teddy_bear", P))

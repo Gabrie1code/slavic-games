@@ -416,9 +416,9 @@ func _build_window_view(window_pos: Vector3) -> void:
 	var center_x := window_pos.x
 	var layers := [
 		# [картинка, ширина, высота, низ по Y, глубина за стеной]
-		["window_trees", 18.0, 10.0, -6.0, 4.0],
-		["window_houses", 56.0, 18.0, -6.0, 28.0],
-		["window_sky", 170.0, 85.0, -25.0, 60.0],
+		["window_houses", 120.0, 18.0, -6.0, 28.0],
+		# Небо огромное: под любым углом из окна за ним не видно пустоты (была коричневая кайма).
+		["window_sky", 600.0, 320.0, -60.0, 60.0],
 	]
 	for layer: Array in layers:
 		var quad := MeshInstance3D.new()
@@ -437,9 +437,24 @@ func _build_window_view(window_pos: Vector3) -> void:
 			BACK_Z - 0.2 - float(layer[4]))
 		add_child(quad)
 	# Земля двора под окнами (между стеной и деревьями видно, если смотреть вниз).
-	var ground := _box(Vector3(80, 0.1, 40), Vector3(center_x, -6.05, BACK_Z - 20.2),
+	var ground := _box(Vector3(400, 0.1, 60), Vector3(center_x, -6.05, BACK_Z - 30.2),
 		_mat(Color(0.37, 0.5, 0.28), 1.0))
 	ground.layers = FP_ONLY_LAYER
+	# Деревья у дома — настоящие 3D-модели на разной глубине (при ходьбе видно, что они объёмные).
+	var trees: Array[Vector3] = [
+		Vector3(-6.0, 0, 6.0), Vector3(-2.5, 0, 9.5), Vector3(2.0, 0, 6.5), Vector3(5.5, 0, 10.5),
+		Vector3(8.5, 0, 7.0), Vector3(-9.5, 0, 12.0), Vector3(0.5, 0, 15.0), Vector3(-4.0, 0, 18.0),
+	]
+	for i in trees.size():
+		var model := "tree_poplar" if i % 2 == 0 else "tree_birch"
+		var tree := (load("res://assets/models/courtyard/%s.glb" % model) as PackedScene) \
+			.instantiate() as Node3D
+		tree.position = Vector3(center_x + trees[i].x, -6.0, BACK_Z - 0.2 - trees[i].z)
+		tree.rotation.y = i * 1.7
+		tree.scale = Vector3.ONE * (1.6 + (i % 3) * 0.15)
+		add_child(tree)
+		_set_layers(tree, FP_ONLY_LAYER)
+		_no_shadow(tree)
 	# Сверху (общая камера) — прежняя плоская картинка прямо за проёмом.
 	var flat := MeshInstance3D.new()
 	var flat_mesh := QuadMesh.new()

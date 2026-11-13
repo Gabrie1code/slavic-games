@@ -35,7 +35,9 @@ const UNFREEZE_TIME := 2.0
 const IMMUNE_TIME := 1.5
 const ZONE_RADIUS := 3.0
 ## Как близко к лавочке (спереди или сзади), чтобы под неё залезть.
-const BENCH_RADIUS := 1.0
+const BENCH_RADIUS := 1.5
+## Горка, качели, лавочка: после использования снова можно через столько секунд.
+const PLAY_COOLDOWN := 15.0
 const ZONE_LIMIT := 3.0
 const ZONE_PUSH := 13.0
 const STUN_TIME := 1.0
@@ -68,6 +70,8 @@ class Racer:
 	var stun_left := 0.0
 	## Едет с горки или сидит на качелях — водящий не может заморозить.
 	var busy := false
+	## Перезарядка горки, качелей и лавочки у этого игрока: "slide"/"swing"/"bench" -> сек.
+	var play_cooldown: Dictionary = {}
 	## Спринт на Shift: на 3 сек +50% у бегущих, +15% у водящего; перезарядка 15 сек.
 	var sprint := SprintAbility.new()
 	## Жёлтые лучики-вспышка у головы, пока размораживает друга.
@@ -638,26 +642,41 @@ func _update_playground(delta: float) -> void:
 	_yard.swing.update_swing(delta, characters)
 	_yard.carousel.update_spin(delta, characters)
 	for r in _racers:
-		# Пробел — прыжок, но не там, где он нужен для дела (разморозить, горка, качели).
-		r.character.can_jump = not _yard.slide.can_ride(r.character) \
-			and (r.is_chaser or (_yard.swing.free_seat_near(r.character) < 0
-				and _free_bench_near(r) < 0))
+		for kind: String in r.play_cooldown.keys():
+			r.play_cooldown[kind] = maxf(0.0, float(r.play_cooldown[kind]) - delta)
+		var slide := _yard.slide.can_ride(r.character)
+		var seat := -1 if r.is_chaser else _yard.swing.free_seat_near(r.character)
+		var bench := -1 if r.is_chaser else _free_bench_near(r)
+		# Пробел — прыжок, но не там, где он нужен для дела (горка, качели, лавочка).
+		r.character.can_jump = not slide and seat < 0 and bench < 0
 		if r.frozen or r.busy or r.player.input == null or not r.character.input_enabled:
 			continue
 		if not r.player.input.is_just_pressed("confirm"):
 			continue
-		if _yard.slide.can_ride(r.character):
-			_set_busy(r, "НА ГОРКЕ!")
-			_yard.slide.ride(r.character)
-		elif not r.is_chaser:
-			var seat := _yard.swing.free_seat_near(r.character)
-			var bench := _free_bench_near(r)
-			if seat >= 0:
+		if slide:
+			if _play_ready(r, "slide", "Горка"):
+				_set_busy(r, "НА ГОРКЕ!")
+				_yard.slide.ride(r.character)
+		elif seat >= 0:
+			if _play_ready(r, "swing", "Качели"):
 				_set_busy(r, "НА КАЧЕЛЯХ!")
 				_yard.swing.sit(r.character, seat)
-			elif bench >= 0:
+		elif bench >= 0:
+			if _play_ready(r, "bench", "Лавочка"):
 				_hide_under_bench(r, bench)
 	_update_hiding(delta)
+
+
+## Горку/качели/лавочку можно снова через PLAY_COOLDOWN сек после прошлого раза.
+## Готово — сразу ставит новую перезарядку и возвращает true; нет — пишет, сколько ждать.
+func _play_ready(r: Racer, kind: String, title: String) -> bool:
+	var left := float(r.play_cooldown.get(kind, 0.0))
+	if left > 0.0:
+		if not r.player.is_bot():
+			_show_message("%s: снова через %d с" % [title, ceili(left)])
+		return false
+	r.play_cooldown[kind] = PLAY_COOLDOWN
+	return true
 
 
 ## Свободная лавочка рядом с бегущим (-1 — нет).

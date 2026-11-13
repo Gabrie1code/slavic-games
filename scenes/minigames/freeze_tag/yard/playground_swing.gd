@@ -13,7 +13,7 @@ const SEAT := preload("res://assets/models/playground/swing_seat.glb")
 const BEAM_Y := 2.4
 const ROPE := 1.9
 const SEAT_X: Array[float] = [-0.6, 0.6]
-const USE_RADIUS := 1.0
+const USE_RADIUS := 1.5 # как радиус разморозки (UNFREEZE_RADIUS)
 const PUSH_RADIUS := 0.75
 const MAX_SWING := 0.9
 ## Частота маятника: √(g / L).

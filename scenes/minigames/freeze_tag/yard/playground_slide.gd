@@ -8,7 +8,7 @@ extends Node3D
 signal ride_finished(character: PlayerCharacter)
 
 const SCENE := preload("res://assets/models/playground/slide.glb")
-const USE_RADIUS := 1.1
+const USE_RADIUS := 1.5 # как радиус разморозки (UNFREEZE_RADIUS)
 const BOOST := 10.0
 ## Путь катания (локальные координаты): подойти к лесенке → наверх → площадка → вниз → выход.
 const PATH: Array[Vector3] = [
