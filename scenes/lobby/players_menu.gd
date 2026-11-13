@@ -112,15 +112,12 @@ func _row(slot: int, p: PlayerData) -> Control:
 	swatch.custom_minimum_size = Vector2(22, 22)
 	swatch.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	line.add_child(swatch)
-	var name_box := VBoxContainer.new()
-	name_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	name_box.add_theme_constant_override("separation", 0)
-	if p.is_bot():
-		name_box.add_child(_label("%s (бот)" % p.display_name, 21, Color.WHITE))
-	else:
-		name_box.add_child(_label(p.display_name, 21, Color.WHITE))
-		name_box.add_child(_label(p.device_label(), 14, Color(1, 1, 1, 0.6)))
-	line.add_child(name_box)
+	# Только ник, по центру строки по высоте (строку «Клавиатура WASD» убрали).
+	var name_label := _label("%s (бот)" % p.display_name if p.is_bot() else p.display_name, 21,
+		Color.WHITE)
+	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	name_label.size_flags_vertical = Control.SIZE_FILL
+	line.add_child(name_label)
 	if not p.is_bot():
 		line.add_child(_label("%d ₽" % PlayerManager.wallet(p), 19, Color("f6c343")))
 	var marked := is_ready.is_valid() and bool(is_ready.call(p))
