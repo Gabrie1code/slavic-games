@@ -331,9 +331,12 @@ func _build_bedroom() -> void:
 	_build_night_light()
 	_place(_model("floor_rug_oval"), Vector3(6.3, 0.005, -0.8)).rotation_degrees.y = 90.0
 	_tippable("dumbbell", Vector3(0.34, 0.12, 0.12), 0.06, Vector3(8.5, 0, 0.6), 3.0, 30.0)
-	_tippable("stool", Vector3(0.36, 0.47, 0.36), 0.24, Vector3(8.4, 0, -0.4), 2.0)
-	_breakable("book_stack_tall", Vector3(8.4, 0.47, -0.4),
-		[Color("992018"), Color("cc9918"), Color("26262e"), Color("4d8c99")], 0.4)
+	var stool := _tippable("stool", Vector3(0.36, 0.47, 0.36), 0.24, Vector3(8.4, 0, -0.4), 2.0)
+	# Книги на табурете — каждая со своей физикой: сбили табурет — книги падают на пол.
+	var pile := BookPile.new()
+	pile.position = Vector3(8.4, 0.475, -0.4)
+	add_child(pile)
+	pile.build(6, stool)
 	_chandelier(Vector3(6.2, 0, -1.4), BEDROOM_SWITCH, PI / 2)
 
 

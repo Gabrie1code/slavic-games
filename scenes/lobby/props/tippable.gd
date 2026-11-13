@@ -8,6 +8,9 @@ const RESET_TIME := 12.0
 ## Какой разгон нужен персонажу, чтобы уронить вещь (PlayerCharacter.run_up): чем больше вещь,
 ## тем больше. Аккуратно подошёл — просто упёрся.
 var run_up_needed := 0.4
+## На чём вещь стоит (книга на табурете): пока опора не вернулась на место, вещь тоже не
+## возвращается — иначе книга появилась бы в воздухе над пустым местом и снова упала.
+var support: Tippable
 
 var _home: Transform3D
 var _model: Node3D
@@ -16,7 +19,12 @@ var _away_time := 0.0
 
 ## scene — модель, size — размер коробки столкновений, center_y — её центр по высоте.
 func setup(scene: PackedScene, size: Vector3, center_y: float, body_mass: float = 4.0) -> void:
-	_model = scene.instantiate()
+	setup_model(scene.instantiate() as Node3D, size, center_y, body_mass)
+
+
+## То же, но модель уже собрана (например, кодом — книга из коробок).
+func setup_model(model: Node3D, size: Vector3, center_y: float, body_mass: float = 4.0) -> void:
+	_model = model
 	add_child(_model)
 	add_to_group("tippable")
 	var shape := CollisionShape3D.new()
@@ -46,7 +54,7 @@ func _physics_process(delta: float) -> void:
 	var moved := global_position.distance_to(_home.origin) > 0.25 \
 		or global_basis.y.dot(Vector3.UP) < 0.95
 	_away_time = _away_time + delta if moved else 0.0
-	if _away_time > RESET_TIME:
+	if _away_time > RESET_TIME and (support == null or support.is_at_home()):
 		_away_time = 0.0
 		_return_home()
 
