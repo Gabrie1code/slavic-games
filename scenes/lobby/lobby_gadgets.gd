@@ -55,8 +55,9 @@ func _init(apt: Apartment, chars: Dictionary) -> void:
 
 
 ## Одна строка подсказки: кнопка, действие, недоступно ли (серым).
-static func entry(key: String, text: String, off: bool = false) -> Dictionary:
-	return {"key": key, "text": text, "off": off}
+## on_run — действие работает и на бегу (Shift): подсказка не сереет (удар молотком).
+static func entry(key: String, text: String, off: bool = false, on_run: bool = false) -> Dictionary:
+	return {"key": key, "text": text, "off": off, "on_run": on_run}
 
 
 ## Бежит (Shift и движется) — тогда кнопки действий не работают и подсказки серые: можно
@@ -70,7 +71,7 @@ static func is_running(p: PlayerData, character: PlayerCharacter) -> bool:
 static func greyed(entries: Array[Dictionary]) -> Array[Dictionary]:
 	var result: Array[Dictionary] = []
 	for e in entries:
-		result.append(entry(e["key"], e["text"], true))
+		result.append(e if e.get("on_run", false) else entry(e["key"], e["text"], true))
 	return result
 
 
@@ -253,7 +254,7 @@ func hand_hint(p: PlayerData) -> Array[Dictionary]:
 	if holds_can(p):
 		return _can_holder_hint(p)
 	if holds_hammer(p):
-		var hammer_entries: Array[Dictionary] = [entry(attack_key(p), "Ударить молотком"),
+		var hammer_entries: Array[Dictionary] = [entry(attack_key(p), "Ударить молотком", false, true),
 			entry(drop_key(p), "Бросить молоток")]
 		return hammer_entries
 	if _holds_remote(p):

@@ -248,7 +248,8 @@ func _process(delta: float) -> void:
 		if _gadgets.hand_busy(p):
 			var view: Dictionary = _views.get(p.id, {})
 			_gadgets.process_hand(p, view.get("camera"), view.get("can")) # баллончик / губка
-			if p.input.is_just_pressed("attack") and not running and _gadgets.holds_hammer(p):
+			# Молоток бьёт и на бегу (Shift) — исключение из правила «на бегу действий нет».
+			if p.input.is_just_pressed("attack") and _gadgets.holds_hammer(p):
 				_punch(p, true) # молоток бьёт, как кулак (+ разбивает экран автомата)
 		elif p.input.is_just_pressed("attack") and (running or not _gadgets.try_attack_use(p)):
 			_punch(p) # у раковины удар берёт губку (try_attack_use), иначе — кулак
