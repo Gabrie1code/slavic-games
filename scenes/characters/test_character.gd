@@ -29,6 +29,11 @@ const KNOCKBACK_DECAY := 18.0
 const CROUCH_SPEED := 0.4
 const CROUCH_DROP := 0.2
 const CROUCH_LEAN := 0.45
+## Прыжок «как в party-играх»: взлёт сразу, в момент толчка модель вытягивается, в полёте ноги
+## поджаты и руки в стороны, на спуске ноги тянутся к земле, при приземлении — сжатие, пыль, звук.
+const STRETCH := 0.2
+const AIR_ARMS_RISE := 0.55
+const AIR_ARMS_FALL := 0.95
 ## Максимальная скорость взлёта (прыжок 7, отбрасывание битой до ~7 — хватает с запасом).
 const MAX_RISE_SPEED := 9.0
 ## Поворот правой руки: опущена / поднята вверх / вытянута в сторону.
@@ -85,6 +90,13 @@ var _run_dir := Vector2.ZERO
 var _impact_speed := 0.0
 ## Когда последний раз толкнули вещь с разгоном: id вещи -> время (не толкать каждый кадр).
 var _bumped: Dictionary = {}
+## Прыжок: насколько персонаж в «позе полёта» (0..1), сколько уже в воздухе, сжатие/растяжение
+## модели (>0 — вытянут, <0 — сплющен), стоял ли на земле в прошлом кадре.
+var _air := 0.0
+var _air_time := 0.0
+var _squash := 0.0
+var _was_on_floor := true
+var _air_pose_on := false
 var _gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity")
 var _arm_tween: Tween
 var _right_arm_busy := false
@@ -162,6 +174,8 @@ func _physics_process(delta: float) -> void:
 		# включить, сесть…), лобби отменит прыжок (jump_pending = false), и персонаж не подпрыгнет.
 		if jump_pending and is_on_floor():
 			velocity.y = JUMP_VELOCITY
+			_squash = 1.0 # толчок: вытянулся вверх
+			JumpFx.play(self, false)
 		jump_pending = not crouching and can_jump and player.input.is_just_pressed("confirm") \
 			and is_on_floor()
 
@@ -184,7 +198,9 @@ func _physics_process(delta: float) -> void:
 		rotation.y = lerp_angle(rotation.y, yaw, TURN_SPEED * delta)
 
 	_update_run_up(delta)
+	var fall_speed := -velocity.y
 	move_and_slide()
+	_check_landing(delta, fall_speed)
 	# Защита от «катапульты»: персонаж не взлетает быстрее MAX_RISE_SPEED, что бы его ни подбросило
 	# (раньше удар по полке с хрусталём мог запустить персонажа под потолок и выше).
 	velocity.y = minf(velocity.y, MAX_RISE_SPEED)
@@ -228,6 +244,7 @@ func _process(delta: float) -> void:
 	_model.position.y = SIT_DROP if sitting else absf(sin(_walk_phase)) * 0.06 * amount
 	_model.position.y -= CROUCH_DROP * crouch_amount
 	_part("Head").rotation.x = sin(_idle_time * 2.0) * 0.04 + CROUCH_LEAN * crouch_amount * 0.8
+	_animate_jump(delta)
 
 
 ## Сесть: персонаж ставится в точку (под сиденьем) и поворачивается на yaw.
@@ -246,6 +263,51 @@ func stand_up() -> void:
 	sitting = false
 	global_position += -global_basis.z * 0.7 + Vector3.UP * 0.1
 	set_physics_process(true)
+
+
+## Приземлился после полёта: сплющиться (тем сильнее, чем быстрее падал), пыль и «тук».
+func _check_landing(delta: float, fall_speed: float) -> void:
+	var on_floor := is_on_floor()
+	if on_floor and not _was_on_floor and _air_time > 0.12:
+		var strength := clampf(fall_speed / 12.0, 0.2, 1.0)
+		_squash = -(0.45 + 0.55 * strength)
+		if fall_speed > 3.5 and _idle_time > 0.5: # не «тукать» всем сразу при появлении
+			JumpFx.dust(self, strength)
+			JumpFx.play(self, true, strength)
+	_air_time = 0.0 if on_floor else _air_time + delta
+	_was_on_floor = on_floor
+
+
+## Поза прыжка поверх ходьбы: в воздухе ноги поджаты (на взлёте) или тянутся вниз (на спуске),
+## руки разведены; модель вытягивается при толчке и сплющивается при приземлении.
+func _animate_jump(delta: float) -> void:
+	var airborne := is_physics_processing() and not sitting and not is_on_floor() \
+		and _air_time > 0.06
+	_air = move_toward(_air, 1.0 if airborne else 0.0, delta * (8.0 if airborne else 12.0))
+	_squash = move_toward(_squash, 0.0, delta * 6.0)
+	_model.scale = Vector3(1.0 - STRETCH * 0.5 * _squash, 1.0 + STRETCH * _squash,
+		1.0 - STRETCH * 0.5 * _squash)
+	if _air <= 0.0:
+		if _air_pose_on: # поза закончилась — руки на место (один раз, чтобы не мешать другим позам)
+			_air_pose_on = false
+			_part("ArmL").rotation.z = -ARM_DOWN
+			if not _right_arm_busy:
+				_part("ArmR").rotation.z = ARM_DOWN
+		return
+	_air_pose_on = true
+	# 1 — летит вверх, 0 — падает.
+	var rise := clampf(0.5 + 0.5 * velocity.y / JUMP_VELOCITY, 0.0, 1.0)
+	var leg_l := lerpf(-0.12, 0.85, rise)
+	var leg_r := lerpf(0.12, 0.4, rise)
+	_part("LegL").rotation.x = lerpf(_part("LegL").rotation.x, leg_l, _air)
+	_part("LegR").rotation.x = lerpf(_part("LegR").rotation.x, leg_r, _air)
+	var spread := lerpf(AIR_ARMS_FALL, AIR_ARMS_RISE, rise) * _air
+	_part("ArmL").rotation.z = -(ARM_DOWN + spread)
+	_part("ArmL").rotation.x = lerpf(_part("ArmL").rotation.x, -0.3, _air)
+	if not _right_arm_busy:
+		_part("ArmR").rotation.z = ARM_DOWN + spread
+		_part("ArmR").rotation.x = lerpf(_part("ArmR").rotation.x, -0.3, _air)
+	_model.position.y *= 1.0 - _air # в воздухе без «подпрыгивания» шага
 
 
 ## Разгон: идёт быстро и не сворачивает резко — копится; медленно — быстро пропадает.
