@@ -566,12 +566,20 @@ func _build_decor() -> void:
 	_wall_shelf(Vector3(RIGHT_X, 1.5, -0.9), -PI / 2, book_shelf)
 	_wall_shelf(Vector3(RIGHT_X, 1.55, 0.5), -PI / 2, plant_shelf)
 	_wall_shelf(Vector3(PARTITION_X + 0.08, 1.6, -3.0), PI / 2, plant_shelf)
+	# Передняя стена гостиной слева от прохода на кухню: полка (книги, матрёшка, кактус) и плакат.
+	var front_shelf := [
+		["shelf_books", -0.28, 0.1, [Color("992018"), Color("1a4080"), Color("cc9918")]],
+		["shelf_matryoshka", 0.0, 0.1, [Color("cc1a14"), Color("e6c040")]],
+		["shelf_cactus", 0.24, 0.11, [Color("a64d26"), Color("26592a")]],
+	]
+	_wall_shelf(Vector3(-3.25, 1.55, LIVING_FRONT_Z), PI, front_shelf, FP_ONLY_LAYER)
 	# Плакаты.
 	var size := Vector2(0.5, 0.7)
 	_poster("home_space", size, Vector3(PARTITION_X - 0.085, 1.65, 0.65), -PI / 2)
 	_poster("home_kefir", size, Vector3(LEFT_X + 0.012, 1.65, -2.65), PI / 2)
 	_poster("home_calendar", size, Vector3(5.75, 1.6, BACK_Z + 0.012), 0.0)
 	_poster("home_hockey", size, Vector3(PARTITION_X + 0.085, 1.6, 0.65), PI / 2)
+	_poster("home_energy", size, Vector3(-4.75, 1.65, LIVING_FRONT_Z - 0.012), PI)
 	# Ковровая дорожка к двери в спальню (заходить в спальню не стала — владельцу не понравилось).
 	_rug_floor(_place(_model("floor_runner"), Vector3(1.55, 0.004, -1.0)))
 
@@ -605,12 +613,19 @@ func _tapestry(center: Vector3, size: Vector2) -> void:
 
 ## Настенная полка: пустая полка-модель и вещи на ней (Breakable). items — [[модель, x, z, цвета
 ## осколков], …] в координатах полки (вдоль полки — x, от стены — z).
-func _wall_shelf(pos: Vector3, yaw: float, items: Array) -> void:
-	_place(_model("wall_shelf"), pos).rotation.y = yaw
+## layer ≠ 0 — полка и вещи только на этом слое (на передней стене — только от первого лица:
+## сама стена сверху не видна, и полка висела бы в воздухе).
+func _wall_shelf(pos: Vector3, yaw: float, items: Array, layer: int = 0) -> void:
+	var shelf := _place(_model("wall_shelf"), pos)
+	shelf.rotation.y = yaw
+	if layer:
+		_set_layers(shelf, layer)
 	for item: Array in items:
 		var local := Vector3(item[1], 0.03, item[2]).rotated(Vector3.UP, yaw)
 		var thing := _breakable(item[0], pos + local, item[3], 0.12, 0.03)
 		thing.rotation.y = yaw
+		if layer:
+			_set_layers(thing, layer)
 
 
 # ---------------- Телефон, часы, кот ----------------

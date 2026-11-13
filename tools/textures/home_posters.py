@@ -136,3 +136,26 @@ for k in range(6):
 big_text(d, "ХОККЕЙ", 610, 92, RED, DARK)
 d.text((W / 2, 672), "ТРУС НЕ ИГРАЕТ В ХОККЕЙ!", font=font(24), fill=DARK, anchor="mm")
 finish(img, "home_hockey")
+
+# 5. «БЕРЕГИ ЭЛЕКТРОЭНЕРГИЮ!» — жёлтый фон, большая лампочка, рука у выключателя.
+img = Image.new("RGB", (W, H), (245, 205, 70))
+d = ImageDraw.Draw(img)
+for k in range(12):                                                  # лучи от лампочки
+    a = math.radians(k * 30 + 15)
+    d.polygon([(256, 250), (256 + 330 * math.cos(a - 0.08), 250 + 330 * math.sin(a - 0.08)),
+               (256 + 330 * math.cos(a + 0.08), 250 + 330 * math.sin(a + 0.08))],
+              fill=(250, 222, 110))
+d.ellipse((166, 120, 346, 300), fill=(255, 250, 225), outline=DARK, width=6)   # колба
+d.polygon([(206, 285), (306, 285), (290, 330), (222, 330)], fill=(255, 250, 225), outline=DARK)
+for y in range(332, 380, 12):                                        # цоколь
+    d.rectangle((222, y, 290, y + 8), fill=(150, 150, 150), outline=DARK)
+d.line((236, 290, 246, 200, 256, 230, 266, 200, 276, 290), fill=(220, 120, 30), width=5)  # нить
+# Выключатель и палец, который его выключает.
+d.rounded_rectangle((330, 400, 410, 500), radius=10, fill=(240, 236, 226), outline=DARK, width=4)
+d.rectangle((358, 420, 382, 452), fill=RED)
+d.polygon([(470, 470), (395, 440), (380, 446), (386, 456), (470, 500)], fill=(240, 190, 150),
+          outline=DARK)
+big_text(d, "БЕРЕГИ", 560, 80, RED, DARK)
+big_text(d, "ЭЛЕКТРОЭНЕРГИЮ!", 630, 54, DARK)
+d.text((W / 2, 680), "УХОДЯ — ГАСИ СВЕТ", font=font(24), fill=DARK, anchor="mm")
+finish(img, "home_energy")
