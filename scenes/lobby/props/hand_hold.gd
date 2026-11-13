@@ -74,3 +74,45 @@ static func _set_layers(node: Node, layer: int) -> void:
 		(node as VisualInstance3D).layers = layer
 	for child in node.get_children():
 		_set_layers(child, layer)
+
+
+## «Рука поверх стен»: вещь в кадре (кулак, молоток, губка…) рисуется так, будто она у самых
+## глаз, и не утопает в стене, когда подходишь вплотную. Для этого у каждого материала включается
+## сжатие глубины к камере (z_clip_scale, есть в Godot 4.5+). Форма и размер на экране не
+## меняются. Материалы копируются: у моделей из .glb они общие с вещами в мире.
+## Подключено к camera.child_entered_tree — срабатывает для всего, что вешается на камеру.
+static func on_top(node: Node) -> void:
+	if node is GeometryInstance3D:
+		(node as GeometryInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	if node is MeshInstance3D:
+		_on_top_mesh(node as MeshInstance3D)
+	for child in node.get_children():
+		on_top(child)
+
+
+static func _on_top_mesh(mesh_instance: MeshInstance3D) -> void:
+	if mesh_instance.material_override:
+		mesh_instance.material_override = _on_top_material(mesh_instance.material_override)
+		return
+	if mesh_instance.mesh == null:
+		return
+	for i in mesh_instance.mesh.get_surface_count():
+		var mat := mesh_instance.get_surface_override_material(i)
+		if mat == null:
+			mat = mesh_instance.mesh.surface_get_material(i)
+		if mat:
+			mesh_instance.set_surface_override_material(i, _on_top_material(mat))
+
+
+static func _on_top_material(mat: Material) -> Material:
+	if not mat is BaseMaterial3D:
+		return mat
+	var copy := mat.duplicate() as BaseMaterial3D
+	if "use_z_clip_scale" in copy:
+		copy.set("use_z_clip_scale", true)
+		copy.set("z_clip_scale", 0.2) # в 5 раз ближе к глазам (стена ближе 0,3 м не бывает)
+	else:
+		# Запасной путь для старого Godot: рисовать без проверки глубины, поверх всего.
+		copy.no_depth_test = true
+		copy.render_priority = 10
+	return copy

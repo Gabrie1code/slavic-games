@@ -565,6 +565,8 @@ func _create_view(p: PlayerData) -> void:
 		& ~Apartment.OVERVIEW_ONLY_LAYER & ~PlayerCharacter.name_layer(p.slot)) | _viewmodel_layer(p)
 	viewport.add_child(camera)
 	camera.current = true
+	# Всё «в кадре» (кулак, вещи в руке) рисуется поверх стен — не пропадает вплотную к ним.
+	camera.child_entered_tree.connect(HandHold.on_top)
 	var fist := MeshInstance3D.new()
 	var fist_mesh := SphereMesh.new()
 	fist_mesh.radius = 0.09
