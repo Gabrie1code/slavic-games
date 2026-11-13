@@ -43,21 +43,33 @@ func holds(p: PlayerData) -> bool:
 	return _held.has(p.id)
 
 
-## Бутылка на столе рядом, на которую смотрит игрок (рука свободна — проверяет вызывающий).
-func can_take(p: PlayerData) -> bool:
-	var bottle := kitchen.bottle
-	if bottle == null or not characters.has(p.id):
-		return false
+## Бутылка рядом, на которую смотрит игрок: на столе или брошенная на полу (null — нет).
+## Рука свободна — проверяет вызывающий.
+func _reachable(p: PlayerData) -> KitchenBottle:
+	if not characters.has(p.id):
+		return null
 	var character := characters[p.id] as Node3D
-	var to := bottle.global_position - character.global_position
-	return Vector2(to.x, to.z).length() < REACH \
-		and LobbyGadgets.facing(character, bottle.global_position)
+	for node in character.get_tree().get_nodes_in_group("kitchen_bottle"):
+		var bottle := node as KitchenBottle
+		if bottle == null or bottle.state == KitchenBottle.State.HELD or bottle.is_queued_for_deletion():
+			continue
+		var to := bottle.global_position - character.global_position
+		if Vector2(to.x, to.z).length() < REACH \
+				and LobbyGadgets.facing(character, bottle.global_position):
+			return bottle
+	return null
+
+
+func can_take(p: PlayerData) -> bool:
+	return _reachable(p) != null
 
 
 func take_hint(p: PlayerData) -> Array[Dictionary]:
 	var result: Array[Dictionary] = []
-	if can_take(p):
-		result.append(LobbyGadgets.entry(LobbyGadgets.attack_key(p), "Взять бутылку"))
+	var bottle := _reachable(p)
+	if bottle:
+		var text := "Взять бутылку" if bottle == kitchen.bottle else "Подобрать бутылку"
+		result.append(LobbyGadgets.entry(LobbyGadgets.attack_key(p), text))
 	return result
 
 
@@ -73,9 +85,11 @@ func hint(p: PlayerData) -> Array[Dictionary]:
 
 ## ЛКМ со свободной рукой у стола — взять бутылку. true — взял.
 func try_take(p: PlayerData) -> bool:
-	if not can_take(p):
+	var bottle := _reachable(p)
+	if bottle == null:
 		return false
-	var bottle := kitchen.take_bottle()
+	if bottle == kitchen.bottle:
+		kitchen.take_bottle() # со стола — через 20 сек там появится новая
 	_held[p.id] = bottle
 	bottle.hold(p, characters[p.id])
 	return true

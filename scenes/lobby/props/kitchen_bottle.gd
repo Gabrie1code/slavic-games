@@ -63,6 +63,8 @@ func _process(delta: float) -> void:
 
 func hold(p: PlayerData, character: PlayerCharacter) -> void:
 	state = State.HELD
+	_loose_time = 0.0 # подобрали с пола — больше не исчезает
+	_model.scale = Vector3.ONE
 	holder = p
 	_set_loose_physics(false)
 	var start := global_transform
