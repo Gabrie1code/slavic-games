@@ -1,0 +1,133 @@
+"""Плюшевый мишка для шкафа в серванте — гладкий и «вязаный» (по примеру владельца):
+все части — шары с большим числом граней и сглаживанием (как майка и молоток), сверху рельеф
+вязки — карта нормалей assets/textures/knit_normal.png (tools/textures/knit_normal.py).
+Большая круглая голова, выпуклая мордочка, треугольный нос и шов-ротик, блестящие глазки,
+круглые ушки, руки вдоль тела, толстые ноги вперёд. Точка (0,0,0) — на дне, лицом на −Y.
+
+Запуск:
+    python tools/blender/teddy.py assets/models/apartment [--render превью.png]
+"""
+import math
+import os
+import sys
+
+import bpy
+from mathutils import Vector
+
+ARGS = [a for a in sys.argv[1:] if not a.startswith("--")]
+OUT = ARGS[0] if ARGS else "."
+RENDER = sys.argv[sys.argv.index("--render") + 1] if "--render" in sys.argv else None
+KNIT = os.path.abspath("assets/textures/knit_normal.png")
+bpy.ops.wm.read_factory_settings(use_empty=True)
+
+
+def mat(name, color, rough, knit=0.0):
+    m = bpy.data.materials.new(name)
+    m.use_nodes = True
+    nodes = m.node_tree.nodes
+    b = nodes["Principled BSDF"]
+    b.inputs["Base Color"].default_value = (*color, 1)
+    b.inputs["Roughness"].default_value = rough
+    if knit:                                                # рельеф вязки
+        tex = nodes.new("ShaderNodeTexImage")
+        tex.image = bpy.data.images.load(KNIT)
+        tex.image.colorspace_settings.name = "Non-Color"
+        nmap = nodes.new("ShaderNodeNormalMap")
+        nmap.inputs["Strength"].default_value = knit
+        m.node_tree.links.new(tex.outputs["Color"], nmap.inputs["Color"])
+        m.node_tree.links.new(nmap.outputs["Normal"], b.inputs["Normal"])
+    return m
+
+
+FUR = mat("TeddyFur", (0.3, 0.17, 0.08), 0.95, knit=0.8)
+FUR_L = mat("TeddyMuzzle", (0.38, 0.23, 0.11), 0.95, knit=0.8)
+FUR_D = mat("TeddyEarInside", (0.22, 0.12, 0.06), 0.95, knit=0.6)
+NOSE = mat("TeddyNose", (0.08, 0.05, 0.04), 0.35)
+EYE = mat("TeddyEye", (0.01, 0.01, 0.01), 0.08)
+
+
+def ball(r, loc, m, scale=(1, 1, 1), rot=(0, 0, 0), segs=32, rings=16):
+    """Гладкий шар/эллипсоид: много граней, сглаживание, поворот и масштаб — в вершины."""
+    bpy.ops.mesh.primitive_uv_sphere_add(segments=segs, ring_count=rings, radius=r, location=loc,
+                                         rotation=rot)
+    o = bpy.context.object
+    o.scale = scale
+    bpy.ops.object.transform_apply(scale=True, rotation=True)
+    o.data.materials.append(m)
+    for p in o.data.polygons:
+        p.use_smooth = True
+    return o
+
+
+def rod(a, b, r, m):
+    a, b = Vector(a), Vector(b)
+    d = b - a
+    bpy.ops.mesh.primitive_cylinder_add(vertices=8, radius=r, depth=d.length, location=(a + b) / 2)
+    o = bpy.context.object
+    o.rotation_euler = d.to_track_quat("Z", "Y").to_euler()
+    bpy.ops.object.transform_apply(rotation=True)
+    o.data.materials.append(m)
+    for p in o.data.polygons:
+        p.use_smooth = True
+    return o
+
+
+P = [ball(0.078, (0, 0, 0.1), FUR, scale=(1, 0.9, 1.12)),                  # тело-«груша»
+     ball(0.084, (0, 0.005, 0.068), FUR, scale=(1, 0.92, 0.82)),            # низ тела шире
+     ball(0.075, (0, -0.01, 0.228), FUR, scale=(1.05, 0.97, 0.97)),         # голова
+     ball(0.031, (0, -0.07, 0.205), FUR_L, scale=(1.15, 0.9, 0.82)),        # мордочка
+     ball(0.012, (0, -0.096, 0.214), NOSE, scale=(1.4, 0.7, 0.85), segs=20, rings=10),
+     rod((0, -0.097, 0.207), (0, -0.095, 0.191), 0.0018, NOSE)]             # шов-ротик
+for s in (-1, 1):
+    P += [ball(0.0085, (s * 0.03, -0.073, 0.243), EYE, segs=16, rings=8),   # блестящий глаз
+          ball(0.027, (s * 0.061, 0.0, 0.286), FUR, scale=(1, 0.55, 1)),     # ухо
+          ball(0.017, (s * 0.061, -0.012, 0.284), FUR_D, scale=(1, 0.35, 1), segs=20, rings=10),
+          ball(0.03, (s * 0.076, -0.03, 0.108), FUR, scale=(0.92, 1, 2.0),  # рука вдоль тела
+               rot=(math.radians(-12), math.radians(s * 10), 0)),
+          ball(0.043, (s * 0.048, -0.055, 0.04), FUR, scale=(1, 1.45, 0.85)),  # бедро
+          ball(0.04, (s * 0.052, -0.106, 0.045), FUR, scale=(0.9, 0.72, 1.05))]  # круглая ступня
+
+bpy.ops.object.select_all(action="DESELECT")
+for o in P:
+    o.select_set(True)
+bpy.context.view_layer.objects.active = P[0]
+bpy.ops.object.join()
+bear = bpy.context.object
+bear.name = "TeddyBear"
+bpy.context.scene.cursor.location = (0, 0, 0)
+bpy.ops.object.origin_set(type="ORIGIN_CURSOR")
+bpy.ops.export_scene.gltf(filepath=os.path.join(OUT, "teddy_bear.glb"), use_selection=True,
+                          export_format="GLB")
+print("EXPORTED teddy_bear", len(bear.data.polygons), "faces")
+
+if RENDER:
+    sc = bpy.context.scene
+    copies = []
+    for i, yaw in enumerate((0, 40, 100)):
+        c = bear.copy()
+        sc.collection.objects.link(c)
+        c.location.x = i * 0.32
+        c.rotation_euler.z = math.radians(yaw)
+        copies.append(c)
+    bear.hide_render = True
+    bpy.ops.mesh.primitive_plane_add(size=6, location=(0.32, 0, 0))
+    bpy.context.object.data.materials.append(mat("Floor", (0.45, 0.45, 0.47), 0.8))
+    sc.render.engine = "CYCLES"
+    sc.cycles.samples = 48
+    sc.render.resolution_x, sc.render.resolution_y = 1200, 520
+    sc.view_settings.view_transform = "Standard"
+    sc.world = bpy.data.worlds.new("W")
+    sc.world.color = (0.55, 0.55, 0.57)
+    sun = bpy.data.objects.new("S", bpy.data.lights.new("S", "SUN"))
+    sun.data.energy = 3.0
+    sun.rotation_euler = (math.radians(50), math.radians(10), math.radians(-30))
+    sc.collection.objects.link(sun)
+    cam = bpy.data.objects.new("C", bpy.data.cameras.new("C"))
+    sc.collection.objects.link(cam)
+    sc.camera = cam
+    cam.data.type = "ORTHO"
+    cam.data.ortho_scale = 1.0
+    cam.location = (0.32, -2.5, 0.55)
+    cam.rotation_euler = (Vector((0.32, 0, 0.14)) - cam.location).to_track_quat("-Z", "Y").to_euler()
+    sc.render.filepath = os.path.abspath(RENDER)
+    bpy.ops.render.render(write_still=True)
