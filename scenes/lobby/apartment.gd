@@ -552,26 +552,24 @@ func _build_decor() -> void:
 	_solid(_model("plant_ficus"), plant_size, 0.5, Vector3(8.65, 0, 1.15), 1.3)
 	# Настенные полки (задняя сторона модели — к стене; модель смотрит на +Z).
 	# Вещи на полках — отдельные, бьются как хрусталь (и через время появляются снова).
-	var book_shelf := [
-		["shelf_books", -0.28, 0.1, [Color("992018"), Color("1a4080"), Color("cc9918")]],
-		["shelf_matryoshka", 0.13, 0.1, [Color("cc1a14"), Color("e6c040")]],
-		["shelf_elephant", 0.36, 0.1, [Color("ebebe6")]],
-	]
-	var plant_shelf := [
-		["shelf_plant", -0.28, 0.11, [Color("a64d26"), Color("408c33")]],
-		["shelf_jar", -0.02, 0.1, [GLASS, Color("cc1a14")]],
-		["shelf_cactus", 0.2, 0.11, [Color("a64d26"), Color("26592a")]],
-	]
-	_wall_shelf(Vector3(PARTITION_X - 0.08, 1.55, -3.0), -PI / 2, book_shelf)
-	_wall_shelf(Vector3(RIGHT_X, 1.5, -0.9), -PI / 2, book_shelf)
-	_wall_shelf(Vector3(RIGHT_X, 1.55, 0.5), -PI / 2, plant_shelf)
-	_wall_shelf(Vector3(PARTITION_X + 0.08, 1.6, -3.0), PI / 2, plant_shelf)
-	# Передняя стена гостиной слева от прохода на кухню: полка (книги, матрёшка, кактус) и плакат.
-	var front_shelf := [
-		["shelf_books", -0.28, 0.1, [Color("992018"), Color("1a4080"), Color("cc9918")]],
-		["shelf_matryoshka", 0.0, 0.1, [Color("cc1a14"), Color("e6c040")]],
-		["shelf_cactus", 0.24, 0.11, [Color("a64d26"), Color("26592a")]],
-	]
+	# Вещицы — tools/blender/shelf_items.py, на каждой полке свой набор.
+	var books := ["shelf_books", -0.28, 0.1, [Color("992018"), Color("1a4080"), Color("cc9918")]]
+	var plant := ["shelf_plant", -0.28, 0.11, [Color("a64d26"), Color("408c33")]]
+	var cactus := ["shelf_cactus", 0.2, 0.11, [Color("a64d26"), Color("26592a")]]
+	_wall_shelf(Vector3(PARTITION_X - 0.08, 1.55, -3.0), -PI / 2, [books,
+		["shelf_matryoshka", 0.08, 0.1, [Color("cc1a14"), Color("e6c040"), Color("1f7a33")]],
+		["shelf_elephant", 0.36, 0.1, [Color("f0f0ec"), Color("1a3c99")]]])
+	_wall_shelf(Vector3(RIGHT_X, 1.5, -0.9), -PI / 2, [books,
+		["shelf_clock", 0.04, 0.1, [Color("c41810"), Color("f2efe2"), Color("b5b5b8")]],
+		["shelf_frame", 0.27, 0.1, [Color("6e3a14"), Color("a8865c")]]])
+	_wall_shelf(Vector3(RIGHT_X, 1.55, 0.5), -PI / 2, [plant,
+		["shelf_jar", -0.02, 0.1, [GLASS, Color("cc1a14"), Color("1a59cc")]], cactus])
+	_wall_shelf(Vector3(PARTITION_X + 0.08, 1.6, -3.0), PI / 2, [plant,
+		["shelf_vase", 0.0, 0.1, [Color("f0f0ec"), Color("1a3c99")]],
+		["shelf_samovar", 0.24, 0.1, [Color("c8902e"), Color("f0f0ec")]]])
+	# Передняя стена гостиной слева от прохода на кухню: книги, самовар, кактус.
+	var front_shelf := [books,
+		["shelf_samovar", 0.02, 0.1, [Color("c8902e"), Color("f0f0ec")]], cactus]
 	_wall_shelf(Vector3(-3.25, 1.55, LIVING_FRONT_Z), PI, front_shelf, FP_ONLY_LAYER)
 	# Плакаты.
 	var size := Vector2(0.5, 0.7)

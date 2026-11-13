@@ -1,8 +1,9 @@
 """Уют для квартиры: настенные полки и комнатные растения (низкополигонально).
 
   wall_shelf.glb        — пустая полка на кронштейнах; вещи для неё — отдельные модели (бьются):
-                          shelf_books, shelf_matryoshka, shelf_elephant, shelf_plant, shelf_cactus,
-                          shelf_jar (точка (0,0,0) — под вещью на полке);
+                          shelf_books, shelf_plant, shelf_cactus (точка (0,0,0) — под вещью);
+                          остальные вещицы (матрёшки, слоник, банка, будильник…) —
+                          tools/blender/shelf_items.py;
   plant_ficus.glb       — фикус в кадке (~1.5 м);
   plant_snake.glb       — «тёщин язык» (сансевиерия) в горшке (~0.8 м);
   plant_palm.glb        — пальма в кадке (~1.3 м);
@@ -54,11 +55,6 @@ LEAF3 = mat("LeafStripe", (0.55, 0.65, 0.2), 0.7)
 TRUNK = mat("Trunk", (0.35, 0.24, 0.12), 0.8)
 BOOKS = [mat("Book%d" % i, c, 0.8) for i, c in enumerate(
     [(0.6, 0.1, 0.08), (0.1, 0.25, 0.5), (0.15, 0.4, 0.15), (0.8, 0.6, 0.1), (0.4, 0.15, 0.4)])]
-MATR_RED = mat("MatrRed", (0.8, 0.1, 0.08), 0.4)
-MATR_FACE = mat("MatrFace", (0.95, 0.85, 0.7), 0.5)
-MATR_GOLD = mat("MatrGold", (0.9, 0.7, 0.2), 0.4)
-WHITE = mat("Porcelain", (0.92, 0.92, 0.9), 0.3)
-GLASS = mat("JarGlass", (0.75, 0.85, 0.8), 0.2)
 
 
 def flat(o, m, smooth=False):
@@ -157,13 +153,6 @@ def shelf_base(length=0.9):
     return parts
 
 
-def matryoshka(x, y, s):
-    return [cyl(0.045 * s, 0.08 * s, (x, y, 0.03 + 0.04 * s), MATR_RED, verts=10, r2=0.04 * s),
-            blob(0.035 * s, (x, y, 0.03 + 0.11 * s), MATR_RED),
-            blob(0.024 * s, (x, y - 0.02 * s, 0.03 + 0.11 * s), MATR_FACE, scale=(1, 0.6, 1)),
-            cyl(0.046 * s, 0.012 * s, (x, y, 0.03 + 0.06 * s), MATR_GOLD, verts=10)]
-
-
 # ---- Полка на кронштейнах (пустая) и вещи для неё — отдельно, каждую можно разбить ----
 export("wall_shelf", shelf_base())
 
@@ -175,15 +164,6 @@ for i in range(7):
     P.append(box((0.035, 0.15, h), (x, -0.1, 0.03 + h / 2), BOOKS[i % 5], rot=(0, tilt, 0)))
     x += 0.04
 export_item("shelf_books", P, (-0.28, -0.1, 0.03))
-export_item("shelf_matryoshka",
-            matryoshka(0.05, -0.1, 1.0) + matryoshka(0.15, -0.1, 0.75) + matryoshka(0.23, -0.1, 0.55),
-            (0.13, -0.1, 0.03))
-P = [blob(0.05, (0.36, -0.1, 0.09), WHITE, scale=(1.3, 0.8, 0.9)),                # слоник
-     cyl(0.012, 0.05, (0.42, -0.1, 0.1), WHITE, verts=6, r2=0.008, rot=(0, 0.9, 0))]
-for lx in (0.31, 0.41):
-    P.append(cyl(0.012, 0.05, (lx, -0.1, 0.055), WHITE, verts=6))
-export_item("shelf_elephant", P, (0.36, -0.1, 0.03))
-
 P = []
 for o in pot(0.055, 0.1):
     o.location += Vector((-0.28, -0.11, 0.03))
@@ -206,9 +186,6 @@ for k in range(6):                                                        # ка
     P.append(blob(0.035, (0.2 + random.uniform(-0.03, 0.03), -0.11, 0.14 + k * 0.025), LEAF,
                   scale=(1, 1, 1.3)))
 export_item("shelf_cactus", P, (0.2, -0.11, 0.03))
-P = [cyl(0.035, 0.09, (-0.02, -0.1, 0.075), GLASS, verts=10),               # баночка с пуговицами
-     cyl(0.037, 0.015, (-0.02, -0.1, 0.125), MATR_RED, verts=10)]
-export_item("shelf_jar", P, (-0.02, -0.1, 0.03))
 
 # ---- Фикус ----
 random.seed(21) # у каждой модели свой «посев»: правка одной не меняет другие

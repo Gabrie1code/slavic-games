@@ -10,7 +10,7 @@ import os
 import random
 import sys
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 OUT = sys.argv[1] if len(sys.argv) > 1 else "."
 random.seed(11)
@@ -183,3 +183,19 @@ d.line((290, 470, 330, 410), fill=(90, 50, 25), width=10)            # руко�
 d.polygon([(305, 395), (365, 420), (355, 440), (295, 415)], fill=DARK)  # молот
 d.text((W / 2 + 70, 650), "МИНУТА ДОРОГА!", font=font(28), fill=(250, 236, 190), anchor="mm")
 finish(img, "kitchen_time")
+
+# 7. Старая фотография для рамки на полке (сепия): двое на фоне, белая кайма.
+img = Image.new("RGB", (300, 400), (232, 220, 196))
+d = ImageDraw.Draw(img)
+d.rectangle((14, 14, 286, 386), fill=(150, 120, 86))
+for y in range(14, 386):                                             # фон светлее кверху
+    t = (y - 14) / 372
+    d.line((14, y, 286, y), fill=(int(176 - 50 * t), int(146 - 44 * t), int(104 - 34 * t)))
+for cx, h, shirt in ((110, 0, (96, 70, 48)), (190, 16, (70, 50, 36))):  # мужчина и женщина
+    d.ellipse((cx - 30, 120 + h, cx + 30, 185 + h), fill=(214, 186, 150))  # лицо
+    d.chord((cx - 34, 105 + h, cx + 34, 160 + h), 180, 360, fill=(60, 42, 30))  # волосы
+    d.polygon([(cx - 60, 386), (cx - 48, 230 + h), (cx, 200 + h), (cx + 48, 230 + h),
+               (cx + 60, 386)], fill=shirt)
+img = img.filter(ImageFilter.GaussianBlur(1.2))
+img.save(os.path.join(OUT, "shelf_photo.png"))
+print("SAVED shelf_photo")
