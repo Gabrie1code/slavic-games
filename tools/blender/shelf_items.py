@@ -5,8 +5,9 @@
                      фартук с цветком, золотой поясок;
   shelf_elephant   — фарфоровый слоник «гжель»: хобот вверх, уши, бивни, синяя попонка;
   shelf_jar        — стеклянная банка с разноцветными пуговицами, жестяная крышка;
-  shelf_clock      — красный будильник с двумя звонками и циферблатом;
-  shelf_samovar    — маленький латунный самовар с краником и заварничком сверху;
+  shelf_clock      — красный будильник с двумя звонками; стрелки ClockHour / ClockMinute —
+                     отдельные объекты, в игре показывают время компьютера (ShelfClock);
+  shelf_rocket     — сувенир «ракета» на подставке;
   shelf_frame      — фотография в деревянной рамке на подставке (сепия);
   shelf_vase       — ваза «гжель»: белая с синими поясками и горошинами.
 Растения и книги — в tools/blender/decor.py.
@@ -135,7 +136,7 @@ def tube(pts, radius, m, taper=None):
     return finish(o, m)
 
 
-def export(name, parts):
+def export(name, parts, write=True):
     bpy.ops.object.select_all(action="DESELECT")
     for o in parts:
         o.select_set(True)
@@ -145,9 +146,10 @@ def export(name, parts):
     obj.name = name
     bpy.context.scene.cursor.location = (0, 0, 0)
     bpy.ops.object.origin_set(type="ORIGIN_CURSOR")
-    bpy.ops.export_scene.gltf(filepath=os.path.join(OUT, name + ".glb"), use_selection=True,
-                              export_format="GLB")
-    print("EXPORTED", name)
+    if write:
+        bpy.ops.export_scene.gltf(filepath=os.path.join(OUT, name + ".glb"), use_selection=True,
+                                  export_format="GLB")
+        print("EXPORTED", name)
     return obj
 
 
@@ -160,7 +162,6 @@ FLOWER = mat("MatrFlower", (0.85, 0.08, 0.1), 0.4)
 LEAFG = mat("MatrLeaf", (0.15, 0.5, 0.15), 0.5)
 PORCELAIN = mat("Porcelain", (0.94, 0.94, 0.92), 0.2)
 COBALT = mat("Cobalt", (0.06, 0.18, 0.6), 0.25)
-BRASS = mat("Brass", (0.78, 0.55, 0.22), 0.25, 0.85)
 TIN = mat("Tin", (0.7, 0.7, 0.72), 0.3, 0.8)
 GLASS = mat("JarGlass", (0.8, 0.9, 0.88), 0.05, alpha=0.35)
 WOOD = mat("FrameWood", (0.36, 0.18, 0.07), 0.45)
@@ -248,35 +249,61 @@ for k in range(12):
     ln = 0.007 if k % 3 == 0 else 0.004
     P.append(box((0.0018, 0.002, ln), (math.sin(a) * 0.029, -0.0195, 0.058 + math.cos(a) * 0.029), DARK,
                  rot=(0, -a, 0)))
-P.append(box((0.0025, 0.002, 0.018), (-0.006, -0.0205, 0.064), DARK, rot=(0, math.radians(40), 0)))
-P.append(box((0.0018, 0.002, 0.026), (0.008, -0.0205, 0.066), DARK, rot=(0, math.radians(-30), 0)))
 for side in (-1, 1):
     P.append(ball(0.016, (side * 0.026, 0, 0.1), TIN, scale=(1, 1, 0.7)))              # звонки
     P.append(cyl(0.004, 0.03, (side * 0.025, 0.006, 0.012), TIN, verts=8,
                  rot=(0, math.radians(side * 25), 0)))                                 # ножки
 P.append(cyl(0.003, 0.03, (0, 0, 0.105), TIN, verts=8))
 P.append(ball(0.006, (0, 0, 0.12), TIN))
-export("shelf_clock", P)
+P.append(ball(0.0035, (0, -0.0205, 0.058), DARK))                                      # ось стрелок
+clock = export("shelf_clock", P, write=False)
 
-# ---------------- Самовар ----------------
-P = [lathe([(0.0, 0.0), (0.028, 0.0), (0.022, 0.012), (0.03, 0.022), (0.046, 0.05),
-            (0.05, 0.08), (0.044, 0.105), (0.03, 0.115), (0.02, 0.12), (0.0, 0.12)], BRASS)]
-P.append(lathe([(0.0, 0.12), (0.016, 0.12), (0.022, 0.128), (0.0, 0.132)], BRASS))
-for side in (-1, 1):                                                                   # ручки
-    P.append(tube([(side * 0.046, 0, 0.1), (side * 0.064, 0, 0.098), (side * 0.064, 0, 0.082),
-                   (side * 0.048, 0, 0.078)], 0.003, DARK))
-P.append(tube([(0, -0.045, 0.045), (0, -0.065, 0.044), (0, -0.07, 0.032)], 0.004, BRASS))  # краник
-P.append(box((0.012, 0.004, 0.006), (0, -0.07, 0.03), DARK))
-# Заварничек сверху: белый с синим.
-P.append(lathe([(0.0, 0.132), (0.016, 0.132), (0.024, 0.145), (0.022, 0.16), (0.012, 0.166),
-                (0.0, 0.167)], PORCELAIN))
-P.append(ball(0.005, (0, 0, 0.17), COBALT))
-P.append(tube([(0, -0.02, 0.146), (0, -0.034, 0.152), (0, -0.038, 0.162)], 0.0035, PORCELAIN))
-export("shelf_samovar", P)
+
+def hand(name, length, width, y):
+    """Стрелка — отдельный объект с началом на оси: в игре её крутит код по часам компьютера."""
+    o = box((width, 0.0015, length), (0, y, 0.058 + length / 2 - 0.003), DARK)
+    o.name = name
+    bpy.context.scene.cursor.location = (0, y, 0.058)
+    bpy.ops.object.select_all(action="DESELECT")
+    o.select_set(True)
+    bpy.context.view_layer.objects.active = o
+    bpy.ops.object.origin_set(type="ORIGIN_CURSOR")
+    return o
+
+
+hands = [hand("ClockHour", 0.018, 0.0028, -0.0198), hand("ClockMinute", 0.027, 0.0018, -0.0212)]
+bpy.ops.object.select_all(action="DESELECT")
+for o in [clock] + hands:
+    o.select_set(True)
+bpy.ops.export_scene.gltf(filepath=os.path.join(OUT, "shelf_clock.glb"), use_selection=True,
+                          export_format="GLB")
+print("EXPORTED shelf_clock")
+
+# ---------------- Сувенир «ракета» ----------------
+# Металлическая ракета на подставке (как настольные сувениры в честь полёта в космос):
+# серебристый корпус, красный нос и стабилизаторы, тёмная подставка.
+SILVER = mat("RocketSilver", (0.78, 0.8, 0.84), 0.2, 0.85)
+ROCKET_RED = mat("RocketRed", (0.75, 0.05, 0.04), 0.3)
+STAND = mat("RocketStand", (0.1, 0.08, 0.07), 0.4)
+P = [lathe([(0.0, 0.0), (0.045, 0.0), (0.045, 0.012), (0.036, 0.02), (0.0, 0.02)], STAND)]
+P.append(cyl(0.004, 0.03, (0, 0, 0.035), SILVER, verts=10))                          # стойка
+P.append(lathe([(0.0, 0.048), (0.012, 0.048), (0.016, 0.06), (0.016, 0.15), (0.014, 0.17),
+                (0.0, 0.17)], SILVER, segs=24))
+P.append(lathe([(0.0, 0.168), (0.014, 0.168), (0.01, 0.19), (0.004, 0.205), (0.0, 0.21)],
+               ROCKET_RED, segs=24))                                                   # нос
+for k in range(4):                                                                     # стабилизаторы
+    a = 2 * math.pi * k / 4 + math.pi / 4
+    fin = box((0.022, 0.003, 0.04), (math.cos(a) * 0.022, math.sin(a) * 0.022, 0.072), ROCKET_RED,
+              rot=(0, 0, a))
+    P.append(fin)
+P.append(ring(0.0162, 0.002, (0, 0, 0.12), ROCKET_RED))
+for z in (0.135, 0.105):                                                               # иллюминаторы
+    P.append(ball(0.004, (0, -0.016, z), mat("RocketWindow", (0.2, 0.45, 0.8), 0.1), scale=(1, 0.4, 1)))
+export("shelf_rocket", P)
 
 # ---------------- Фото в рамке ----------------
 PHOTO = mat("OldPhoto", (1, 1, 1), 0.7, image="assets/textures/posters/shelf_photo.png")
-TILT = math.radians(12)
+TILT = math.radians(-12)                                    # верх отклонён назад, к стене
 frame = [box((0.11, 0.012, 0.14), (0, 0, 0.0), WOOD), ]
 bpy.ops.mesh.primitive_plane_add(size=1.0, location=(0, -0.0065, 0), rotation=(math.radians(90), 0, 0))
 pic = bpy.context.object
@@ -308,7 +335,7 @@ export("shelf_vase", P)
 print("DONE")
 
 if RENDER:
-    names = ["shelf_matryoshka", "shelf_elephant", "shelf_jar", "shelf_clock", "shelf_samovar",
+    names = ["shelf_matryoshka", "shelf_elephant", "shelf_jar", "shelf_clock", "shelf_rocket",
              "shelf_frame", "shelf_vase"]
     for i, n in enumerate(names):
         bpy.data.objects[n].location = (-0.66 + i * 0.22, 0, 0)

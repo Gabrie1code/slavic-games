@@ -173,8 +173,10 @@ for k in range(12):                                                       # тр
     # (не назад — там стена).
     hang = k >= 8
     a = random.uniform(-2.6, -0.5) if hang else k / 8 * math.tau
-    rim = Vector((math.cos(a) * 0.05, math.sin(a) * 0.05, 0))
-    base = Vector((-0.28, -0.11, 0.12)) + (rim if hang else rim * 0.3)
+    # Свисающие плети начинаются над кромкой горшка (кромка — на 0.13, радиус 0.069) и уходят
+    # через край наружу; раньше начинались внутри стенки и торчали сквозь горшок.
+    rim = Vector((math.cos(a), math.sin(a), 0)) * (0.072 if hang else 0.015)
+    base = Vector((-0.28, -0.11, 0.142 if hang else 0.115)) + rim
     pitch = random.uniform(1.75, 2.05) if hang else random.uniform(0.35, 1.05)
     P.append(leaf(tuple(base), random.uniform(0.12, 0.2), 0.05, a, pitch, LEAF2 if k % 2 else LEAF3))
 export_item("shelf_plant", P, (-0.28, -0.11, 0.03))

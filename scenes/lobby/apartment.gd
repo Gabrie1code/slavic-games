@@ -566,10 +566,10 @@ func _build_decor() -> void:
 		["shelf_jar", -0.02, 0.1, [GLASS, Color("cc1a14"), Color("1a59cc")]], cactus])
 	_wall_shelf(Vector3(PARTITION_X + 0.08, 1.6, -3.0), PI / 2, [plant,
 		["shelf_vase", 0.0, 0.1, [Color("f0f0ec"), Color("1a3c99")]],
-		["shelf_samovar", 0.24, 0.1, [Color("c8902e"), Color("f0f0ec")]]])
-	# Передняя стена гостиной слева от прохода на кухню: книги, самовар, кактус.
+		["shelf_rocket", 0.24, 0.1, [Color("c8ccd4"), Color("c41810")]]])
+	# Передняя стена гостиной слева от прохода на кухню: книги, будильник, кактус.
 	var front_shelf := [books,
-		["shelf_samovar", 0.02, 0.1, [Color("c8902e"), Color("f0f0ec")]], cactus]
+		["shelf_clock", 0.02, 0.1, [Color("c41810"), Color("f2efe2"), Color("b5b5b8")]], cactus]
 	_wall_shelf(Vector3(-3.25, 1.55, LIVING_FRONT_Z), PI, front_shelf, FP_ONLY_LAYER)
 	# Плакаты.
 	var size := Vector2(0.5, 0.7)
@@ -622,6 +622,8 @@ func _wall_shelf(pos: Vector3, yaw: float, items: Array, layer: int = 0) -> void
 		var local := Vector3(item[1], 0.03, item[2]).rotated(Vector3.UP, yaw)
 		var thing := _breakable(item[0], pos + local, item[3], 0.12, 0.03)
 		thing.rotation.y = yaw
+		if item[0] == "shelf_clock":
+			thing.add_child(ShelfClockHands.new()) # стрелки — по часам компьютера
 		if layer:
 			_set_layers(thing, layer)
 

@@ -208,7 +208,7 @@ func _build_furniture() -> void:
 	model_name.text = "192"
 	model_name.font_size = 64
 	model_name.pixel_size = 0.0004
-	model_name.modulate = Color("f2ede0")
+	model_name.modulate = Color("2a2520") # тёмные цифры на светлой плашке
 	model_name.outline_size = 0
 	model_name.position = Vector3(0, 1.36, 0.32)
 	fridge.add_child(model_name)
@@ -365,12 +365,14 @@ func _build_calendar() -> void:
 	var date := Time.get_date_dict_from_system()
 	var weekday := int(date["weekday"]) # 0 — воскресенье, 6 — суббота
 	var ink := Color("c4172c") if weekday == 0 or weekday == 6 else Color("1c1c1c")
-	_calendar_label(pad, "КАЛЕНДАРЬ", 26, Color("1c1c1c"), 0.075)
+	var title := _calendar_label(pad, "КАЛЕНДАРЬ", 26, Color("1c1c1c"), 0.075)
+	title.outline_size = 5 # обводка тем же цветом — буквы жирнее
+	title.outline_modulate = Color("1c1c1c")
 	_calendar_label(pad, str(date["day"]), 150, ink, -0.005)
 	_calendar_label(pad, WEEKDAYS[weekday], 28, ink, -0.08)
 
 
-func _calendar_label(pad: Node3D, text: String, size: int, color: Color, y: float) -> void:
+func _calendar_label(pad: Node3D, text: String, size: int, color: Color, y: float) -> Label3D:
 	var label := Label3D.new()
 	label.text = text
 	label.font_size = size
@@ -379,6 +381,7 @@ func _calendar_label(pad: Node3D, text: String, size: int, color: Color, y: floa
 	label.outline_size = 0
 	label.position = Vector3(0, y, 0.0325)
 	pad.add_child(label)
+	return label
 
 
 # ---------------- Для лобби: что перед игроком ----------------
