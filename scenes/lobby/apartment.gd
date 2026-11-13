@@ -270,8 +270,7 @@ func _build_living_room() -> void:
 	_tippable("dumbbell", Vector3(0.34, 0.104, 0.12), 0.052, Vector3(1.55, 0, -3.15), 3.0, -10.0)
 
 	# Зона отдыха: ковёр, диван напротив телевизора, журнальный столик, кресло, торшер.
-	var rug := _place(_model("floor_rug"), Vector3(-2.6, 0.005, -0.2))
-	rug.rotation_degrees.y = 0.0
+	_rug_floor(_place(_model("floor_rug"), Vector3(-2.6, 0.005, -0.2)))
 	_solid(_model("sofa"), Vector3(2.4, 0.6, 0.9), 0.3, SOFA_POS, SOFA_YAW)
 	for local_x in [-0.55, 0.55]:
 		var front := Vector3(0, 0, 1).rotated(Vector3.UP, SOFA_YAW)
@@ -339,7 +338,9 @@ func _build_bedroom() -> void:
 	night_lamp = _breakable("table_lamp", stand_pos + Vector3(0, 0.6, 0),
 		[Color("2a7040"), Color("c0a050")], 0.4)
 	_build_night_light()
-	_place(_model("floor_rug_oval"), Vector3(6.3, 0.005, -0.8)).rotation_degrees.y = 90.0
+	var oval := _place(_model("floor_rug_oval"), Vector3(6.3, 0.005, -0.8))
+	oval.rotation_degrees.y = 90.0
+	_rug_floor(oval)
 	_tippable("dumbbell", Vector3(0.34, 0.104, 0.12), 0.052, Vector3(8.5, 0, 0.6), 3.0, 30.0)
 	var stool := _tippable("stool", Vector3(0.36, 0.47, 0.36), 0.24, Vector3(8.4, 0, -0.4), 2.0)
 	# Книги на табурете — каждая со своей физикой: сбили табурет — книги падают на пол.
@@ -382,11 +383,11 @@ func _build_night_light() -> void:
 ## Лампочка под абажуром торшера: тёплый свет и светящийся шарик.
 func _build_lamp_light() -> void:
 	# Без теней: абажур отбрасывал резкий восьмиугольник света на пол («кривое свечение»).
-	var light := _warm_light(LAMP_ENERGY, 4.0, Vector3(0, 1.4, 0))
+	var light := _warm_light(LAMP_ENERGY, 4.0, Vector3(0, 1.5, 0))
 	light.omni_attenuation = 1.5 # мягче к краю
 	floor_lamp.add_child(light)
 	var bulb_mat := _bulb_mat()
-	floor_lamp.add_child(_bulb(0.07, Vector3(0, 1.45, 0), bulb_mat))
+	floor_lamp.add_child(_bulb(0.06, Vector3(0, 1.58, 0), bulb_mat)) # в патроне под абажуром
 	floor_lamp_light = LobbyLamp.new(light, bulb_mat)
 
 
@@ -567,7 +568,7 @@ func _build_decor() -> void:
 	_poster("home_calendar", size, Vector3(5.75, 1.6, BACK_Z + 0.012), 0.0)
 	_poster("home_hockey", size, Vector3(PARTITION_X + 0.085, 1.6, 0.65), PI / 2)
 	# Ковровая дорожка к двери в спальню (заходить в спальню не стала — владельцу не понравилось).
-	_place(_model("floor_runner"), Vector3(1.55, 0.004, -1.0))
+	_rug_floor(_place(_model("floor_runner"), Vector3(1.55, 0.004, -1.0)))
 
 
 ## Радио играет спокойную фоновую музыку (своя, без слов — tools/audio/radio_music.py).
@@ -783,6 +784,21 @@ func _solid(model: Node3D, size: Vector3, center_y: float, pos: Vector3,
 	if pos.y < 0.01:
 		body.add_child(_contact_shadow(Vector2(size.x, size.z)))
 	return body
+
+
+## Ковёр твёрдый: невидимая форма столкновений по самой модели (выпуклая оболочка — у
+## овального половика тоже овал). Иначе упавшие вещи (пульт, баллончик, книги) лежали на полу
+## под ковром — «тонули» в нём. Игрок заходит на ковёр (3 см) без помех: капсула персонажа
+## перекатывается через край.
+func _rug_floor(rug: Node3D) -> void:
+	var body := StaticBody3D.new()
+	rug.add_child(body)
+	for node in rug.find_children("*", "MeshInstance3D", true, false):
+		var mesh_instance := node as MeshInstance3D
+		var shape := CollisionShape3D.new()
+		shape.shape = mesh_instance.mesh.create_convex_shape(true, true)
+		body.add_child(shape)
+		shape.global_transform = mesh_instance.global_transform
 
 
 ## Мягкая тень-пятно под мебелью на полу (на ковре тоже): без неё диван и кресло казались

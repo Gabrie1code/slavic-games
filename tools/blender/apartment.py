@@ -227,8 +227,29 @@ P.append(box((0.42, 0.03, 0.18), (0, 0.19, 0.88), WOOD_L, bevel=0.01))
 made.append(export("chair", P))
 
 # ---------------- Торшер, настольная лампа ----------------
-P = [cyl(0.2, 0.04, (0, 0, 0.02), METAL, verts=12), cyl(0.02, 1.45, (0, 0, 0.75), METAL, verts=6),
-     cyl(0.3, 0.35, (0, 0, 1.55), SHADE, verts=12, r2=0.17)]
+# Абажур — полый (стенка 8 мм, открыт сверху и снизу): снизу видно патрон и лампочку
+# (саму лампочку в игре добавляет код — она горит/гаснет). Раньше был сплошной конус.
+SHADE_IN = mat("LampShadeInside", (1.0, 0.85, 0.55), 0.8)
+P = [cyl(0.2, 0.04, (0, 0, 0.02), METAL, verts=12), cyl(0.02, 1.45, (0, 0, 0.75), METAL, verts=6)]
+bpy.ops.mesh.primitive_cone_add(vertices=12, radius1=0.3, radius2=0.17, depth=0.35,
+                                location=(0, 0, 1.55), end_fill_type="NOTHING")
+shade = bpy.context.object
+shade.data.materials.append(SHADE)
+shade.data.materials.append(SHADE_IN)
+solid = shade.modifiers.new("Solidify", "SOLIDIFY")
+solid.thickness = 0.008
+solid.offset = -1.0
+solid.material_offset = 1                                # внутренняя сторона — светлая подкладка
+bpy.ops.object.modifier_apply(modifier="Solidify")
+for poly in shade.data.polygons:
+    poly.use_smooth = False
+P.append(shade)
+P.append(cyl(0.028, 0.06, (0, 0, 1.5), METAL, verts=8))                                 # патрон
+for k in range(3):                                       # проволочки от патрона к абажуру
+    a = math.radians(90 + k * 120)
+    r_in, r_out = 0.028, 0.222                           # радиус абажура на высоте 1.58
+    mid = ((r_in + r_out) / 2 * math.cos(a), (r_in + r_out) / 2 * math.sin(a), 1.58)
+    P.append(box((r_out - r_in, 0.006, 0.006), mid, METAL, rot=(0, 0, a)))
 made.append(export("floor_lamp", P))
 P = [cyl(0.09, 0.03, (0, 0, 0.015), METAL, verts=10), cyl(0.015, 0.3, (0, 0, 0.16), METAL, verts=6),
      cyl(0.16, 0.18, (0, 0, 0.34), mat("LampShadeGreen", (0.15, 0.45, 0.25), 0.7), verts=12, r2=0.09)]

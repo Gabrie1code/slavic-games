@@ -125,7 +125,9 @@ func _build_walls() -> void:
 	_collider(Vector3(0.2, HEIGHT, depth + 0.4), Vector3(X1 + 0.1, HEIGHT / 2.0, (Z0 + Z1) / 2.0))
 	# Передняя — как у всей квартиры: невидимая стенка и стена только от первого лица.
 	_collider(Vector3(width + 0.2, HEIGHT, 0.4), Vector3((X0 + X1) / 2.0, HEIGHT / 2.0, Z1 + 0.2))
-	_fp_only(Vector3(width, HEIGHT, 0.2), Vector3((X0 + X1) / 2.0, HEIGHT / 2.0, Z1 + 0.1),
+	# Грань стены — Z1 − 0.1, как у краски внизу: раньше стена стояла на 10 см дальше краски,
+	# и над полоской был уступ — «перегородка надстроилась».
+	_fp_only(Vector3(width, HEIGHT, 0.2), Vector3((X0 + X1) / 2.0, HEIGHT / 2.0, Z1),
 		_whitewash)
 	# Изнутри у передней стены тоже краска до PAINT_HEIGHT и полоска (видно от первого лица).
 	_fp_only(Vector3(width, PAINT_HEIGHT, 0.01),
