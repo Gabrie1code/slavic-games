@@ -9,7 +9,8 @@
   kitchen_window    — рама окна 1.0 × 1.1 с подоконником;
   kitchen_table     — стол на ножках с клеёнкой (assets/textures/kitchen/oilcloth.png);
   kitchen_kettle    — эмалированный красный чайник со свистком;
-  kitchen_glass     — стакан чая в подстаканнике;
+  kitchen_bottle    — тёмно-зелёная бутылка (без надписей);
+  kitchen_tumbler / kitchen_tumbler_wine — гранёный стакан, пустой / с тёмно-бордовым;
   kitchen_radio     — радиоточка на стену (задняя стенка — в y = 0);
   kitchen_lamp      — абажур над столом (верх — в z = 3: крепится к потолку), лампочка KitchenBulb.
 Названий брендов нет (только пародийные/без надписей).
@@ -479,16 +480,49 @@ P.append(tube("Grip", [(0, 0.104, 0.302), (0, 0.04, 0.315), (0, -0.04, 0.315), (
               0.011, BLACK))
 export("kitchen_kettle", P)
 
-# ---------------- Стакан в подстаканнике ----------------
-P = [cyl(0.032, 0.11, (0, 0, 0.065), GLASS, verts=16)]
-P.append(cyl(0.029, 0.08, (0, 0, 0.055), TEA, verts=16))
-P.append(cyl(0.036, 0.075, (0, 0, 0.045), NICKEL, verts=16, r2=0.034))
-P.append(cyl(0.024, 0.01, (0, 0, 0.005), NICKEL, verts=16))
-bpy.ops.mesh.primitive_torus_add(major_radius=0.022, minor_radius=0.004, major_segments=16,
-                                 minor_segments=6, location=(0.05, 0, 0.05), rotation=(math.radians(90), 0, 0))
-P.append(finish(bpy.context.object, NICKEL))
-P.append(box((0.003, 0.004, 0.12), (0.012, 0.0, 0.115), NICKEL, rot=(0, math.radians(-12), 0)))  # ложечка
-export("kitchen_glass", P)
+# ---------------- Бутылка и гранёные стаканы ----------------
+# Тёмно-зелёная бутылка (без надписей) и гранёный стакан: kitchen_tumbler — пустой,
+# kitchen_tumbler_wine — с тёмно-бордовым налитым. Стекло полупрозрачное (альфа).
+def clear_glass(name, color, alpha, rough=0.05):
+    m = mat(name, color, rough)
+    m.node_tree.nodes["Principled BSDF"].inputs["Alpha"].default_value = alpha
+    m.blend_method = "BLEND"
+    return m
+
+
+BOTTLE = clear_glass("BottleGreen", (0.01, 0.09, 0.03), 0.85, 0.08)
+LABEL = mat("BottleLabel", (0.75, 0.65, 0.45), 0.8)
+CAP = mat("BottleCap", (0.6, 0.55, 0.45), 0.3, 0.7)
+TUMBLER = clear_glass("TumblerGlass", (0.85, 0.92, 0.94), 0.25)
+WINE = mat("DarkWine", (0.12, 0.004, 0.012), 0.1)
+P = [lathe("Bottle", [(0.001, 0.0), (0.036, 0.0), (0.038, 0.006), (0.038, 0.2), (0.034, 0.225),
+                      (0.02, 0.255), (0.014, 0.275), (0.014, 0.31), (0.016, 0.313), (0.016, 0.322),
+                      (0.001, 0.322)], BOTTLE, segs=24)]
+P.append(cyl(0.0385, 0.07, (0, 0, 0.11), LABEL, verts=24, smooth=True))           # этикетка
+P.append(cyl(0.0165, 0.012, (0, 0, 0.318), CAP, verts=16))                         # пробка
+export("kitchen_bottle", P)
+
+
+def tumbler(name, fill):
+    """Гранёный стакан: 16 граней, гладкий ободок сверху, толстое дно; fill — налито (или None)."""
+    parts = [lathe(name + "Body", [(0.001, 0.0), (0.029, 0.0), (0.031, 0.004), (0.031, 0.012),
+                                   (0.001, 0.012)], TUMBLER, segs=16)]
+    bpy.ops.mesh.primitive_cone_add(vertices=16, radius1=0.03, radius2=0.036, depth=0.09,
+                                    location=(0, 0, 0.012 + 0.045), end_fill_type="NOTHING")
+    wall = bpy.context.object
+    wall.data.materials.append(TUMBLER)
+    mod = wall.modifiers.new("S", "SOLIDIFY")
+    mod.thickness = 0.002
+    bpy.ops.object.modifier_apply(modifier="S")
+    parts.append(wall)                                                              # грани
+    parts.append(cyl(0.0365, 0.012, (0, 0, 0.108), TUMBLER, verts=32, smooth=True))  # ободок
+    if fill:
+        parts.append(cyl(0.031, 0.05, (0, 0, 0.012 + 0.025), fill, verts=16, r2=0.033, smooth=True))
+    export(name, parts)
+
+
+tumbler("kitchen_tumbler", None)
+tumbler("kitchen_tumbler_wine", WINE)
 
 # ---------------- Радиоточка ----------------
 P = [box((0.24, 0.08, 0.16), (0, -0.04, 0.08), IVORY, bevel=0.012, segs=2)]
@@ -524,7 +558,7 @@ for o in list(bpy.context.scene.objects):
         o.location = (-0.1, 0.12, 1.45)
     elif o.name == "kitchen_kettle":
         o.location = (-1.07, -0.12, 0.88)
-    elif o.name == "kitchen_glass":
+    elif o.name == "kitchen_bottle":
         o.location = (1.1, -0.4, 0.75)
     elif o.name == "kitchen_radio":
         o.location = (0.8, 0.3, 1.4)
