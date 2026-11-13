@@ -4,8 +4,8 @@ extends Node3D
 ## небо (огромная картинка), газон, тропинка, настоящие 3D-хрущёвки напротив, деревья пониже,
 ## кусты и голуби: ходят по земле, иногда улетают, вместо них прилетают другие.
 ## Время суток — как на часах у игрока (берётся при входе в лобби и идёт дальше): днём голубое
-## небо, утром рассвет, вечером закат, ночью темно, звёзды и луна. F8 — промотать на час вперёд
-## (проверить, как выглядит ночь днём).
+## небо, утром рассвет, вечером закат, ночью темно, звёзды и луна. Всё меняется плавно.
+## F8 — плавно промотать на час вперёд (проверить, как выглядит ночь днём).
 ## Узел ставится в точку под окном (x — центр окна, z — внешняя сторона стены); «вперёд» — −Z.
 
 const COURTYARD := "res://assets/models/courtyard/"
@@ -44,7 +44,8 @@ var _sky_mat: ShaderMaterial
 ## Общий «фильтр» для всех вещей двора (material_overlay) — темнее ночью, теплее на закате.
 var _tint_mat: ShaderMaterial
 var _sky_quad: MeshInstance3D
-var _since_update := 0.0
+## Сколько ещё часов «промотать» плавно (F8 — час за 3 секунды, без рывка).
+var _skip_left := 0.0
 
 
 func _ready() -> void:
@@ -61,20 +62,18 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
-	# Время идёт как в жизни; картинку обновляем раз в секунду.
-	hour = fmod(hour + delta / 3600.0, 24.0)
-	_since_update += delta
-	if _since_update > 1.0:
-		_since_update = 0.0
-		_apply_time()
+	# Время идёт как в жизни; небо пересчитывается каждый кадр — всё меняется плавно.
+	var skip := minf(_skip_left, delta / 3.0)
+	_skip_left -= skip
+	hour = fmod(hour + delta / 3600.0 + skip, 24.0)
+	_apply_time()
 	_update_pigeons(delta)
 
 
 func _unhandled_input(event: InputEvent) -> void:
 	var key := event as InputEventKey
 	if key and key.pressed and not key.echo and key.keycode == KEY_F8:
-		hour = fmod(hour + 1.0, 24.0)
-		_apply_time()
+		_skip_left += 1.0
 
 
 func _update_pigeons(delta: float) -> void:
@@ -116,7 +115,8 @@ func _apply_time() -> void:
 			a = DAY_KEYS[i]
 			b = DAY_KEYS[i + 1]
 			break
-	var t := inverse_lerp(float(a[0]), float(b[0]), hour)
+	# smoothstep — без «рывков» скорости на стыках ключевых часов.
+	var t := smoothstep(0.0, 1.0, inverse_lerp(float(a[0]), float(b[0]), hour))
 	_sky_mat.set_shader_parameter("top_color", (a[1] as Color).lerp(b[1], t))
 	_sky_mat.set_shader_parameter("horizon_color", (a[2] as Color).lerp(b[2], t))
 	_sky_mat.set_shader_parameter("cloud_color", (a[3] as Color).lerp(b[3], t))
@@ -126,14 +126,16 @@ func _apply_time() -> void:
 	var day_t := inverse_lerp(SUNRISE, SUNSET, hour)
 	var sun_up := sin(PI * clampf(day_t, 0.0, 1.0))
 	_sky_mat.set_shader_parameter("sun_uv", _arc_uv(day_t, 50.0))
-	_sky_mat.set_shader_parameter("sun_alpha", 1.0 if day_t > 0.0 and day_t < 1.0 else 0.0)
+	# Солнце и луна появляются и исчезают у горизонта плавно, а не вспышкой.
+	_sky_mat.set_shader_parameter("sun_alpha", clampf(sun_up * 6.0, 0.0, 1.0))
 	# Низкое солнце — оранжевое.
 	_sky_mat.set_shader_parameter("sun_color",
 		Color(1.0, 0.55, 0.25).lerp(Color(1.0, 0.96, 0.78), clampf(sun_up * 2.0, 0.0, 1.0)))
 	var night_len := 24.0 - SUNSET + SUNRISE
 	var moon_t := fposmod(hour - SUNSET, 24.0) / night_len
 	_sky_mat.set_shader_parameter("moon_uv", _arc_uv(moon_t, 55.0))
-	_sky_mat.set_shader_parameter("moon_alpha", 1.0 if moon_t > 0.0 and moon_t < 1.0 else 0.0)
+	var moon_up := sin(PI * clampf(moon_t, 0.0, 1.0))
+	_sky_mat.set_shader_parameter("moon_alpha", clampf(moon_up * 6.0, 0.0, 1.0))
 
 
 ## Точка дуги на небе (t: 0 — восход слева, 1 — закат справа) в UV квадрата неба.
