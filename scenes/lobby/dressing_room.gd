@@ -515,7 +515,7 @@ func _build() -> void:
 	column.add_theme_constant_override("separation", 8)
 	margin.add_child(column)
 
-	_title_label = _label("РЫНОК · %s" % player.display_name, GOLD)
+	_title_label = _label("ГАРДЕРОБ · %s" % player.display_name, GOLD)
 	column.add_child(_title_label)
 	for i in _row_count():
 		var panel := PanelContainer.new()
