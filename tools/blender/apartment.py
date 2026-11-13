@@ -534,11 +534,63 @@ made.append(export("chandelier", P))
 # Шторы висят в 37 см перед окном — перед подоконником (он выступает на 30 см), поэтому
 # задёрнутые не проходят сквозь подоконник и кактус.
 DRAPE = mat("Drape", (0.45, 0.12, 0.08), 0.9)
-P = [box((2.44, 0.52, 0.025), (0, -0.18, 2.985), WOOD_L),                                # доска
-     box((2.46, 0.025, 0.16), (0, -0.45, 2.92), WOOD_L),                                 # бленда
-     box((2.47, 0.03, 0.025), (0, -0.46, 2.86), WOOD),                                   # кант снизу
-     box((2.47, 0.03, 0.02), (0, -0.46, 2.97), WOOD),                                    # кант сверху
-     box((2.36, 0.02, 0.012), (0, -0.37, 2.93), METAL)]                                  # шина
+CURTAIN_BOTTOM = 0.14                       # низ штор чуть выше пола
+EDGE = 1.15                                 # внешний край полотна (от середины окна)
+
+
+def strip(pts, z0, z1, m, thick):
+    """Вертикальная лента по точкам плана pts [(x, y)] от высоты z0 до z1 (с толщиной)."""
+    verts = [(x, y, z0) for x, y in pts] + [(x, y, z1) for x, y in pts]
+    n = len(pts)
+    faces = [(i, i + 1, i + 1 + n, i + n) for i in range(n - 1)]
+    me = bpy.data.meshes.new("Strip")
+    me.from_pydata(verts, [], faces)
+    o = bpy.data.objects.new("Strip", me)
+    bpy.context.scene.collection.objects.link(o)
+    mod = o.modifiers.new("Solid", "SOLIDIFY")
+    mod.thickness = thick
+    mod.offset = 0
+    return flat(o, m)
+
+
+def arc(side, x0, y0, rx, y1, n, wave=0.0):
+    """Плавный загиб к стене: четверть эллипса от (side*x0, y0) наружу и назад к стене (y1).
+    wave — складки (ткань), 0 — гладко (дерево)."""
+    pts = []
+    for i in range(n + 1):
+        t = i / n * math.pi / 2
+        x = x0 + rx * math.sin(t)
+        y = y0 + (y1 - y0) * (1 - math.cos(t))
+        if wave and 0 < i < n:
+            x += wave if i % 2 else -wave
+        pts.append((side * x, y))
+    return pts
+
+
+# Доска под потолком: прямоугольник + скруглённые концы (повторяют загиб бленды к стене).
+board = [(-EDGE, 0.08)]
+board += arc(-1, EDGE, -0.45, 0.1, 0.08, 8)[::-1]
+board += arc(1, EDGE, -0.45, 0.1, 0.08, 8)
+board.append((EDGE, 0.08))
+outline = [(x, y) for x, y in board]
+me = bpy.data.meshes.new("Board")
+me.from_pydata([(x, y, 2.973) for x, y in outline] + [(x, y, 2.998) for x, y in outline], [],
+               [tuple(range(len(outline))), tuple(range(len(outline) * 2 - 1, len(outline) - 1, -1))] +
+               [(i, (i + 1) % len(outline), (i + 1) % len(outline) + len(outline), i + len(outline))
+                for i in range(len(outline))])
+board_o = bpy.data.objects.new("Board", me)
+bpy.context.scene.collection.objects.link(board_o)
+P = [flat(board_o, WOOD_L)]
+# Бленда: прямая спереди и скругления по бокам до самой стены — сбоку не видно пустоты.
+front = [(-EDGE, -0.45), (EDGE, -0.45)]
+P.append(strip(front, 2.84, 2.973, WOOD_L, 0.025))
+P.append(strip([(-EDGE - 0.005, -0.462), (EDGE + 0.005, -0.462)], 2.845, 2.87, WOOD, 0.012))   # кант
+for side in (-1, 1):
+    P.append(strip(arc(side, EDGE, -0.45, 0.1, 0.08, 8), 2.84, 2.973, WOOD_L, 0.025))
+    P.append(strip(arc(side, EDGE + 0.005, -0.462, 0.1, 0.08, 8), 2.845, 2.87, WOOD, 0.012))
+    # Загиб шторы к стене (не двигается): от края полотна назад к стене, со складками.
+    P.append(strip(arc(side, EDGE, -0.37, 0.07, 0.07, 8, wave=0.012), CURTAIN_BOTTOM, 2.88, DRAPE, 0.012))
+P.append(box((2.3, 0.02, 0.012), (0, -0.37, 2.93), METAL))                                # шина
 made.append(export("curtain_cornice", P))
 
 
@@ -547,7 +599,7 @@ def curtain_panel(sign):
     В игре сжимается по X, когда шторы раздвинуты (складки собираются гармошкой)."""
     n = 20
     verts, faces = [], []
-    rows = ((0.03, 0.036), (1.4, 0.032), (2.88, 0.024))  # (высота, глубина складки)
+    rows = ((CURTAIN_BOTTOM, 0.036), (1.4, 0.032), (2.88, 0.024))  # (высота, глубина складки)
     for z, amp in rows:
         for i in range(n + 1):
             y = 0.0 if i in (0, n) else (amp if i % 2 else -amp)
@@ -563,9 +615,7 @@ def curtain_panel(sign):
     mod = o.modifiers.new("Solid", "SOLIDIFY")
     mod.thickness = 0.012
     mod.offset = 0
-    flat(o, DRAPE)
-    hooks = [cyl(0.012, 0.04, (sign * 1.14 * i / 10, 0, 2.9), METAL, verts=6) for i in range(11)]
-    return [o] + hooks
+    return [flat(o, DRAPE)]
 
 
 made.append(export("curtain_left", curtain_panel(1)))

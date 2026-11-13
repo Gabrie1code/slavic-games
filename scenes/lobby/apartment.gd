@@ -665,7 +665,7 @@ func _build_living_extras() -> void:
 	add_child(phone)
 	# Часы с кукушкой — на задней стене между книжной секцией и окном.
 	var clock := CuckooClock.new()
-	clock.position = Vector3(0.3, 1.95, BACK_Z) # по центру между книжной секцией и шторой
+	clock.position = Vector3(0.18, 1.95, BACK_Z) # между книжной секцией и загибом шторы к стене
 	add_child(clock)
 	# Кот бродит по всей квартире, лежанка — в спальне.
 	cat = LobbyCat.new()
