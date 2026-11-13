@@ -8,6 +8,8 @@ extends AudioStreamPlayer
 
 const STREAM_PATH := "res://assets/audio/radio_music.wav"
 const LOUD_DB := -6.0
+## Общая громкость музыки: 10% от прежней (−20 дБ).
+const VOLUME := 0.1
 ## Ближе NEAR м — в полную силу, дальше FAR м — не слышно.
 const NEAR := 1.5
 const FAR := 12.0
@@ -40,7 +42,7 @@ func _process(_delta: float) -> void:
 		return
 	var dist := _listener_distance()
 	var k := clampf(inverse_lerp(FAR, NEAR, dist), 0.0, 1.0)
-	volume_db = LOUD_DB + linear_to_db(maxf(k * k, 0.0001))
+	volume_db = LOUD_DB + linear_to_db(maxf(k * k * VOLUME, 0.0001))
 
 
 ## Кнопка у радио: выключить / включить.
