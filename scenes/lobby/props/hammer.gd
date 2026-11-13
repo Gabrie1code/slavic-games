@@ -14,13 +14,14 @@ const HAND_POS := Vector3(0, -0.44, 0.0)
 ## вертикально вверх с наклоном вперёд ~25° — как держат молоток наготове. Гвоздодёр — назад.
 const HAND_UP := Vector3(0.0, 0.22, -0.975)
 const HAND_CLAW := Vector3(0.0, 0.975, 0.22)
-const GRIP_COLOR := Color("d81e1e")
-const STEEL_COLOR := Color("2c3138")
+const MODEL := preload("res://assets/models/apartment/hammer.glb")
 
 var state := State.STORED
 var holder: PlayerData
 
 var _model: Node3D
+## Наклон ручки вперёд в руке (рад): наготове 0.4, в момент удара — почти горизонтально.
+var _tilt := 0.4
 var _loose_time := 0.0
 
 
@@ -44,65 +45,16 @@ func _ready() -> void:
 	_set_loose_physics(false)
 
 
-## Слесарный молоток-гвоздодёр: красная резиновая рукоятка, тёмная стальная рукоять,
-## боёк с круглой ударной частью и раздвоенным гвоздодёром (и для «молотка в кадре»).
+## Модель — tools/blender/hammer.py (гладкая: тела вращения и сглаживание). Точка (0,0,0) —
+## середина рукоятки, ручка вверх по +Y, ударная часть на −Z, гвоздодёр на +Z.
 static func make_model() -> Node3D:
-	var root := Node3D.new()
-	root.add_child(_cyl(0.021, 0.15, Vector3.ZERO, GRIP_COLOR, 0.7))                  # рукоятка
-	root.add_child(_cyl(0.023, 0.012, Vector3(0, -0.075, 0), GRIP_COLOR, 0.7))        # торец
-	root.add_child(_cyl(0.013, 0.19, Vector3(0, 0.17, 0), STEEL_COLOR, 0.35, 0.35))   # рукоять
-	root.add_child(_cyl(0.017, 0.025, Vector3(0, 0.27, 0), STEEL_COLOR, 0.35, 0.35))  # шейка
-	root.add_child(_box(Vector3(0.04, 0.05, 0.06), Vector3(0, 0.295, 0), STEEL_COLOR, 0.35, 0.35))
-	var face := _cyl(0.022, 0.06, Vector3(0, 0.295, -0.055), STEEL_COLOR, 0.3, 0.35) # ударная
-	face.rotation.x = PI / 2.0
-	root.add_child(face)
-	var cap := _cyl(0.025, 0.012, Vector3(0, 0.295, -0.088), STEEL_COLOR, 0.3, 0.35)
-	cap.rotation.x = PI / 2.0
-	root.add_child(cap)
-	for side: float in [-1.0, 1.0]:                                                     # гвоздодёр
-		var claw := _box(Vector3(0.013, 0.026, 0.08), Vector3(side * 0.01, 0.288, 0.066),
-			STEEL_COLOR, 0.35, 0.35)
-		claw.rotation.x = 0.4 # загнут вниз
-		root.add_child(claw)
-	return root
-
-
-static func _cyl(radius: float, height: float, pos: Vector3, color: Color, rough: float,
-		metal: float = 0.0) -> MeshInstance3D:
-	var mesh_instance := MeshInstance3D.new()
-	var mesh := CylinderMesh.new()
-	mesh.top_radius = radius
-	mesh.bottom_radius = radius
-	mesh.height = height
-	mesh.radial_segments = 8
-	mesh.rings = 1
-	mesh_instance.mesh = mesh
-	mesh_instance.material_override = _mat(color, rough, metal)
-	mesh_instance.position = pos
-	return mesh_instance
-
-
-static func _mat(color: Color, rough: float, metal: float) -> StandardMaterial3D:
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = color
-	mat.roughness = rough
-	mat.metallic = metal
-	return mat
-
-
-## metal — не больше 0.35: чистый металл без отражений в игре чёрный.
-static func _box(size: Vector3, pos: Vector3, color: Color, rough: float,
-		metal: float = 0.0) -> MeshInstance3D:
-	var mesh_instance := MeshInstance3D.new()
-	var mesh := BoxMesh.new()
-	mesh.size = size
-	mesh_instance.mesh = mesh
-	mesh_instance.material_override = _mat(color, rough, metal)
-	mesh_instance.position = pos
-	return mesh_instance
+	return MODEL.instantiate() as Node3D
 
 
 func _process(delta: float) -> void:
+	if state == State.HELD:
+		HandHold.follow(self, 0.0, _tilt) # ручка вверх с наклоном вперёд (при ударе — сильнее)
+		return
 	if state != State.LOOSE:
 		return
 	_loose_time += delta
@@ -152,6 +104,9 @@ func drop(character: PlayerCharacter, world: Node3D, dir: Vector3 = Vector3.ZERO
 ## Взмах молотком (рука с молотком резко вперёд-вниз и обратно).
 func swing(character: PlayerCharacter) -> void:
 	character.set_arm_pose(0.15, 1.75, 0.07)
+	var strike := create_tween()
+	strike.tween_property(self, "_tilt", 1.5, 0.07)
+	strike.tween_property(self, "_tilt", 0.4, 0.2)
 	await get_tree().create_timer(0.14).timeout
 	if is_instance_valid(character) and state == State.HELD:
 		character.set_arm_pose(0.15, 0.9, 0.18)

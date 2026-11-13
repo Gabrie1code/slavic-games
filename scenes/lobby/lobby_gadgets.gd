@@ -313,7 +313,7 @@ func _process_sponge(p: PlayerData, camera: Camera3D) -> void:
 
 ## Губка «в кадре» у камеры от первого лица (создаётся, когда взяли; убирается, когда бросили).
 func _show_view_sponge(p: PlayerData, camera: Camera3D) -> void:
-	if camera == null or _view_sponges.has(p.id):
+	if camera == null or _has_view(_view_sponges, p.id):
 		return
 	# Губка в кулаке «в кадре» (слой «в кадре» этого игрока).
 	var model := HandHold.make_view(p.color, Sponge.make_model(), 0.02, 1 << (p.slot + 10), 0.3)
@@ -328,7 +328,7 @@ func _hold_sponge(p: PlayerData, sponge: Sponge) -> void:
 
 ## Бросить губку (G или ушёл из лобби).
 func _release_sponge(p: PlayerData, dir: Vector3 = Vector3.ZERO) -> void:
-	if _view_sponges.has(p.id):
+	if _has_view(_view_sponges, p.id):
 		(_view_sponges[p.id] as Node).queue_free()
 		_view_sponges.erase(p.id)
 	if not _held_sponges.has(p.id):
@@ -371,7 +371,7 @@ func _near_loose_sponge(p: PlayerData) -> Sponge:
 
 ## Убрать губку из руки без броска (её кладут на раковину).
 func _release_sponge_quietly(p: PlayerData) -> void:
-	if _view_sponges.has(p.id):
+	if _has_view(_view_sponges, p.id):
 		(_view_sponges[p.id] as Node).queue_free()
 		_view_sponges.erase(p.id)
 	_held_sponges.erase(p.id)
@@ -412,7 +412,7 @@ func _use_remote(p: PlayerData) -> bool:
 ## Пульт в руке: G — бросить туда, куда смотришь.
 func _process_remote(p: PlayerData, camera: Camera3D) -> void:
 	var character: PlayerCharacter = characters[p.id]
-	if camera and not _view_remotes.has(p.id):
+	if camera and not _has_view(_view_remotes, p.id):
 		var remote_model := TvRemote.make_model()
 		var model := HandHold.make_view(p.color, remote_model, 0.01, 1 << (p.slot + 10), 0.1)
 		remote_model.position.z = -0.03 # кнопки видны впереди кулака
@@ -420,7 +420,7 @@ func _process_remote(p: PlayerData, camera: Camera3D) -> void:
 		_view_remotes[p.id] = model
 	if p.input.is_just_pressed("attack"): # ЛКМ — нажать красную кнопку (просто щёлкает)
 		apartment.tv_remote.press()
-		if _view_remotes.has(p.id):
+		if _has_view(_view_remotes, p.id):
 			TvRemote.press_button(_view_remotes[p.id]) # ищет кнопку внутри (кулак + пульт)
 	if not p.input.is_just_pressed("drop"):
 		return
@@ -429,7 +429,7 @@ func _process_remote(p: PlayerData, camera: Camera3D) -> void:
 
 
 func _hide_view_remote(p: PlayerData) -> void:
-	if _view_remotes.has(p.id):
+	if _has_view(_view_remotes, p.id):
 		(_view_remotes[p.id] as Node).queue_free()
 		_view_remotes.erase(p.id)
 
@@ -445,7 +445,7 @@ func holds_hammer(p: PlayerData) -> bool:
 func swing_hammer(p: PlayerData) -> void:
 	var hammer: Hammer = _held_hammers[p.id]
 	hammer.swing(characters[p.id])
-	if _view_hammers.has(p.id):
+	if _has_view(_view_hammers, p.id):
 		var view: Node3D = _view_hammers[p.id]
 		var hit := view.create_tween()
 		hit.tween_property(view, "rotation:x", -1.1, 0.08).set_ease(Tween.EASE_OUT)
@@ -457,7 +457,7 @@ func swing_hammer(p: PlayerData) -> void:
 
 ## Молоток в руке: G — бросить туда, куда смотришь.
 func _process_hammer(p: PlayerData, camera: Camera3D) -> void:
-	if camera and not _view_hammers.has(p.id):
+	if camera and not _has_view(_view_hammers, p.id):
 		camera.add_child(_make_view_hammer(p))
 	if p.input.is_just_pressed("drop"):
 		_release_hammer(p, look_dir(characters[p.id], camera))
@@ -495,7 +495,7 @@ func _make_view_hammer(p: PlayerData) -> Node3D:
 
 ## Бросить молоток (dir — взгляд; Vector3.ZERO — уронить под себя, игрок ушёл из лобби).
 func _release_hammer(p: PlayerData, dir: Vector3 = Vector3.ZERO) -> void:
-	if _view_hammers.has(p.id):
+	if _has_view(_view_hammers, p.id):
 		(_view_hammers[p.id] as Node).queue_free()
 		_view_hammers.erase(p.id)
 	if not _held_hammers.has(p.id):
@@ -552,6 +552,14 @@ func _near_loose_hammer(p: PlayerData) -> Hammer:
 				and _near(p, hammer.global_position, CAN_RADIUS):
 			return hammer
 	return null
+
+
+## Есть ли у игрока вещь «в кадре». Камера от первого лица удаляется вместе с ней при переходе
+## на вид сверху (F2) — тогда запись устарела: убираем её (иначе удар молотком ронял игру).
+func _has_view(views: Dictionary, id: int) -> bool:
+	if views.has(id) and not is_instance_valid(views[id]):
+		views.erase(id)
+	return views.has(id)
 
 
 func _set_layers(node: Node, layer: int) -> void:

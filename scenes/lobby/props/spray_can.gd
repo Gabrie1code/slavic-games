@@ -80,6 +80,9 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
+	if state == State.HELD:
+		HandHold.follow(self, 0.09) # ровно в кулаке, как бы ни была повёрнута рука
+		return
 	if state != State.LOOSE:
 		return
 	_loose_time += delta

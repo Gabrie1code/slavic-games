@@ -90,6 +90,11 @@ static func _box(size: Vector3, pos: Vector3, color: Color, rough: float) -> Mes
 	return mesh_instance
 
 
+func _process(_delta: float) -> void:
+	if state == State.HELD:
+		HandHold.follow(self, 0.01) # ровно в кулаке, кнопками вверх
+
+
 func _physics_process(delta: float) -> void:
 	if state != State.LOOSE:
 		return

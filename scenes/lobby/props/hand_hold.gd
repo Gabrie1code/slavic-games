@@ -22,6 +22,29 @@ static func place(item: Node3D, grip: float) -> void:
 
 ## Вещь «в кадре»: кулак цвета игрока сжимает вещь. Возвращает корень (кулак + вещь);
 ## tilt — небольшой наклон вещи влево (рад), чтобы смотрелась живее.
+## Каждый кадр, пока вещь в руке: держать её ровно по миру — вверх (с наклоном вперёд tilt рад)
+## по повороту персонажа, в кулаке. Так поза не зависит от того, как сейчас повёрнута рука
+## (раньше вещь в зеркале торчала вбок / лежала горизонтально).
+static func follow(item: Node3D, grip: float, tilt: float = 0.0) -> void:
+	var arm := item.get_parent() as Node3D
+	var character := _character_of(item)
+	if arm == null or character == null:
+		return
+	var right := character.global_basis.x.normalized()
+	var fwd := -character.global_basis.z.normalized()
+	var up := (Vector3.UP * cos(tilt) + fwd * sin(tilt)).normalized()
+	var back := right.cross(up).normalized()
+	var hand := arm.to_global(HAND)
+	item.global_transform = Transform3D(Basis(up.cross(back), up, back), hand - up * grip)
+
+
+static func _character_of(node: Node) -> PlayerCharacter:
+	var current := node.get_parent()
+	while current and not current is PlayerCharacter:
+		current = current.get_parent()
+	return current as PlayerCharacter
+
+
 static func make_view(color: Color, item: Node3D, grip: float, layer: int,
 		tilt: float = 0.15) -> Node3D:
 	var root := Node3D.new()
