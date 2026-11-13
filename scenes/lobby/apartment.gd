@@ -254,9 +254,10 @@ func _build_living_room() -> void:
 		var seat_pos := SOFA_POS + Vector3(local_x, 0.1, 0.12).rotated(Vector3.UP, SOFA_YAW)
 		seats.append({"pos": seat_pos, "yaw": SOFA_YAW + PI, "approach": seat_pos + front * 0.9,
 			"name": "Сесть на диван"})
-	# Пульт — посередине дивана, между подушками, вдоль сиденья: смотрит на телевизор.
+	# Пульт — в углу дивана у подлокотника (слева, если стоять лицом к дивану), вдоль сиденья:
+	# перпендикулярно стене с телевизором.
 	tv_remote = TvRemote.new()
-	tv_remote.home_position = SOFA_POS + Vector3(0, 0.6, 0.15).rotated(Vector3.UP, SOFA_YAW)
+	tv_remote.home_position = SOFA_POS + Vector3(-0.85, 0.6, 0.12).rotated(Vector3.UP, SOFA_YAW)
 	tv_remote.home_yaw = 0.0
 	tv_remote.set_meta("home_parent", self)
 	add_child(tv_remote)
