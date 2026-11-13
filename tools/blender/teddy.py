@@ -43,7 +43,6 @@ FUR = mat("TeddyFur", (0.3, 0.17, 0.08), 0.95, knit=0.8)
 FUR_L = mat("TeddyMuzzle", (0.38, 0.23, 0.11), 0.95, knit=0.8)
 FUR_D = mat("TeddyEarInside", (0.22, 0.12, 0.06), 0.95, knit=0.6)
 NOSE = mat("TeddyNose", (0.08, 0.05, 0.04), 0.35)
-RIBBON = mat("TeddyRibbon", (0.55, 0.09, 0.09), 0.4)
 EYE = mat("TeddyEye", (0.01, 0.01, 0.01), 0.08)
 
 
@@ -77,18 +76,6 @@ def limb(a, b, r, m, flat=1.0):
     return o
 
 
-def torus(major, minor, loc, m, scale=(1, 1, 1), rot=(0, 0, 0)):
-    bpy.ops.mesh.primitive_torus_add(major_radius=major, minor_radius=minor, major_segments=40,
-                                     minor_segments=12, location=loc, rotation=rot)
-    o = bpy.context.object
-    o.scale = scale
-    bpy.ops.object.transform_apply(scale=True, rotation=True)
-    o.data.materials.append(m)
-    for p in o.data.polygons:
-        p.use_smooth = True
-    return o
-
-
 def rod(a, b, r, m):
     a, b = Vector(a), Vector(b)
     d = b - a
@@ -116,20 +103,11 @@ for s in (-1, 1):
           ball(0.03, (s * 0.066, 0.004, 0.298), FUR, scale=(1, 0.5, 1)),     # ухо
           ball(0.02, (s * 0.066, -0.009, 0.296), FUR_D, scale=(1, 0.3, 1), segs=20, rings=10),
           # Рука растёт из плеча (круглое плечо вливается в тело) и идёт вниз-вперёд к бедру.
-          ball(0.03, (s * 0.07, -0.008, 0.166), FUR),                           # плечо
+          ball(0.02, (s * 0.066, -0.01, 0.162), FUR),                           # плечо (небольшое)
           limb((s * 0.076, -0.012, 0.163), (s * 0.1, -0.048, 0.072), 0.031, FUR, flat=0.95),
-          ball(0.045, (s * 0.052, -0.055, 0.042), FUR, scale=(1, 1.45, 0.85),  # бедро
+          ball(0.053, (s * 0.052, -0.052, 0.048), FUR, scale=(1, 1.4, 0.95),  # бедро (толстое)
                rot=(0, 0, math.radians(s * -14))),
-          ball(0.042, (s * 0.068, -0.108, 0.046), FUR, scale=(0.92, 0.72, 1.05))]  # ступня
-# Бантик на шее: лента вокруг шеи, две петли, узелок и два хвостика.
-P.append(torus(0.058, 0.009, (0, -0.004, 0.176), RIBBON, scale=(1, 0.95, 0.7)))
-for s in (-1, 1):
-    P.append(ball(0.02, (s * 0.024, -0.074, 0.177), RIBBON, scale=(1.35, 0.42, 0.8),
-                  rot=(0, math.radians(s * -18), 0), segs=24, rings=12))            # петля
-    P.append(limb((s * 0.004, -0.074, 0.168), (s * 0.016, -0.08, 0.13), 0.007, RIBBON,
-                  flat=0.45))                                                       # хвостик
-P.append(ball(0.009, (0, -0.075, 0.174), RIBBON, scale=(1.1, 0.8, 1), segs=16, rings=8))  # узелок
-
+          ball(0.047, (s * 0.068, -0.112, 0.05), FUR, scale=(0.95, 0.75, 1.05))]  # ступня
 bpy.ops.object.select_all(action="DESELECT")
 for o in P:
     o.select_set(True)
