@@ -319,11 +319,11 @@ func _build_living_room() -> void:
 	var books_b := [Color("cc9918"), Color("6a2a6a"), Color("1a4080")]
 	_breakable("book_stack_mags", dining + Vector3(0.45, 0.78, 0.15), books_b, 0.4)
 
-	# Банки с заготовками у серванта.
+	# Банки с заготовками (огурцы, варенье) — в ряд вдоль левой стены у серванта.
 	for i in 3:
 		var jar := "jar_pickles" if i % 2 == 0 else "jar_jam"
 		var color := Color("5a7a2a") if i % 2 == 0 else Color("801010")
-		_breakable(jar, Vector3(-5.6 + i * 0.32, 0, -3.15), [color, GLASS], 0.35)
+		_breakable(jar, Vector3(LEFT_X + 0.16, 0, -3.1 + i * 0.3), [color, GLASS], 0.35)
 
 
 # ---------------- Спальня ----------------
@@ -436,8 +436,11 @@ func _fade_hanging(delta: float) -> void:
 	for item in _hanging_top:
 		var pos: Vector3 = item["pos"]
 		var nearest := INF
+		var above: float = item.get("only_above", -INF) # лампа над столом — только стоящим на нём
 		for node in people:
 			var person := node as Node3D
+			if person.global_position.y < above:
+				continue
 			nearest = minf(nearest, Vector2(person.global_position.x - pos.x,
 				person.global_position.z - pos.z).length())
 		var hang: Node3D = item["node"]
@@ -681,6 +684,8 @@ func _build_rubgame() -> void:
 	# Лампа над сукном — только от первого лица (сверху закрыла бы стол).
 	var lamp := _place(_rubgame_model("rubgame_lamp"), RUBGAME_TABLE_POS + Vector3(0.3, 0, 0))
 	_set_layers(lamp, RUBGAME_LAMP_LAYER)
+	# Встал на стол под лампой — она плавно растворяется, чтобы не закрывать обзор.
+	_hanging_top.append({"node": lamp, "pos": lamp.position, "only_above": 0.4})
 	var light := OmniLight3D.new()
 	light.light_color = Color(1.0, 0.9, 0.65)
 	light.light_energy = 1.6

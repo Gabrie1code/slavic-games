@@ -25,7 +25,7 @@ func _ready() -> void:
 	close_text = "Закрыть духовку"
 	front_offset = Vector3(0.0, 0.4, 0.75)
 	_light = OmniLight3D.new()
-	_light.light_color = Color(1.0, 0.78, 0.45)
+	_light.light_color = Color(1.0, 0.6, 0.25) # тёплый оранжевый, как в настоящей духовке
 	# Светит только внутри: небольшой радиус и тени — стенки духовки не пускают свет наружу
 	# (раньше светилась вся плита снаружи).
 	_light.light_energy = 1.2
@@ -50,4 +50,4 @@ func _ready() -> void:
 func _door_moved(amount: float) -> void:
 	_light.visible = amount > 0.02
 	_light.light_energy = 1.2 * amount
-	_bulb_mat.albedo_color = LobbyLamp.BULB_OFF.lerp(LobbyLamp.BULB_ON, amount)
+	_bulb_mat.albedo_color = LobbyLamp.BULB_OFF.lerp(Color(1.0, 0.72, 0.35), amount)

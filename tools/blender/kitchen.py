@@ -153,6 +153,30 @@ def export_objects(name, objs):
     print("EXPORTED", name)
 
 
+def tube_pts(pts, radius, m, taper=None):
+    """Гладкая трубка по точкам с сужением (taper — доли радиуса по точкам)."""
+    curve = bpy.data.curves.new("T", "CURVE")
+    curve.dimensions = "3D"
+    curve.bevel_depth = radius
+    curve.bevel_resolution = 4
+    spline = curve.splines.new("NURBS")
+    spline.points.add(len(pts) - 1)
+    for k, (p, pt) in enumerate(zip(spline.points, pts)):
+        p.co = (*pt, 1)
+        p.radius = taper[k] if taper else 1.0
+    spline.use_endpoint_u = True
+    spline.order_u = 3
+    o = bpy.data.objects.new("T", curve)
+    bpy.context.scene.collection.objects.link(o)
+    bpy.ops.object.select_all(action="DESELECT")
+    bpy.context.view_layer.objects.active = o
+    o.select_set(True)
+    bpy.ops.object.convert(target="MESH")
+    o = bpy.context.object
+    o.data.materials.clear()
+    return finish(o, m, smooth=True)
+
+
 ENAMEL = mat("Enamel", (0.92, 0.91, 0.86), 0.25)
 BLACK = mat("BlackIron", (0.06, 0.06, 0.07), 0.6)
 CHROME = mat("Chrome", (0.75, 0.77, 0.8), 0.15, 0.8)
@@ -181,7 +205,7 @@ CORD = mat("Cord", (0.1, 0.1, 0.1), 0.6)
 # OvenBulb. Дверца — отдельная модель kitchen_oven_door (петля снизу), откидывается вниз.
 OVEN_IN = mat("OvenInside", (0.16, 0.16, 0.18), 0.4)
 DISH = mat("DishGlass", (0.75, 0.88, 0.92), 0.05)
-CHICKEN = mat("RoastChicken", (0.42, 0.11, 0.04), 0.3)
+CHICKEN = mat("RoastChicken", (0.45, 0.13, 0.04), 0.25)
 CHICKEN_DARK = mat("RoastCrust", (0.16, 0.04, 0.015), 0.35)
 BONE = mat("Bone", (0.95, 0.92, 0.84), 0.5)
 OVEN_BULB = mat("OvenBulb", (1.0, 0.85, 0.5), 0.3, 0, 2.0)
@@ -207,20 +231,30 @@ dish = bpy.context.object
 dish.scale = (0.15, 0.11, 0.03)
 bpy.ops.object.transform_apply(scale=True, location=False)
 P.append(finish(dish, DISH, smooth=True))
-# Курица как на фото владельца: пухлая вытянутая тушка, на одном конце — две толстые ножки
-# торчат вверх-назад с круглыми косточками; румяно-красноватая корочка с подпалинами.
-P.append(sphere(1.0, (0.02, 0.01, 0.388), CHICKEN, scale=(0.12, 0.08, 0.06), segs=24, rings=14))
-P.append(sphere(1.0, (0.05, 0.01, 0.415), CHICKEN_DARK, scale=(0.07, 0.05, 0.03)))  # подпалина
+# Курица как на фото владельца: пухлая тушка (грудка выше и шире к хвосту, низ плоский),
+# толстые окорочка по бокам, ножки торчат вверх-назад и сужаются к тёмным косточкам, крылышки
+# прижаты к бокам, корочка красно-коричневая с подпалинами (несколько тёмных пятен).
+CX, CY, CZ = 0.0, 0.01, 0.335                                          # низ тушки (на блюде)
+bpy.ops.mesh.primitive_uv_sphere_add(segments=32, ring_count=18, radius=1.0, location=(CX, CY, CZ))
+body = bpy.context.object
+for v in body.data.vertices:
+    x, y, z = v.co
+    wide = 1.0 + 0.18 * x                                              # к хвосту (+x) шире
+    v.co = Vector((x * 0.125, y * 0.085 * wide, max(z, -0.35) * 0.075 * (1.0 + 0.12 * (1 - abs(y)))))
+    v.co.z += 0.075 * 0.35                                              # плоский низ — на z = CZ
+bpy.ops.object.shade_smooth()
+P.append(finish(body, CHICKEN, smooth=True))
+for (dx, dy, sx, sy) in ((0.02, 0.0, 0.06, 0.035), (0.06, 0.025, 0.025, 0.02), (-0.03, -0.03, 0.03, 0.02),
+                         (0.07, -0.03, 0.02, 0.015)):                    # подпалины
+    P.append(sphere(1.0, (CX + dx, CY + dy, CZ + 0.072), CHICKEN_DARK, scale=(sx, sy, 0.012)))
 for side in (-1, 1):
-    y = 0.01 + side * 0.035
-    leg = sphere(1.0, (-0.105, y, 0.41), CHICKEN, scale=(0.06, 0.04, 0.04))
-    leg.rotation_euler = (0, math.radians(-35), 0)                                  # вверх-назад
-    bpy.context.view_layer.objects.active = leg
-    bpy.ops.object.transform_apply(rotation=True, location=False, scale=False)
-    P.append(leg)
-    P.append(cyl(0.009, 0.04, (-0.142, y, 0.448), CHICKEN_DARK, verts=8,
-                 rot=(0, math.radians(-35), 0), smooth=True))                       # косточка
-    P.append(sphere(0.013, (-0.155, y, 0.466), CHICKEN_DARK))                        # кончик
+    y = CY + side * 0.06
+    P.append(sphere(1.0, (CX - 0.06, y, CZ + 0.04), CHICKEN, scale=(0.055, 0.035, 0.04)))  # окорочок
+    P.append(tube_pts([(CX - 0.085, y, CZ + 0.055), (CX - 0.12, y * 0.8, CZ + 0.085),
+                       (CX - 0.14, y * 0.7, CZ + 0.11)], 0.022, CHICKEN, [1.0, 0.7, 0.35]))  # голень
+    P.append(sphere(0.011, (CX - 0.142, y * 0.7, CZ + 0.115), CHICKEN_DARK, scale=(1, 1, 1.2)))  # косточка
+    P.append(sphere(1.0, (CX + 0.04, CY + side * 0.075, CZ + 0.045), CHICKEN_DARK,
+                    scale=(0.045, 0.012, 0.025)))                         # крылышко
 P.append(sphere(0.022, (0.17, 0.2, OZ1 - 0.04), OVEN_BULB))                         # лампочка
 # Варочная поверхность, щиток, ручки (как было).
 P.append(box((0.48, 0.56, 0.012), (0, 0.005, 0.846), mat("Cooktop", (0.85, 0.84, 0.8), 0.3)))

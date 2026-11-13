@@ -61,7 +61,7 @@ func hint(p: PlayerData) -> Array[Dictionary]:
 	var text := "Выпить" if wait <= 0.0 or bottle.drinking else "Выпить (через %d с)" % ceili(wait)
 	var result: Array[Dictionary] = [
 		LobbyGadgets.entry(LobbyGadgets.attack_key(p), text, bottle.drinking or wait > 0.0),
-		LobbyGadgets.entry(LobbyGadgets.drop_key(p), "Бросить бутылку")]
+		LobbyGadgets.entry(LobbyGadgets.drop_key(p), "Выбросить бутылку на пол", bottle.drinking)]
 	return result
 
 
