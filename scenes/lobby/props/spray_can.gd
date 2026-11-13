@@ -158,6 +158,13 @@ static func tint_stripe(node: Node, paint: Color) -> void:
 		for i in mesh_instance.mesh.get_surface_count():
 			var surface := mesh_instance.mesh.surface_get_material(i)
 			if surface and surface.resource_name.begins_with("CanStripe"):
+				# Уже своя копия (покраска раньше или «поверх стен» у баллончика в кадре) —
+				# меняем только цвет: новая копия теряла «поверх стен», и полоса пряталась
+				# за корпусом.
+				var current := mesh_instance.get_surface_override_material(i) as BaseMaterial3D
+				if current:
+					current.albedo_color = paint
+					continue
 				var stripe := StandardMaterial3D.new()
 				stripe.albedo_color = paint
 				stripe.roughness = 0.4
