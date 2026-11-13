@@ -46,8 +46,10 @@ func _ready() -> void:
 static func make_model() -> Node3D:
 	var root := Node3D.new()
 	root.add_child(_box(SIZE, Vector3(0, SIZE.y / 2.0, 0), Color("1c1c1e"), 0.5))
-	root.add_child(_box(Vector3(0.016, 0.008, 0.016), Vector3(-0.015, SIZE.y, -0.075),
-		Color("c62828"), 0.4))
+	var power := _box(Vector3(0.016, 0.008, 0.016), Vector3(-0.015, SIZE.y, -0.075),
+		Color("c62828"), 0.4)
+	power.name = "PowerButton"
+	root.add_child(power)
 	for row in 4:
 		for col in 3:
 			var pos := Vector3(-0.018 + col * 0.018, SIZE.y, -0.035 + row * 0.022)
@@ -56,6 +58,22 @@ static func make_model() -> Node3D:
 	root.add_child(_box(Vector3(0.03, 0.012, 0.004), Vector3(0, SIZE.y / 2.0, -SIZE.z / 2.0),
 		Color("4a0d12"), 0.15))
 	return root
+
+
+## Нажать красную кнопку на модели пульта: она утапливается и возвращается (ничего не включает).
+static func press_button(model: Node) -> void:
+	var button := model.find_child("PowerButton", true, false) as Node3D
+	if button == null:
+		return
+	var tween := button.create_tween()
+	tween.tween_property(button, "position:y", SIZE.y - 0.005, 0.05)
+	tween.tween_property(button, "position:y", SIZE.y, 0.1).set_trans(Tween.TRANS_BACK) \
+		.set_ease(Tween.EASE_OUT)
+
+
+## Нажать кнопку на этом пульте (в руке — видно всем со стороны).
+func press() -> void:
+	press_button(_model)
 
 
 static func _box(size: Vector3, pos: Vector3, color: Color, rough: float) -> MeshInstance3D:

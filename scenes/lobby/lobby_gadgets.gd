@@ -245,7 +245,8 @@ func hand_hint(p: PlayerData) -> Array[Dictionary]:
 	if holds_can(p):
 		return _can_holder_hint(p)
 	if holds_remote(p):
-		var remote_entries: Array[Dictionary] = [entry(drop_key(p), "Бросить пульт")]
+		var remote_entries: Array[Dictionary] = [entry(attack_key(p), "Нажать кнопку"),
+			entry(drop_key(p), "Бросить пульт")]
 		return remote_entries
 	if not holds_sponge(p):
 		return _no_hint()
@@ -401,6 +402,10 @@ func _process_remote(p: PlayerData, camera: Camera3D) -> void:
 		_set_layers(model, 1 << (p.slot + 10)) # слой «в кадре» этого игрока
 		camera.add_child(model)
 		_view_remotes[p.id] = model
+	if p.input.is_just_pressed("attack"): # ЛКМ — нажать красную кнопку (просто щёлкает)
+		apartment.tv_remote.press()
+		if _view_remotes.has(p.id):
+			TvRemote.press_button(_view_remotes[p.id])
 	if not p.input.is_just_pressed("drop"):
 		return
 	_hide_view_remote(p)
