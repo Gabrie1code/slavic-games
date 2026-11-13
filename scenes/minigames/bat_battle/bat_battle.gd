@@ -26,7 +26,7 @@ const OUT_Y := -1.5
 
 ## Атака-вращение.
 const SPIN_TIME := 0.35
-const SPIN_COOLDOWN := 0.9
+const SPIN_COOLDOWN := 1.08 # было 0.9; +20% — бить чуть реже
 const SPIN_SPEED_FACTOR := 0.6
 ## Как держать биту в покое: рука согнута перед грудью, бита лежит на плече.
 const REST_ARM_Z := 0.42
