@@ -13,6 +13,7 @@ const CAT_RADIUS := 1.3
 const LOOK_ANGLE := 50.0
 const GRAMOPHONE_RADIUS := 1.4
 const LAMP_RADIUS := 1.2
+const SWITCH_RADIUS := 1.0
 const ARCADE_RADIUS := 1.1
 const TOILET_RADIUS := 1.2
 const SINK_RADIUS := 1.0
@@ -162,7 +163,7 @@ func holds_can(p: PlayerData) -> bool:
 ## Каждый кадр для держащего баллончик: «бросить» (G) — бросить; второе действие (ПКМ) — цвет;
 ## зажат удар — красить туда, куда смотрит прицел (camera — камера от первого лица, null — вид
 ## сверху: тогда «прицел» — прямо перед персонажем). view_can — баллончик «в кадре».
-func process_can_holder(p: PlayerData, camera: Camera3D, view_can: Node3D) -> void:
+func _process_can_holder(p: PlayerData, camera: Camera3D, view_can: Node3D) -> void:
 	var can: SprayCan = _held_cans[p.id]
 	var character: PlayerCharacter = characters[p.id]
 	if p.input.is_just_pressed("drop"):
@@ -222,7 +223,7 @@ func holds_sponge(p: PlayerData) -> bool:
 ## Каждый кадр для того, у кого что-то в руке.
 func process_hand(p: PlayerData, camera: Camera3D, view_can: Node3D) -> void:
 	if holds_can(p):
-		process_can_holder(p, camera, view_can)
+		_process_can_holder(p, camera, view_can)
 	elif holds_sponge(p):
 		_process_sponge(p, camera)
 	elif holds_remote(p):
@@ -241,7 +242,7 @@ func release_hand(p: PlayerData) -> void:
 ## Подсказки тому, у кого что-то в руке.
 func hand_hint(p: PlayerData) -> Array[Dictionary]:
 	if holds_can(p):
-		return can_holder_hint(p)
+		return _can_holder_hint(p)
 	if holds_remote(p):
 		var remote_entries: Array[Dictionary] = [entry(drop_key(p), "Бросить пульт")]
 		return remote_entries
@@ -325,7 +326,7 @@ func _use_sponge(p: PlayerData) -> bool:
 		if sink == null or sink.sponge != null:
 			return false
 		var sponge: Sponge = _held_sponges[p.id]
-		release_sponge_quietly(p)
+		_release_sponge_quietly(p)
 		sink.return_sponge(sponge)
 		characters[p.id].set_arm_angle(PlayerCharacter.ARM_DOWN, 0.2)
 		return true
@@ -349,7 +350,7 @@ func _near_loose_sponge(p: PlayerData) -> Sponge:
 
 
 ## Убрать губку из руки без броска (её кладут на раковину).
-func release_sponge_quietly(p: PlayerData) -> void:
+func _release_sponge_quietly(p: PlayerData) -> void:
 	if _view_sponges.has(p.id):
 		(_view_sponges[p.id] as Node).queue_free()
 		_view_sponges.erase(p.id)
@@ -430,7 +431,7 @@ func release_can(p: PlayerData, dir: Vector3 = Vector3.ZERO) -> void:
 
 
 ## Подсказка держащему баллончик (добавляется к остальным).
-func can_holder_hint(p: PlayerData) -> Array[Dictionary]:
+func _can_holder_hint(p: PlayerData) -> Array[Dictionary]:
 	if not holds_can(p):
 		return _no_hint()
 	return [entry(attack_key(p), "Красить (зажать)"), entry(secondary_key(p), "Сменить цвет"),
@@ -481,7 +482,42 @@ func _can_hint(p: PlayerData) -> Array[Dictionary]:
 	var result: Array[Dictionary] = []
 	if text != "":
 		result.append(entry(confirm_key(p), text, disabled))
+	if not apartment.night_lamp.is_broken(): # ночник на тумбочке — на вторую кнопку
+		var lit := apartment.night_lamp_light.is_on()
+		result.append(entry(secondary_key(p), "Выключить ночник" if lit else "Включить ночник"))
 	return result
+
+
+## Вторая кнопка (ПКМ) с пустой рукой: у тумбочки — ночник. true — нажатие использовано.
+func try_secondary(p: PlayerData) -> bool:
+	if hand_busy(p) or apartment.night_lamp.is_broken():
+		return false
+	if not _near(p, apartment.nightstand.front_point(), NIGHTSTAND_RADIUS):
+		return false
+	apartment.night_lamp_light.toggle()
+	return true
+
+
+## Торшер и выключатели люстр: днём свет включают, вечером выключают (на время, см. LobbyLamp).
+func _light_hint(p: PlayerData) -> Array[Dictionary]:
+	var result: Array[Dictionary] = []
+	if _near_tippable(p, apartment.floor_lamp, LAMP_RADIUS):
+		var lamp_on := apartment.floor_lamp_light.is_on()
+		result.append(entry(confirm_key(p), "Выключить торшер" if lamp_on else "Включить торшер"))
+		return result
+	var chandelier := _near_switch(p)
+	if chandelier:
+		var lit := chandelier.is_on()
+		result.append(entry(confirm_key(p), "Выключить свет" if lit else "Включить свет"))
+	return result
+
+
+## Выключатель люстры, к которому подошли лицом (null — нет рядом).
+func _near_switch(p: PlayerData) -> LobbyLamp:
+	for chandelier in apartment.chandeliers:
+		if _near(p, chandelier["switch"], SWITCH_RADIUS):
+			return chandelier["lamp"]
+	return null
 
 
 ## Пустая подсказка. Именно типизированный массив: `return []` Godot 4.7 возвращает как
@@ -538,13 +574,17 @@ func try_interact(p: PlayerData) -> bool:
 	return false
 
 
-## Торшер, ночник, игровые автоматы — «щёлкнуть выключателем». true — нажатие использовано.
+## Торшер, люстры, раковина, туалет, игровые автоматы — «щёлкнуть выключателем».
+## true — нажатие использовано.
 func _use_switch(p: PlayerData) -> bool:
 	var arcade := _near_arcade(p)
 	var toilet := _near_toilet(p)
 	var sink := _near_sink(p)
-	if _near_tippable(p, apartment.floor_lamp, LAMP_RADIUS) and apartment.lamp_lit():
-		apartment.turn_off_lamp()
+	var chandelier := _near_switch(p)
+	if _near_tippable(p, apartment.floor_lamp, LAMP_RADIUS):
+		apartment.floor_lamp_light.toggle()
+	elif chandelier:
+		chandelier.toggle()
 	elif sink and sink.can_use(p):
 		sink.use(p, characters[p.id])
 	elif toilet and toilet.can_flush():
@@ -581,9 +621,9 @@ func hint(p: PlayerData) -> Array[Dictionary]:
 func _furniture_hint(p: PlayerData) -> Array[Dictionary]:
 	if _near_tippable(p, apartment.gramophone, GRAMOPHONE_RADIUS):
 		return [entry(confirm_key(p), "Завести граммофон", not _gramophone_ready())]
-	# Выключенный торшер «чинится» сам — кнопки нет, пока снова не загорится.
-	if _near_tippable(p, apartment.floor_lamp, LAMP_RADIUS) and apartment.lamp_lit():
-		return [entry(confirm_key(p), "Выключить торшер")]
+	var light_entries := _light_hint(p)
+	if not light_entries.is_empty():
+		return light_entries
 	var can_entries := _can_hint(p)
 	if not can_entries.is_empty():
 		return can_entries

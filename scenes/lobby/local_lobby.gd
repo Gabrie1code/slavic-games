@@ -251,6 +251,8 @@ func _process(delta: float) -> void:
 			_gadgets.process_hand(p, view.get("camera"), view.get("can")) # баллончик / губка
 		elif p.input.is_just_pressed("attack") and (running or not _gadgets.try_attack_use(p)):
 			_punch(p) # у раковины удар берёт губку (try_attack_use), иначе — кулак
+		elif p.input.is_just_pressed("secondary") and not running:
+			_gadgets.try_secondary(p) # ПКМ у тумбочки — ночник
 		if act and _gadgets.can_use_toilet(p):
 			_open_room(p, ToiletScreen.new().setup_for(p, character, _apartment.toilet_room.toilet))
 			continue

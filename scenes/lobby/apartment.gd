@@ -57,8 +57,9 @@ const RUBGAME_TABLE_POS := Vector3(-8.6, 0, 0.2)
 const RUBGAME_ZONE := Vector3(-7.9, 0, 1.45)
 const PHONE_TABLE_POS := Vector3(-5.55, 0, 0.85)
 const LAMP_ENERGY := 1.3
-const LAMP_BACK := 8.0
-const LAMP_FADE := 1.5
+## Выключатели люстр — на перегородке у двери в спальню (со стороны гостиной и спальни).
+const LIVING_SWITCH := Vector3(PARTITION_X - 0.09, 1.25, 0.15)
+const BEDROOM_SWITCH := Vector3(PARTITION_X + 0.09, 1.25, 0.15)
 const SPAWNS: Array[Vector3] = [
 	Vector3(-0.3, 0.3, -1.2), Vector3(0.9, 0.3, -1.2),
 	Vector3(-0.3, 0.3, -2.4), Vector3(0.9, 0.3, -2.4),
@@ -76,12 +77,15 @@ const GLASS := Color(0.8, 0.95, 0.9, 0.6)
 var seats: Array[Dictionary] = []
 ## Стол рулетки (крутится сам каждые 20 секунд).
 var rubgame_table: RubgameTable
-## Граммофон (играет три ноты) и торшер (включается; повалили — гаснет).
+## Граммофон (играет три ноты) и торшер (повалили — гаснет).
 var gramophone: Tippable
 var floor_lamp: Tippable
-## Торшер включён (горит, только пока стоит на месте). Выключили кнопкой — через LAMP_BACK сек
-## сам включается и плавно разгорается (как восстанавливается разбитая посуда).
-var lamp_on := true
+## Свет зависит от времени суток (LobbyLamp): днём не горит, вечером горит; кнопкой — наоборот
+## на 20 сек. Торшер, ночник и люстры (у люстр — выключатели на стене: {"lamp", "switch"}).
+var floor_lamp_light: LobbyLamp
+var night_lamp_light: LobbyLamp
+var chandeliers: Array[Dictionary] = []
+var window_view: WindowView
 ## Тумбочка в спальне: ящик с баллончиком.
 var nightstand: Nightstand
 ## Дисковый телефон (гостиная, у двери в игровую) и кот.
@@ -94,16 +98,12 @@ var cat: LobbyCat
 ## Пульт от телевизора (лежит на диване, его можно взять и бросить).
 var tv_remote: TvRemote
 
-var _lamp_light: OmniLight3D
-var _lamp_glow: MeshInstance3D
-var _lamp_glow_mat: StandardMaterial3D
-var _lamp_level := 1.0 # 0 — не горит, 1 — горит в полную силу
-var _lamp_back_at := 0.0
-## Ночник на тумбочке в спальне: горит всегда; разбили — не светит, пока не восстановится.
-var _night_lamp: Breakable
-var _night_light: OmniLight3D
-var _night_bulb_mat: StandardMaterial3D
+## Ночник на тумбочке в спальне; разбили — не светит, пока не восстановится.
+var night_lamp: Breakable
 var _night_bulb: MeshInstance3D
+## Солнце в комнате (DirectionalLight лобби): вечером слабее, чтобы был виден свет ламп.
+var _sun: DirectionalLight3D
+var _sun_energy := 1.0
 var _time := 0.0
 ## Модель окна гостиной (у неё прячем «небо», чтобы видеть вид за проёмом).
 var _last_window: Node3D
@@ -272,7 +272,7 @@ func _build_living_room() -> void:
 	_place(_model("wall_carpet"), Vector3(LEFT_X + 0.08, 0.85, -0.3)).rotation_degrees.y = 90.0
 	floor_lamp = _tippable("floor_lamp", Vector3(0.5, 1.75, 0.5), 0.88, Vector3(-1.0, 0, 1.45), 6.0)
 	_build_lamp_light()
-	_no_shadow(_place(_model("chandelier"), Vector3(-2.4, 0, -0.6))) # странная тень на полу
+	_chandelier(Vector3(-2.4, 0, -0.6), LIVING_SWITCH, -PI / 2)
 
 	# Обеденный стол у перегородки: варенье, ваза, книги; стулья и табурет падают.
 	var dining := Vector3(1.6, 0, 2.0)
@@ -308,7 +308,7 @@ func _build_bedroom() -> void:
 	nightstand = Nightstand.new()
 	nightstand.position = stand_pos
 	add_child(nightstand)
-	_night_lamp = _breakable("table_lamp", stand_pos + Vector3(0, 0.6, 0),
+	night_lamp = _breakable("table_lamp", stand_pos + Vector3(0, 0.6, 0),
 		[Color("2a7040"), Color("c0a050")], 0.4)
 	_build_night_light()
 	_place(_model("floor_rug_oval"), Vector3(6.3, 0.005, -0.8)).rotation_degrees.y = 90.0
@@ -316,89 +316,90 @@ func _build_bedroom() -> void:
 	_tippable("stool", Vector3(0.36, 0.47, 0.36), 0.24, Vector3(8.4, 0, -0.4), 2.0)
 	_breakable("book_stack_tall", Vector3(8.4, 0.47, -0.4),
 		[Color("992018"), Color("cc9918"), Color("26262e"), Color("4d8c99")], 0.4)
-	_no_shadow(_place(_model("chandelier"), Vector3(6.2, 0, -1.4)))
+	_chandelier(Vector3(6.2, 0, -1.4), BEDROOM_SWITCH, PI / 2)
 
 
 func _process(delta: float) -> void:
 	_time += delta
-	# Задели торшер (даже чуть сдвинули) — он гаснет, как от кнопки, и загорается только через
-	# LAMP_BACK сек после того, как встал на место. Раньше от толчка свет мигал и вспыхивал.
-	if not floor_lamp.is_at_home():
-		lamp_on = false
-		_lamp_back_at = _time + LAMP_BACK
-	elif not lamp_on and _time >= _lamp_back_at:
-		lamp_on = true
-	# Гаснет сразу, разгорается плавно.
-	var target := 1.0 if lamp_on else 0.0
-	if target < _lamp_level:
-		_lamp_level = target
-	else:
-		_lamp_level = move_toward(_lamp_level, target, delta / LAMP_FADE)
-	_lamp_light.light_energy = LAMP_ENERGY * _lamp_level
-	_lamp_light.visible = _lamp_level > 0.01
-	_lamp_glow_mat.albedo_color = Color(0.3, 0.27, 0.22).lerp(Color(1.0, 0.92, 0.7), _lamp_level)
-	var night_lit := not _night_lamp.is_broken()
-	_night_light.visible = night_lit
-	# Разбитый ночник — лампочки нет совсем (раньше в воздухе оставался серый кружок).
-	_night_bulb.visible = night_lit
-
-
-## Торшер горит в полную силу (только тогда его можно выключить).
-func lamp_lit() -> bool:
-	return _lamp_level > 0.99
-
-
-## Выключить торшер кнопкой: гаснет и через LAMP_BACK сек плавно загорается снова.
-func turn_off_lamp() -> void:
-	lamp_on = false
-	_lamp_back_at = _time + LAMP_BACK
+	var dark := window_view.is_dark()
+	# Торшер горит, только пока стоит на месте; ночник — пока не разбит.
+	floor_lamp_light.update(delta, dark, floor_lamp.is_at_home())
+	var night_ok := not night_lamp.is_broken()
+	night_lamp_light.update(delta, dark, night_ok)
+	_night_bulb.visible = night_ok # разбитый — без «висящей в воздухе» лампочки
+	for chandelier in chandeliers:
+		(chandelier["lamp"] as LobbyLamp).update(delta, dark, true)
+	# Солнце в комнате вечером и ночью слабее (но не до темноты — играть должно быть видно).
+	if _sun == null:
+		_sun = get_parent().get_node_or_null("Sun") as DirectionalLight3D
+		_sun_energy = _sun.light_energy if _sun else 1.0
+	if _sun:
+		_sun.light_energy = _sun_energy * lerpf(0.4, 1.0, window_view.daylight())
 
 
 ## Лампочка под зелёным абажуром ночника.
 func _build_night_light() -> void:
-	_night_light = OmniLight3D.new()
-	_night_light.light_color = Color(1.0, 0.82, 0.55)
-	_night_light.light_energy = 0.9
-	_night_light.omni_range = 2.6
-	_night_light.position = Vector3(0, 0.3, 0)
-	_night_lamp.add_child(_night_light)
-	var bulb := MeshInstance3D.new()
-	var sphere := SphereMesh.new()
-	sphere.radius = 0.04
-	sphere.height = 0.08
-	bulb.mesh = sphere
-	_night_bulb_mat = StandardMaterial3D.new()
-	_night_bulb_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	bulb.material_override = _night_bulb_mat
-	bulb.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	bulb.position = Vector3(0, 0.29, 0)
-	_night_bulb_mat.albedo_color = Color(1.0, 0.92, 0.7)
-	_night_lamp.add_child(bulb)
-	_night_bulb = bulb
+	var light := _warm_light(0.9, 2.6, Vector3(0, 0.3, 0))
+	night_lamp.add_child(light)
+	var bulb_mat := _bulb_mat()
+	_night_bulb = _bulb(0.04, Vector3(0, 0.29, 0), bulb_mat)
+	night_lamp.add_child(_night_bulb)
+	night_lamp_light = LobbyLamp.new(light, bulb_mat)
 
 
 ## Лампочка под абажуром торшера: тёплый свет и светящийся шарик.
 func _build_lamp_light() -> void:
-	_lamp_light = OmniLight3D.new()
-	_lamp_light.light_color = Color(1.0, 0.82, 0.55)
-	_lamp_light.light_energy = LAMP_ENERGY
-	_lamp_light.omni_range = 4.0
 	# Без теней: абажур отбрасывал резкий восьмиугольник света на пол («кривое свечение»).
-	_lamp_light.shadow_enabled = false
-	_lamp_light.omni_attenuation = 1.5 # мягче к краю
-	_lamp_light.position = Vector3(0, 1.4, 0)
-	floor_lamp.add_child(_lamp_light)
-	_lamp_glow = MeshInstance3D.new()
-	var bulb := SphereMesh.new()
-	bulb.radius = 0.07
-	bulb.height = 0.14
-	_lamp_glow.mesh = bulb
-	_lamp_glow_mat = StandardMaterial3D.new()
-	_lamp_glow_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	_lamp_glow_mat.albedo_color = Color(1.0, 0.92, 0.7)
-	_lamp_glow.material_override = _lamp_glow_mat
-	_lamp_glow.position = Vector3(0, 1.45, 0)
-	floor_lamp.add_child(_lamp_glow)
+	var light := _warm_light(LAMP_ENERGY, 4.0, Vector3(0, 1.4, 0))
+	light.omni_attenuation = 1.5 # мягче к краю
+	floor_lamp.add_child(light)
+	var bulb_mat := _bulb_mat()
+	floor_lamp.add_child(_bulb(0.07, Vector3(0, 1.45, 0), bulb_mat))
+	floor_lamp_light = LobbyLamp.new(light, bulb_mat)
+
+
+## Люстра под потолком со своим светом и выключатель на стене (yaw — куда смотрит выключатель).
+func _chandelier(pos: Vector3, switch_pos: Vector3, switch_yaw: float) -> void:
+	_no_shadow(_place(_model("chandelier"), pos)) # странная тень на полу
+	var light := _warm_light(1.4, 5.5, pos + Vector3(0, 2.3, 0))
+	add_child(light)
+	var bulb_mat := _bulb_mat()
+	add_child(_bulb(0.06, pos + Vector3(0, 2.38, 0), bulb_mat))
+	var plate := _box(Vector3(0.08, 0.12, 0.02), Vector3.ZERO, _mat(Color("efe6d2"), 0.5))
+	var key := _box(Vector3(0.03, 0.05, 0.015), Vector3(0, 0, 0.015), _mat(Color("d9cfb8"), 0.5))
+	key.reparent(plate, false)
+	plate.position = switch_pos
+	plate.rotation.y = switch_yaw
+	chandeliers.append({"lamp": LobbyLamp.new(light, bulb_mat), "switch": switch_pos})
+
+
+func _warm_light(energy: float, light_range: float, pos: Vector3) -> OmniLight3D:
+	var light := OmniLight3D.new()
+	light.light_color = Color(1.0, 0.82, 0.55)
+	light.light_energy = energy
+	light.omni_range = light_range
+	light.shadow_enabled = false
+	light.position = pos
+	return light
+
+
+func _bulb_mat() -> StandardMaterial3D:
+	var mat := StandardMaterial3D.new()
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	return mat
+
+
+## Светящаяся лампочка-шарик (цвет — от LobbyLamp: горит / не горит).
+func _bulb(radius: float, pos: Vector3, mat: StandardMaterial3D) -> MeshInstance3D:
+	var bulb := MeshInstance3D.new()
+	var sphere := SphereMesh.new()
+	sphere.radius = radius
+	sphere.height = radius * 2.0
+	bulb.mesh = sphere
+	bulb.material_override = mat
+	bulb.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	bulb.position = pos
+	return bulb
 
 
 # ---------------- Вид из окна ----------------
@@ -428,6 +429,7 @@ func _build_window_view(window_pos: Vector3) -> void:
 	var outside := WindowView.new()
 	outside.position = Vector3(center_x, 0, BACK_Z - 0.2)
 	add_child(outside)
+	window_view = outside
 	# Сверху (общая камера) — прежняя плоская картинка прямо за проёмом.
 	var flat := MeshInstance3D.new()
 	var flat_mesh := QuadMesh.new()

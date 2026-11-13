@@ -138,6 +138,24 @@ func _apply_time() -> void:
 	_sky_mat.set_shader_parameter("moon_alpha", clampf(moon_up * 6.0, 0.0, 1.0))
 
 
+## На улице вечер или ночь — в квартире пора включать свет (LobbyLamp).
+func is_dark() -> bool:
+	return hour >= 19.5 or hour < 6.5
+
+
+## Насколько светло на улице (1 — день, 0 — ночь): для солнца в комнате.
+func daylight() -> float:
+	var a: Array = DAY_KEYS[0]
+	var b: Array = DAY_KEYS[1]
+	for i in DAY_KEYS.size() - 1:
+		if hour >= float(DAY_KEYS[i][0]) and hour <= float(DAY_KEYS[i + 1][0]):
+			a = DAY_KEYS[i]
+			b = DAY_KEYS[i + 1]
+			break
+	var t := smoothstep(0.0, 1.0, inverse_lerp(float(a[0]), float(b[0]), hour))
+	return 1.0 - lerpf(float(a[5]), float(b[5]), t)
+
+
 ## Точка дуги на небе (t: 0 — восход слева, 1 — закат справа) в UV квадрата неба.
 func _arc_uv(t: float, peak: float) -> Vector2:
 	var x := lerpf(-40.0, 40.0, t)
