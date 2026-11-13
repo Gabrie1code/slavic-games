@@ -120,7 +120,7 @@ func _build_glass() -> void:
 	glass.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	glass.roughness = 0.04
 	glass.metallic = 0.2
-	glass.specular = 0.8
+	glass.metallic_specular = 0.8
 	glass.cull_mode = BaseMaterial3D.CULL_DISABLED
 	var frame := StandardMaterial3D.new()
 	frame.albedo_color = Color(0.4, 0.2, 0.08)

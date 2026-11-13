@@ -159,15 +159,15 @@ func _finish_close() -> void:
 
 
 ## Кнопки и надписи стола проявляются / тают; сам вид (камера) не затухает никогда.
-func _fade_overlay(show: bool) -> void:
+func _fade_overlay(appear: bool) -> void:
 	for child in get_children():
 		var control := child as Control
 		if control == null or control == _view or control == _confirm:
 			continue
-		if show:
+		if appear:
 			control.modulate.a = 0.0
 		var tween := control.create_tween()
-		tween.tween_property(control, "modulate:a", 1.0 if show else 0.0, FADE_TIME)
+		tween.tween_property(control, "modulate:a", 1.0 if appear else 0.0, FADE_TIME)
 
 
 ## Где глаза персонажа (как камера от первого лица в лобби).

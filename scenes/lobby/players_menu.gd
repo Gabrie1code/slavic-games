@@ -123,9 +123,9 @@ func _row(slot: int, p: PlayerData) -> Control:
 	line.add_child(name_box)
 	if not p.is_bot():
 		line.add_child(_label("%d ₽" % PlayerManager.wallet(p), 19, Color("f6c343")))
-	var ready := is_ready.is_valid() and bool(is_ready.call(p))
-	line.add_child(_label("ГОТОВ" if ready else "—", 17,
-		Color("8fd694") if ready else Color(1, 1, 1, 0.35)))
+	var marked := is_ready.is_valid() and bool(is_ready.call(p))
+	line.add_child(_label("ГОТОВ" if marked else "—", 17,
+		Color("8fd694") if marked else Color(1, 1, 1, 0.35)))
 	return panel
 
 

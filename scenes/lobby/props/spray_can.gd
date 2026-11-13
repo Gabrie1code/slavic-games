@@ -184,10 +184,11 @@ func spray_at(target: Vector3, normal: Vector3, hit: bool, delta: float,
 ## Стереть следы краски рядом с точкой (губка): и на стенах, и на людях, и на посуде.
 static func erase_near(point: Vector3, radius: float) -> void:
 	for i in range(_splats.size() - 1, -1, -1):
-		var decal := _splats[i]
-		if not is_instance_valid(decal):
+		if not is_instance_valid(_splats[i]):
 			_splats.remove_at(i)
-		elif decal.global_position.distance_to(point) < radius:
+			continue
+		var decal: Decal = _splats[i]
+		if decal.global_position.distance_to(point) < radius:
 			decal.queue_free()
 			_splats.remove_at(i)
 
@@ -252,11 +253,15 @@ func _place_splat(point: Vector3, normal: Vector3, collider: Object) -> void:
 	_splats.append(decal)
 	var fade := decal.create_tween()
 	fade.tween_property(decal, "modulate:a", 0.0, PAINT_FADE).set_delay(PAINT_LIFE)
-	fade.tween_callback(decal.queue_free)
+	fade.tween_callback(func() -> void:
+		_splats.erase(decal) # убрать из списка до удаления — в списке только живые пятна
+		decal.queue_free())
 	if _splats.size() > MAX_SPLATS:
-		var old: Decal = _splats.pop_front()
+		# Сначала проверка, потом запись в переменную типа Decal: старое пятно могло уже
+		# раствориться само (через 20 сек) — запись удалённого объекта роняла игру.
+		var old: Variant = _splats.pop_front()
 		if is_instance_valid(old):
-			old.queue_free()
+			(old as Decal).queue_free()
 
 
 ## К чему прицепить след: к ближайшей части тела игрока, к посуде (Breakable) или к миру.
