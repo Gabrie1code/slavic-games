@@ -9,7 +9,6 @@ enum State { HOME, HELD, LOOSE }
 const BACK_TIME := 5.0
 const SIZE := Vector3(0.06, 0.025, 0.2)
 const HAND_POS := Vector3(0, -0.45, 0.04)
-const THROW_SPEED := 4.5
 
 var state := State.HOME
 var holder: PlayerData
@@ -117,8 +116,7 @@ func throw(character: PlayerCharacter, dir: Vector3) -> void:
 	global_transform = start
 	_set_render_layer(_model, 1)
 	_set_loose_physics(true)
-	linear_velocity = dir.normalized() * THROW_SPEED + Vector3.UP * 1.5
-	angular_velocity = Vector3(randf_range(-8, 8), randf_range(-8, 8), randf_range(-8, 8))
+	ThrowHelper.launch(self, character, dir)
 	character.set_arm_angle(PlayerCharacter.ARM_DOWN, 0.2)
 
 

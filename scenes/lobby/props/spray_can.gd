@@ -106,7 +106,8 @@ func hold(p: PlayerData, character: PlayerCharacter) -> void:
 
 
 ## Бросить перед собой: дальше баллончик — обычное физическое тело в мире world.
-func drop(character: PlayerCharacter, world: Node3D) -> void:
+## dir — куда бросить (взгляд игрока); Vector3.ZERO — уронить под себя.
+func drop(character: PlayerCharacter, world: Node3D, dir: Vector3 = Vector3.ZERO) -> void:
 	var start := global_transform
 	state = State.LOOSE
 	holder = null
@@ -116,9 +117,7 @@ func drop(character: PlayerCharacter, world: Node3D) -> void:
 	_set_render_layer(_model, 1)
 	_set_loose_physics(true)
 	stop_spray()
-	var forward := -character.global_basis.z
-	linear_velocity = forward * 1.2 + Vector3.UP * 1.0
-	angular_velocity = Vector3(randf_range(-2, 2), randf_range(-1, 1), randf_range(-2, 2))
+	ThrowHelper.launch(self, character, dir)
 	character.set_arm_angle(PlayerCharacter.ARM_DOWN, 0.2)
 
 

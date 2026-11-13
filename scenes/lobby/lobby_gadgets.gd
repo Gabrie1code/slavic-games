@@ -166,7 +166,7 @@ func process_can_holder(p: PlayerData, camera: Camera3D, view_can: Node3D) -> vo
 	var can: SprayCan = _held_cans[p.id]
 	var character: PlayerCharacter = characters[p.id]
 	if p.input.is_just_pressed("drop"):
-		release_can(p)
+		release_can(p, look_dir(character, camera)) # бросить туда, куда смотрит
 		return
 	if p.input.is_just_pressed("secondary"):
 		can.next_color()
@@ -193,6 +193,13 @@ func _aim_hit(character: PlayerCharacter, camera: Camera3D, reach: float) -> Dic
 	var query := PhysicsRayQueryParameters3D.create(from, _aim_end(character, camera, reach),
 		1 | Breakable.PAINT_LAYER, [character.get_rid()])
 	return apartment.get_world_3d().direct_space_state.intersect_ray(query)
+
+
+## Куда смотрит игрок: взгляд камеры от первого лица (или «вперёд» персонажа на виде сверху).
+static func look_dir(character: PlayerCharacter, camera: Camera3D) -> Vector3:
+	if camera:
+		return -camera.global_basis.z
+	return -character.global_basis.z
 
 
 func _aim_end(character: PlayerCharacter, camera: Camera3D, reach: float) -> Vector3:
@@ -266,7 +273,7 @@ func _process_sponge(p: PlayerData, camera: Camera3D) -> void:
 	var character: PlayerCharacter = characters[p.id]
 	_show_view_sponge(p, camera)
 	if p.input.is_just_pressed("drop"):
-		release_sponge(p)
+		release_sponge(p, look_dir(character, camera))
 		return
 	if not p.input.is_pressed("attack"):
 		sponge.stop_scrub()
@@ -299,7 +306,7 @@ func _hold_sponge(p: PlayerData, sponge: Sponge) -> void:
 
 
 ## Бросить губку (G или ушёл из лобби).
-func release_sponge(p: PlayerData) -> void:
+func release_sponge(p: PlayerData, dir: Vector3 = Vector3.ZERO) -> void:
 	if _view_sponges.has(p.id):
 		(_view_sponges[p.id] as Node).queue_free()
 		_view_sponges.erase(p.id)
@@ -308,7 +315,7 @@ func release_sponge(p: PlayerData) -> void:
 	var sponge: Sponge = _held_sponges[p.id]
 	_held_sponges.erase(p.id)
 	if is_instance_valid(sponge) and characters.has(p.id):
-		sponge.drop(characters[p.id], apartment)
+		sponge.drop(characters[p.id], apartment, dir)
 
 
 ## «Подтвердить»: у раковины с губкой в руке — положить её; рядом брошенная губка — подобрать.
@@ -395,10 +402,7 @@ func _process_remote(p: PlayerData, camera: Camera3D) -> void:
 	if not p.input.is_just_pressed("drop"):
 		return
 	_hide_view_remote(p)
-	var dir := -character.global_basis.z
-	if camera:
-		dir = -camera.global_basis.z
-	apartment.tv_remote.throw(character, dir)
+	apartment.tv_remote.throw(character, look_dir(character, camera))
 
 
 func _hide_view_remote(p: PlayerData) -> void:
@@ -415,13 +419,14 @@ func _set_layers(node: Node, layer: int) -> void:
 
 
 ## Бросить баллончик (G или игрок ушёл из лобби).
-func release_can(p: PlayerData) -> void:
+## dir — куда бросить; Vector3.ZERO — уронить под себя (игрок ушёл из лобби).
+func release_can(p: PlayerData, dir: Vector3 = Vector3.ZERO) -> void:
 	if not _held_cans.has(p.id):
 		return
 	var can: SprayCan = _held_cans[p.id]
 	_held_cans.erase(p.id)
 	if is_instance_valid(can) and characters.has(p.id):
-		can.drop(characters[p.id], apartment)
+		can.drop(characters[p.id], apartment, dir)
 
 
 ## Подсказка держащему баллончик (добавляется к остальным).
