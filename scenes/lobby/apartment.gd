@@ -578,7 +578,8 @@ func _build_decor() -> void:
 	_wall_shelf(Vector3(-3.25, 1.55, LIVING_FRONT_Z), PI, front_shelf, FP_ONLY_LAYER)
 	# Плакаты.
 	var size := Vector2(0.5, 0.7)
-	poster("home_space", size, Vector3(PARTITION_X - 0.085, 1.65, 0.65), -PI / 2)
+	# Правее, над столом с граммофоном (раньше раструб закрывал плакат).
+	poster("home_space", size, Vector3(PARTITION_X - 0.085, 1.7, 1.3), -PI / 2)
 	poster("home_kefir", size, Vector3(LEFT_X + 0.012, 1.65, -2.65), PI / 2)
 	poster("home_calendar", size, Vector3(5.75, 1.6, BACK_Z + 0.012), 0.0)
 	poster("home_hockey", size, Vector3(PARTITION_X + 0.085, 1.6, 0.65), PI / 2)
