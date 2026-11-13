@@ -458,12 +458,47 @@ made.append(export("chandelier", P))
 
 # ---------------- Шторы (к окну шириной 1.5 м) ----------------
 # Тюль убран: в игре он светился белым и закрывал вид из окна.
+# Потолочный карниз (как в хрущёвках): доска под потолком от стены до планки-бленды, за
+# блендой — металлическая шина, на ней шторы. Начало координат — у окна (стена в y = +0.08).
+# Шторы висят в 37 см перед окном — перед подоконником (он выступает на 30 см), поэтому
+# задёрнутые не проходят сквозь подоконник и кактус.
 DRAPE = mat("Drape", (0.45, 0.12, 0.08), 0.9)
-P = [box((2.3, 0.04, 0.04), (0, 0, 2.62), METAL)]                                        # карниз
-for x in (-0.95, 0.95):
-    for k in range(4):                                                                     # складки штор
-        P.append(cyl(0.05, 1.95, (x + (k - 1.5) * 0.09, -0.06, 1.62), DRAPE, verts=6))
-made.append(export("curtains", P))
+P = [box((2.44, 0.52, 0.025), (0, -0.18, 2.985), WOOD_L),                                # доска
+     box((2.46, 0.025, 0.16), (0, -0.45, 2.92), WOOD_L),                                 # бленда
+     box((2.47, 0.03, 0.025), (0, -0.46, 2.86), WOOD),                                   # кант снизу
+     box((2.47, 0.03, 0.02), (0, -0.46, 2.97), WOOD),                                    # кант сверху
+     box((2.36, 0.02, 0.012), (0, -0.37, 2.93), METAL)]                                  # шина
+made.append(export("curtain_cornice", P))
+
+
+def curtain_panel(sign):
+    """Полотно шторы со складками: от внешнего края (x = 0) к середине окна (x = sign * 1.14).
+    В игре сжимается по X, когда шторы раздвинуты (складки собираются гармошкой)."""
+    n = 20
+    verts, faces = [], []
+    rows = ((0.03, 0.036), (1.4, 0.032), (2.88, 0.024))  # (высота, глубина складки)
+    for z, amp in rows:
+        for i in range(n + 1):
+            y = 0.0 if i in (0, n) else (amp if i % 2 else -amp)
+            verts.append((sign * 1.14 * i / n, y, z))
+    for r in range(len(rows) - 1):
+        for i in range(n):
+            a = r * (n + 1) + i
+            faces.append((a, a + 1, a + n + 2, a + n + 1) if sign > 0 else (a + 1, a, a + n + 1, a + n + 2))
+    me = bpy.data.meshes.new("Curtain")
+    me.from_pydata(verts, [], faces)
+    o = bpy.data.objects.new("Curtain", me)
+    bpy.context.scene.collection.objects.link(o)
+    mod = o.modifiers.new("Solid", "SOLIDIFY")
+    mod.thickness = 0.012
+    mod.offset = 0
+    flat(o, DRAPE)
+    hooks = [cyl(0.012, 0.04, (sign * 1.14 * i / 10, 0, 2.9), METAL, verts=6) for i in range(11)]
+    return [o] + hooks
+
+
+made.append(export("curtain_left", curtain_panel(1)))
+made.append(export("curtain_right", curtain_panel(-1)))
 
 # ---------------- Ковёр на пол (лежит, узором вверх) ----------------
 # Тёмно-синее поле с ромбической решёткой кремовыми линиями, по центру — ступенчатый бордовый
@@ -524,7 +559,7 @@ layout = {
     "nightstand": (5.8, 1.0, 0), "table_lamp": (5.8, 1.0, 0.55), "window": (2.8, 1.25, 0),
     "armchair": (-1.6, -2.6, 0), "coffee_table": (0.2, -2.6, 0), "bookshelf": (8.6, 1.1, 0),
     "radio": (8.6, 1.1, 0.95), "dumbbell": (3.6, -1.2, 0), "stool": (4.2, -1.2, 0),
-    "chandelier": (0, -1.0, -0.5), "curtains": (2.8, 1.2, 0), "floor_rug": (0.5, -3.6, 0),
+    "chandelier": (0, -1.0, -0.5), "curtain_cornice": (2.8, 1.2, 0), "curtain_left": (1.6, 1.2, 0), "curtain_right": (4.0, 1.2, 0), "floor_rug": (0.5, -3.6, 0),
 }
 for o in made:
     if o.name in layout:

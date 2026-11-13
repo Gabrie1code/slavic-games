@@ -415,11 +415,11 @@ func _restock_bottle() -> void:
 	bottle.position = BOTTLE_POS
 	add_child(bottle)
 
-## Шкафчик или духовка ближе radius и в поле взгляда (если оба — тот, что ближе к центру
-## взгляда); null — нет.
+## Шкафчик, духовка или шторы гостиной ближе radius и в поле взгляда (если несколько — то,
+## что ближе к центру взгляда); null — нет.
 func hinged_near(character: Node3D, radius: float) -> HingedProp:
 	var best: HingedProp = null
-	for prop: HingedProp in [cabinet, oven]:
+	for prop: HingedProp in [cabinet, oven, apartment.curtains]:
 		if prop == null:
 			continue
 		var point := prop.front_point()

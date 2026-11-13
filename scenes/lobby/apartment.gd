@@ -99,6 +99,8 @@ var nightstand: Nightstand
 var phone: RotaryPhone
 ## Кухня (за диваном, вход из гостиной).
 var kitchen_room: KitchenRoom
+## Шторы у окна гостиной (задёрнуть / раздвинуть — как дверцы HingedProp).
+var curtains: WindowCurtains
 ## Туалет (унитаз — toilet_room.toilet).
 var toilet_room: ToiletRoom
 ## Экраны игровых автоматов (кнопкой действия их можно «сломать» на 8 сек).
@@ -264,7 +266,10 @@ func _build_living_room() -> void:
 	window_glass.position = window_pos
 	add_child(window_glass)
 	_build_window_view(window_pos)
-	_place(_model("curtains"), window_pos + Vector3(0, 0, 0.12))
+	# Шторы на потолочном карнизе, задёргиваются (WindowCurtains); висят перед подоконником.
+	curtains = WindowCurtains.new()
+	curtains.position = window_pos
+	add_child(curtains)
 	# Подоконник и батарея твёрдые: на подоконник можно запрыгнуть (раньше проваливались сквозь).
 	_invisible_wall(Vector3(1.7, 0.05, 0.32), window_pos + Vector3(0, 0.86, 0.14))
 	_invisible_wall(Vector3(1.0, 0.5, 0.1), window_pos + Vector3(0, 0.45, 0.05))
@@ -552,8 +557,8 @@ func _build_decor() -> void:
 	var plant_size := Vector3(0.45, 1.0, 0.45)
 	# Фикус — у левой стены рядом с креслом (между телевизором и шкафом он влезал в мебель).
 	_solid(_model("plant_ficus"), plant_size, 0.5, Vector3(-5.5, 0, -1.55))
-	# Пальма — чуть вперёд от угла (в углу листья влезали в штору).
-	_solid(_model("plant_palm"), plant_size, 0.5, Vector3(2.55, 0, -3.05))
+	# Пальма — вперёд от угла: листья не достают до шторы (и раздвинутой, и задёрнутой).
+	_solid(_model("plant_palm"), plant_size, 0.5, Vector3(2.55, 0, -2.9))
 	_solid(_model("plant_snake"), plant_size, 0.5, Vector3(-5.6, 0, 3.15))
 	_solid(_model("plant_snake"), plant_size, 0.5, Vector3(3.5, 0, -3.7), 0.8)
 	_solid(_model("plant_ficus"), plant_size, 0.5, Vector3(8.65, 0, 1.15), 1.3)
