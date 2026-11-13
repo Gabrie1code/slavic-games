@@ -81,6 +81,32 @@ def lathe(profile, m, loc=(0, 0, 0), segs=28, smooth=True):
     return finish(o, m, smooth)
 
 
+def lathe_uv(profile, m, loc=(0, 0, 0), segs=40):
+    """Тело вращения с развёрткой под роспись: u — по окружности (перед, −Y, — u = 0.75),
+    v — по высоте (0 — низ, 1 — верх профиля). Шов — отдельные вершины (u = 0 и u = 1)."""
+    top = max(z for _, z in profile)
+    bm = bmesh.new()
+    uv = bm.loops.layers.uv.new()
+    rings = []
+    for r, z in profile:
+        rings.append([bm.verts.new((loc[0] + r * math.cos(2 * math.pi * i / segs),
+                                    loc[1] + r * math.sin(2 * math.pi * i / segs), loc[2] + z))
+                      for i in range(segs + 1)])
+    for k in range(len(rings) - 1):
+        v0, v1 = profile[k][1] / top, profile[k + 1][1] / top
+        for i in range(segs):
+            f = bm.faces.new((rings[k][i], rings[k][i + 1], rings[k + 1][i + 1], rings[k + 1][i]))
+            for loop, (u, v) in zip(f.loops, ((i / segs, v0), ((i + 1) / segs, v0),
+                                              ((i + 1) / segs, v1), (i / segs, v1))):
+                loop[uv].uv = (u, v)
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    me = bpy.data.meshes.new("LU")
+    bm.to_mesh(me)
+    o = bpy.data.objects.new("LU", me)
+    bpy.context.scene.collection.objects.link(o)
+    return finish(o, m)
+
+
 def ball(r, loc, m, scale=(1, 1, 1), segs=20, rings=12):
     bpy.ops.mesh.primitive_uv_sphere_add(segments=segs, ring_count=rings, radius=r, location=loc)
     o = bpy.context.object
@@ -137,7 +163,7 @@ def tube(pts, radius, m, taper=None):
     return finish(o, m)
 
 
-def export(name, parts, write=True):
+def export(name, parts, write=True, size=1.0):
     bpy.ops.object.select_all(action="DESELECT")
     for o in parts:
         o.select_set(True)
@@ -147,6 +173,9 @@ def export(name, parts, write=True):
     obj.name = name
     bpy.context.scene.cursor.location = (0, 0, 0)
     bpy.ops.object.origin_set(type="ORIGIN_CURSOR")
+    if size != 1.0:
+        obj.scale = (size, size, size)
+        bpy.ops.object.transform_apply(scale=True, location=False, rotation=False)
     if write:
         bpy.ops.export_scene.gltf(filepath=os.path.join(OUT, name + ".glb"), use_selection=True,
                                   export_format="GLB")
@@ -154,13 +183,8 @@ def export(name, parts, write=True):
     return obj
 
 
-SKIN = mat("MatrFace", (0.95, 0.82, 0.68), 0.5)
 GOLD = mat("MatrGold", (0.9, 0.68, 0.15), 0.3, 0.6)
-YELLOW = mat("MatrApron", (0.98, 0.85, 0.3), 0.45)
 DARK = mat("MatrEyes", (0.08, 0.06, 0.05), 0.4)
-PINK = mat("MatrCheek", (0.95, 0.45, 0.45), 0.5)
-FLOWER = mat("MatrFlower", (0.85, 0.08, 0.1), 0.4)
-LEAFG = mat("MatrLeaf", (0.15, 0.5, 0.15), 0.5)
 PORCELAIN = mat("Porcelain", (0.94, 0.94, 0.92), 0.2)
 COBALT = mat("Cobalt", (0.06, 0.18, 0.6), 0.25)
 TIN = mat("Tin", (0.7, 0.7, 0.72), 0.3, 0.8)
@@ -171,36 +195,17 @@ DIAL = mat("ClockDial", (0.97, 0.95, 0.88), 0.4)
 
 
 # ---------------- Матрёшки ----------------
-def matryoshka(x, s, body, scarf):
-    """Матрёшка высотой 0.14·s: гладкий силуэт, платок другого цвета, лицо, фартук с цветком."""
+def matryoshka(x, s, paint):
+    """Матрёшка высотой 0.141·s: гладкое тело вращения, вся роспись — текстурой (лицо, платок,
+    фартук с цветком; tools/textures/shelf_paint.py), без налепленных деталей."""
     prof = [(0.0, 0.0), (0.036, 0.0), (0.043, 0.012), (0.045, 0.035), (0.041, 0.06), (0.032, 0.08),
             (0.03, 0.088), (0.033, 0.1), (0.033, 0.115), (0.026, 0.13), (0.014, 0.139), (0.0, 0.141)]
-    P = [lathe([(r * s, z * s) for r, z in prof[:7]] + [(0.0, 0.088 * s)], body, (x, 0, 0))]
-    P.append(lathe([(0.0, 0.08 * s)] + [(r * s, z * s) for r, z in prof[5:]], scarf, (x, 0, 0)))
-    P.append(ring(0.0315 * s, 0.003 * s, (x, 0, 0.083 * s), GOLD))               # поясок
-    face_z = 0.107 * s
-    P.append(ball(0.021 * s, (x, -0.022 * s, face_z), SKIN, scale=(1, 0.55, 1.05)))
-    for side in (-1, 1):
-        P.append(ball(0.0028 * s, (x + side * 0.0075 * s, -0.034 * s, face_z + 0.004 * s), DARK))
-        P.append(ball(0.0042 * s, (x + side * 0.012 * s, -0.031 * s, face_z - 0.006 * s), PINK,
-                      scale=(1, 0.5, 1)))
-    P.append(ball(0.0035 * s, (x, -0.034 * s, face_z - 0.011 * s), FLOWER, scale=(1.3, 0.5, 0.7)))  # губы
-    # Фартук (жёлтый овал спереди) и цветок на нём.
-    P.append(ball(0.027 * s, (x, -0.034 * s, 0.035 * s), YELLOW, scale=(0.9, 0.35, 1.2)))
-    for k in range(5):
-        a = 2 * math.pi * k / 5
-        P.append(ball(0.0055 * s, (x + math.cos(a) * 0.008 * s, -0.044 * s,
-                                    0.04 * s + math.sin(a) * 0.008 * s), FLOWER, scale=(1, 0.5, 1)))
-    P.append(ball(0.004 * s, (x, -0.046 * s, 0.04 * s), YELLOW, scale=(1, 0.5, 1)))
-    for side in (-1, 1):
-        P.append(ball(0.005 * s, (x + side * 0.012 * s, -0.042 * s, 0.022 * s), LEAFG,
-                      scale=(1.3, 0.45, 0.7)))
-    return P
+    tex = mat("Matr_" + paint, (1, 1, 1), 0.3, image="assets/textures/shelf/%s.png" % paint)
+    return [lathe_uv([(r * s, z * s) for r, z in prof], tex, (x, 0, 0))]
 
 
-P = (matryoshka(-0.08, 1.0, mat("MatrRed", (0.8, 0.08, 0.06), 0.3), mat("MatrScarf1", (0.95, 0.75, 0.15), 0.4))
-     + matryoshka(0.03, 0.78, mat("MatrGreen", (0.1, 0.5, 0.2), 0.3), mat("MatrScarf2", (0.85, 0.1, 0.1), 0.4))
-     + matryoshka(0.115, 0.58, mat("MatrBlue", (0.1, 0.25, 0.7), 0.3), mat("MatrScarf3", (0.95, 0.75, 0.15), 0.4)))
+P = matryoshka(-0.08, 1.0, "matr_red") + matryoshka(0.03, 0.78, "matr_green") \
+    + matryoshka(0.115, 0.58, "matr_blue")
 export("shelf_matryoshka", P)
 
 # ---------------- Фарфоровый слоник ----------------
@@ -300,7 +305,7 @@ for k in range(4):                                                              
 P.append(ring(0.0162, 0.002, (0, 0, 0.12), ROCKET_RED))
 for z in (0.135, 0.105):                                                               # иллюминаторы
     P.append(ball(0.004, (0, -0.016, z), mat("RocketWindow", (0.2, 0.45, 0.8), 0.1), scale=(1, 0.4, 1)))
-export("shelf_rocket", P)
+export("shelf_rocket", P, size=1.35)                                                 # крупнее
 
 # ---------------- Школьный глобус ----------------
 # Шар (синие океаны, зелёные «материки» — пятна), наклонная латунная дуга-меридиан, ножка,
@@ -352,16 +357,9 @@ P = frame + [box((0.008, 0.06, 0.004), (0, 0.035, 0.002), WOOD)]                
 export("shelf_frame", P)
 
 # ---------------- Ваза «гжель» ----------------
-P = [lathe([(0.0, 0.0), (0.026, 0.0), (0.03, 0.01), (0.044, 0.05), (0.046, 0.075), (0.036, 0.105),
-            (0.02, 0.13), (0.018, 0.15), (0.024, 0.165), (0.0, 0.165)], PORCELAIN)]
-for z, r in ((0.012, 0.031), (0.105, 0.0365), (0.16, 0.0225)):
-    P.append(ring(r, 0.0028, (0, 0, z), COBALT))
-for k in range(10):                                                                    # горошины
-    a = 2 * math.pi * k / 10
-    for z, r in ((0.045, 0.043), (0.075, 0.046)):
-        aa = a + (0.31 if z > 0.06 else 0.0)
-        P.append(ball(0.0042, (math.cos(aa) * r, math.sin(aa) * r, z), COBALT,
-                      scale=(1, 1, 1)))
+GZHEL = mat("VaseGzhel", (1, 1, 1), 0.2, image="assets/textures/shelf/vase_gzhel.png")
+P = [lathe_uv([(0.0, 0.0), (0.026, 0.0), (0.03, 0.01), (0.044, 0.05), (0.046, 0.075),
+               (0.036, 0.105), (0.02, 0.13), (0.018, 0.15), (0.024, 0.165), (0.0, 0.165)], GZHEL)]
 export("shelf_vase", P)
 print("DONE")
 
