@@ -19,25 +19,29 @@ const PIGEON_AREA := Rect2(-5.0, 5.0, 10.0, 6.0)
 ## Небо (квадрат 600×320 м на 60 м от окна): высота верха и размер — для перевода в UV.
 const SKY_TOP := 260.0
 const SKY_SIZE := Vector2(600, 320)
-const SUNRISE := 6.0
-const SUNSET := 20.5
-## Время суток по часам: [час, верх неба, у горизонта, облака, «фильтр» двора, ночь 0..1].
+## Время суток: ключевые точки привязаны к восходу и закату ЭТОГО дня (SunCalendar — Россия,
+## по дате на компьютере): [от чего («0», «rise», «set», «24»), сдвиг в часах, верх неба,
+## у горизонта, облака, «фильтр» двора, ночь 0..1]. Зимой день короче — всё сдвигается само.
 const DAY_KEYS: Array = [
-	[0.0, Color("050a1c"), Color("0d1630"), Color("2a3044"), Color(0.22, 0.26, 0.42), 1.0],
-	[4.5, Color("050a1c"), Color("0d1630"), Color("2a3044"), Color(0.22, 0.26, 0.42), 1.0],
-	[5.5, Color("1b2450"), Color("7a4a6e"), Color("6a5470"), Color(0.45, 0.4, 0.55), 0.6],
-	[6.5, Color("4a6fb5"), Color("f2a36b"), Color("f5c2a0"), Color(0.95, 0.78, 0.68), 0.0],
-	[8.0, Color("5f96d2"), Color("cde8f5"), Color("ffffff"), Color(1, 1, 1), 0.0],
-	[17.5, Color("5f96d2"), Color("cde8f5"), Color("ffffff"), Color(1, 1, 1), 0.0],
-	[19.0, Color("5478b8"), Color("f7c27a"), Color("ffe2b8"), Color(1.0, 0.86, 0.72), 0.0],
-	[20.3, Color("34336e"), Color("f06a3a"), Color("f29a7a"), Color(0.8, 0.56, 0.5), 0.1],
-	[21.3, Color("141a40"), Color("4a2a50"), Color("3a3550"), Color(0.36, 0.34, 0.5), 0.6],
-	[22.5, Color("050a1c"), Color("0d1630"), Color("2a3044"), Color(0.22, 0.26, 0.42), 1.0],
-	[24.0, Color("050a1c"), Color("0d1630"), Color("2a3044"), Color(0.22, 0.26, 0.42), 1.0],
+	["0", 0.0, Color("050a1c"), Color("0d1630"), Color("2a3044"), Color(0.22, 0.26, 0.42), 1.0],
+	["rise", -1.5, Color("050a1c"), Color("0d1630"), Color("2a3044"), Color(0.22, 0.26, 0.42), 1.0],
+	["rise", -0.5, Color("1b2450"), Color("7a4a6e"), Color("6a5470"), Color(0.45, 0.4, 0.55), 0.6],
+	["rise", 0.5, Color("4a6fb5"), Color("f2a36b"), Color("f5c2a0"), Color(0.95, 0.78, 0.68), 0.0],
+	["rise", 2.0, Color("5f96d2"), Color("cde8f5"), Color("ffffff"), Color(1, 1, 1), 0.0],
+	["set", -3.0, Color("5f96d2"), Color("cde8f5"), Color("ffffff"), Color(1, 1, 1), 0.0],
+	["set", -1.5, Color("5478b8"), Color("f7c27a"), Color("ffe2b8"), Color(1.0, 0.86, 0.72), 0.0],
+	["set", -0.2, Color("34336e"), Color("f06a3a"), Color("f29a7a"), Color(0.8, 0.56, 0.5), 0.1],
+	["set", 0.8, Color("141a40"), Color("4a2a50"), Color("3a3550"), Color(0.36, 0.34, 0.5), 0.6],
+	["set", 2.0, Color("050a1c"), Color("0d1630"), Color("2a3044"), Color(0.22, 0.26, 0.42), 1.0],
+	["24", 0.0, Color("050a1c"), Color("0d1630"), Color("2a3044"), Color(0.22, 0.26, 0.42), 1.0],
 ]
 
 ## Который час за окном (0..24, с долями).
 var hour := 12.0
+## Восход и закат сегодня (часы) и ключи неба на сегодня: [час, цвета…, ночь].
+var sunrise := 6.0
+var sunset := 20.5
+var _keys: Array = []
 
 var _pigeons: Array[YardPigeon] = []
 var _sky_mat: ShaderMaterial
@@ -51,6 +55,10 @@ var _skip_left := 0.0
 func _ready() -> void:
 	var now := Time.get_time_dict_from_system()
 	hour = float(now["hour"]) + float(now["minute"]) / 60.0 + float(now["second"]) / 3600.0
+	var sun := SunCalendar.today()
+	sunrise = sun.x
+	sunset = sun.y
+	_build_keys()
 	_tint_mat = ShaderMaterial.new()
 	_tint_mat.shader = TINT_SHADER
 	_build_sky()
@@ -104,26 +112,48 @@ func _build_sky() -> void:
 
 # ---------------- Время суток ----------------
 
+## Ключи неба на сегодня: часы от восхода/заката, по порядку (короткий зимний день не ломает
+## порядок — каждый следующий хотя бы на 3 минуты позже предыдущего).
+func _build_keys() -> void:
+	_keys.clear()
+	var last := -1.0
+	for key: Array in DAY_KEYS:
+		var base := {"0": 0.0, "rise": sunrise, "set": sunset, "24": 24.0}
+		var at := clampf(float(base[key[0]]) + float(key[1]), 0.0, 24.0)
+		if key[0] != "24":
+			at = maxf(at, last + 0.05)
+		last = at
+		_keys.append([at] + key.slice(2))
+
+
+## Между какими ключами сейчас: [ключ до, ключ после, доля 0..1 (сглаженная)].
+func _key_pair() -> Array:
+	var a: Array = _keys[0]
+	var b: Array = _keys[1]
+	for i in _keys.size() - 1:
+		if hour >= float(_keys[i][0]) and hour <= float(_keys[i + 1][0]):
+			a = _keys[i]
+			b = _keys[i + 1]
+			break
+	# smoothstep — без «рывков» скорости на стыках ключевых часов.
+	return [a, b, smoothstep(0.0, 1.0, inverse_lerp(float(a[0]), float(b[0]), hour))]
+
+
 ## Цвета неба, солнце/луна и «фильтр» двора для текущего часа.
 func _apply_time() -> void:
 	if _sky_mat == null:
 		return
-	var a: Array = DAY_KEYS[0]
-	var b: Array = DAY_KEYS[1]
-	for i in DAY_KEYS.size() - 1:
-		if hour >= float(DAY_KEYS[i][0]) and hour <= float(DAY_KEYS[i + 1][0]):
-			a = DAY_KEYS[i]
-			b = DAY_KEYS[i + 1]
-			break
-	# smoothstep — без «рывков» скорости на стыках ключевых часов.
-	var t := smoothstep(0.0, 1.0, inverse_lerp(float(a[0]), float(b[0]), hour))
+	var pair := _key_pair()
+	var a: Array = pair[0]
+	var b: Array = pair[1]
+	var t: float = pair[2]
 	_sky_mat.set_shader_parameter("top_color", (a[1] as Color).lerp(b[1], t))
 	_sky_mat.set_shader_parameter("horizon_color", (a[2] as Color).lerp(b[2], t))
 	_sky_mat.set_shader_parameter("cloud_color", (a[3] as Color).lerp(b[3], t))
 	_tint_mat.set_shader_parameter("tint", (a[4] as Color).lerp(b[4], t))
 	_sky_mat.set_shader_parameter("night", lerpf(float(a[5]), float(b[5]), t))
-	# Солнце идёт дугой слева направо с SUNRISE до SUNSET, луна — ночью.
-	var day_t := inverse_lerp(SUNRISE, SUNSET, hour)
+	# Солнце идёт дугой слева направо от восхода до заката, луна — ночью.
+	var day_t := inverse_lerp(sunrise, sunset, hour)
 	var sun_up := sin(PI * clampf(day_t, 0.0, 1.0))
 	_sky_mat.set_shader_parameter("sun_uv", _arc_uv(day_t, 50.0))
 	# Солнце и луна появляются и исчезают у горизонта плавно, а не вспышкой.
@@ -131,8 +161,8 @@ func _apply_time() -> void:
 	# Низкое солнце — оранжевое.
 	_sky_mat.set_shader_parameter("sun_color",
 		Color(1.0, 0.55, 0.25).lerp(Color(1.0, 0.96, 0.78), clampf(sun_up * 2.0, 0.0, 1.0)))
-	var night_len := 24.0 - SUNSET + SUNRISE
-	var moon_t := fposmod(hour - SUNSET, 24.0) / night_len
+	var night_len := 24.0 - sunset + sunrise
+	var moon_t := fposmod(hour - sunset, 24.0) / night_len
 	_sky_mat.set_shader_parameter("moon_uv", _arc_uv(moon_t, 55.0))
 	var moon_up := sin(PI * clampf(moon_t, 0.0, 1.0))
 	_sky_mat.set_shader_parameter("moon_alpha", clampf(moon_up * 6.0, 0.0, 1.0))
@@ -140,20 +170,15 @@ func _apply_time() -> void:
 
 ## На улице вечер или ночь — в квартире пора включать свет (LobbyLamp).
 func is_dark() -> bool:
-	return hour >= 19.5 or hour < 6.5
+	return hour >= sunset - 0.5 or hour < sunrise + 0.5 # полчаса до заката — уже сумерки
 
 
 ## Насколько светло на улице (1 — день, 0 — ночь): для солнца в комнате.
 func daylight() -> float:
-	var a: Array = DAY_KEYS[0]
-	var b: Array = DAY_KEYS[1]
-	for i in DAY_KEYS.size() - 1:
-		if hour >= float(DAY_KEYS[i][0]) and hour <= float(DAY_KEYS[i + 1][0]):
-			a = DAY_KEYS[i]
-			b = DAY_KEYS[i + 1]
-			break
-	var t := smoothstep(0.0, 1.0, inverse_lerp(float(a[0]), float(b[0]), hour))
-	return 1.0 - lerpf(float(a[5]), float(b[5]), t)
+	if _keys.is_empty():
+		return 1.0
+	var pair := _key_pair()
+	return 1.0 - lerpf(float(pair[0][5]), float(pair[1][5]), float(pair[2]))
 
 
 ## Точка дуги на небе (t: 0 — восход слева, 1 — закат справа) в UV квадрата неба.
