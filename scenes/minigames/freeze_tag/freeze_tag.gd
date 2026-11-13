@@ -11,9 +11,10 @@ extends Node3D
 ## бегущих (чтобы шкала была такой же, 0..90). Заморозил всех досрочно —
 ## оставшееся время идёт водящему.
 ##
+## Вид от первого лица (FreezeViews): у каждого живого игрока своя часть экрана; на качелях,
+## горке и под лавочкой камера плавно отъезжает назад (вид от третьего лица).
 ## Туман: водящий (если он живой игрок) видит площадку только рядом с собой — радиус
-## FOG_RADIUS = 1.2 × зона караула. Тогда экран делится: слева водящий в тумане,
-## справа бегущие видят всё. Бегущим туман не мешает.
+## FOG_RADIUS = 1.2 × зона караула. Бегущим туман не мешает.
 ## Площадка: горка (неуязвим, пока едешь, на выходе ускорение), качели (толкать; сесть на
 ## 2–10 сек — неуязвим), лавочки (залезть под лавочку на 2–10 сек — неуязвим),
 ## карусель (только раскручивать).
@@ -104,10 +105,11 @@ var _hud_bars_box: VBoxContainer
 var _zone_material: StandardMaterial3D
 var _yard: FreezeYard
 var _fog_material: ShaderMaterial
-var _chaser_camera: Camera3D
+## Виды от первого лица у живых игроков (FreezeViews).
+var _views: FreezeViews
 ## Кто прячется под лавочкой: PlayerData.id -> {"bench", "left", "racer"}.
 var _hiding: Dictionary = {}
-## Половина экрана бегущих (когда водящий — живой игрок и экран разделён).
+## Вид первого живого бегущего (туда — полоски «размораживает», когда водящий — живой игрок).
 var _runners_view: Control
 
 @onready var _camera: Camera3D = $Camera3D
@@ -183,6 +185,9 @@ func _spawn_racers() -> void:
 			r.status.text = "ВОДЯЩИЙ"
 			r.status.modulate = Color("ff6b5a")
 			_add_chaser_hat(r.character)
+		# Модель — на слое своего слота: своя камера от первого лица её не рисует.
+		r.character.set_render_layer(FreezeViews.body_layer(p.slot))
+		r.character.set_name_layer(HUD_LAYER)
 		_racers.append(r)
 
 
@@ -238,7 +243,6 @@ func _physics_process(delta: float) -> void:
 	_update_chaser(delta)
 	_update_unfreezing(delta)
 	_update_fog()
-	_face_bars()
 	_update_scores()
 
 	var runners := _runners()
@@ -369,7 +373,7 @@ func _freeze(r: Racer) -> void:
 	_show_message("%s заморожен!" % r.player.display_name)
 
 
-## Полоска разморозки над головой (поворачивается к камере в _face_bars).
+## Полоска разморозки над головой (всегда повёрнута к камере — billboard).
 func _build_bar(r: Racer) -> void:
 	r.bar = Node3D.new()
 	r.bar.position.y = 2.55
@@ -382,6 +386,7 @@ func _build_bar(r: Racer) -> void:
 	bg_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	bg_mat.albedo_color = Color(0.05, 0.08, 0.12)
 	bg_mat.no_depth_test = true
+	bg_mat.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED # у каждого игрока своя камера
 	bg.material_override = bg_mat
 	r.bar.add_child(bg)
 	r.bar_fill = MeshInstance3D.new()
@@ -392,9 +397,10 @@ func _build_bar(r: Racer) -> void:
 	fill_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	fill_mat.albedo_color = Color("6fd3ff")
 	fill_mat.no_depth_test = true
+	fill_mat.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+	fill_mat.billboard_keep_scale = true
 	fill_mat.render_priority = 1
 	r.bar_fill.material_override = fill_mat
-	r.bar_fill.position.z = 0.01
 	r.bar.add_child(r.bar_fill)
 	bg.layers = HUD_LAYER
 	r.bar_fill.layers = HUD_LAYER
@@ -405,10 +411,8 @@ func _set_unfreeze_bar(r: Racer, progress: float, helper: Racer) -> void:
 	if r.bar_fill:
 		# Полоска видна только пока кто-то размораживает (пустая висела чёрной чертой над льдом).
 		r.bar.visible = progress > 0.001
-		# Заполнение растёт слева направо.
-		var p := clampf(progress, 0.0, 1.0)
-		r.bar_fill.scale.x = maxf(p, 0.001)
-		r.bar_fill.position.x = -1.22 * (1.0 - p) / 2.0
+		# Заполнение растёт от середины (повёрнуто к камере, сдвиг вбок был бы в мире, а не на экране).
+		r.bar_fill.scale.x = maxf(clampf(progress, 0.0, 1.0), 0.001)
 	_set_hud_bar(r, progress, helper)
 
 
@@ -446,13 +450,6 @@ func _set_hud_bar(r: Racer, progress: float, helper: Racer) -> void:
 		if helper else "%s оттаивает обратно в лёд..." % r.player.display_name
 
 
-## Полоски над головами смотрят на камеру.
-func _face_bars() -> void:
-	for r in _runners():
-		if r.bar:
-			r.bar.look_at(r.bar.global_position * 2.0 - _camera.global_position)
-
-
 func _unfreeze(r: Racer, helper: Racer) -> void:
 	r.frozen = false
 	r.unfreeze_progress = 0.0
@@ -481,6 +478,7 @@ func _finish(all_frozen: bool) -> void:
 		return
 	_finished = true
 	_running = false
+	_views.release_mouse()
 	for r in _racers:
 		r.character.input_enabled = false
 		if r.player.is_bot():
@@ -744,14 +742,40 @@ func _on_playground_done(character: PlayerCharacter) -> void:
 			r.character.input_enabled = true
 
 
-# ---------------- Туман водящего ----------------
+# ---------------- Виды и туман водящего ----------------
 
-## Если водящий — живой игрок: свой экран с туманом (слева), бегущим — общий экран без тумана.
+## Камеры от первого лица (FreezeViews) у каждого живого игрока. Водящему (если он живой) —
+## экранный туман: видно только рядом с собой; ему не видны надписи над головами и значки
+## площадки. Бегущим не видны красные зоны караула (они — подсказка водящему).
 func _setup_views() -> void:
 	_camera.cull_mask &= ~FOG_LAYER
-	if _chaser.player.is_bot():
-		return
-	# Экранный туман (см. chaser_fog.gdshader): квадрат 2×2 растягивается шейдером на весь экран.
+	_views = FreezeViews.new()
+	add_child(_views)
+	if not _chaser.player.is_bot():
+		_add_fog()
+	for r in _racers:
+		if r.player.is_bot():
+			continue
+		var mask := 0xFFFFF & ~FOG_LAYER
+		if r.is_chaser:
+			mask = 0xFFFFF & ~HUD_LAYER & ~ZoneBadge.OVERHEAD_LAYER
+		var view := _views.add_view(r.player, r.character, mask)
+		if r.is_chaser:
+			var caption := _label("Ты водишь — видно только рядом · Shift — рывок", 24,
+				Color("ff6b5a"))
+			caption.set_anchors_preset(Control.PRESET_CENTER_TOP)
+			caption.grow_horizontal = Control.GROW_DIRECTION_BOTH
+			caption.offset_top = 70
+			view.add_child(caption)
+		elif _runners_view == null:
+			_runners_view = view
+	if _views.has_views():
+		_camera.cull_mask = 0 # общий экран полностью закрыт видами игроков
+	_update_fog()
+
+
+## Экранный туман (см. chaser_fog.gdshader): квадрат 2×2 растягивается шейдером на весь экран.
+func _add_fog() -> void:
 	var fog := MeshInstance3D.new()
 	var quad := QuadMesh.new()
 	quad.size = Vector2(2, 2)
@@ -767,31 +791,12 @@ func _setup_views() -> void:
 	fog.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(fog)
 
-	var humans_running := _racers.any(func(r: Racer) -> bool:
-		return not r.is_chaser and not r.player.is_bot())
-	var layer := CanvasLayer.new()
-	layer.layer = 0
-	add_child(layer)
-	_chaser_camera = _add_view(layer, Vector2(0, 0), Vector2(0.5 if humans_running else 1.0, 1),
-		0xFFFFF & ~HUD_LAYER & ~ZoneBadge.OVERHEAD_LAYER) # значки площадки водящему не нужны
-	var caption := _label("Ты водишь — видно только рядом · Shift — рывок", 28, Color("ff6b5a"))
-	caption.set_anchors_preset(Control.PRESET_CENTER_TOP)
-	caption.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	caption.offset_top = 70
-	(_chaser_camera.get_parent().get_parent() as Control).add_child(caption)
-	if humans_running:
-		var runners_camera := _add_view(layer, Vector2(0.5, 0), Vector2(1, 1), 0xFFFFF & ~FOG_LAYER)
-		_runners_view = runners_camera.get_parent().get_parent() as Control
-		runners_camera.look_at_from_position(Vector3(0, 36.0, 22.5), Vector3(0, 0, 0.75))
-	_camera.cull_mask = 0 # общий экран полностью закрыт видами
-	_update_fog()
-
 
 ## Водящий (живой игрок) не должен знать, что кого-то размораживают: полоски «Серёга
-## размораживает Колю» переезжают на половину экрана бегущих, а без неё не показываются.
+## размораживает Колю» переезжают в вид первого живого бегущего, а без него не показываются.
 func _hide_hud_bars_from_chaser() -> void:
-	if _chaser_camera == null:
-		return # водящий — бот, экран общий
+	if _chaser.player.is_bot():
+		return # водящий — бот: полоски видят все
 	if _runners_view == null:
 		_hud_bars_box.visible = false
 		return
@@ -802,41 +807,21 @@ func _hide_hud_bars_from_chaser() -> void:
 	_hud_bars_box.offset_bottom = -150
 
 
-## Вид в части экрана (anchor_from..anchor_to — доли экрана) со своей камерой.
-func _add_view(layer: CanvasLayer, anchor_from: Vector2, anchor_to: Vector2, mask: int) -> Camera3D:
-	var container := SubViewportContainer.new()
-	container.stretch = true
-	container.anchor_left = anchor_from.x
-	container.anchor_top = anchor_from.y
-	container.anchor_right = anchor_to.x
-	container.anchor_bottom = anchor_to.y
-	container.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	layer.add_child(container)
-	var viewport := SubViewport.new()
-	viewport.msaa_3d = Viewport.MSAA_2X
-	container.add_child(viewport)
-	var camera := Camera3D.new()
-	camera.fov = 50.0
-	camera.cull_mask = mask
-	viewport.add_child(camera)
-	camera.current = true
-	var frame := ReferenceRect.new()
-	frame.border_color = Color(0, 0, 0)
-	frame.border_width = 3
-	frame.editor_only = false
-	frame.set_anchors_preset(Control.PRESET_FULL_RECT)
-	frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	container.add_child(frame)
-	return camera
-
-
-## Камера водящего — над ним, дыра в тумане — вокруг него.
-func _update_fog() -> void:
-	if _chaser_camera == null:
+## Камеры игроков: от глаз, а на качелях / горке / под лавочкой — плавно сзади-сверху.
+func _process(delta: float) -> void:
+	if _views == null:
 		return
-	var pos := _chaser.character.global_position
-	_fog_material.set_shader_parameter("center", pos)
-	_chaser_camera.look_at_from_position(pos + Vector3(0, 9.0, 6.0), pos + Vector3(0, 0.5, 0))
+	var busy: Array[int] = []
+	for r in _racers:
+		if r.busy:
+			busy.append(r.player.id)
+	_views.update(delta, busy)
+
+
+## Дыра в тумане — вокруг водящего.
+func _update_fog() -> void:
+	if _fog_material:
+		_fog_material.set_shader_parameter("center", _chaser.character.global_position)
 
 
 # ---------------- Отображение ----------------

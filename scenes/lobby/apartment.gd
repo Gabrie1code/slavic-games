@@ -325,7 +325,7 @@ func _build_living_room() -> void:
 	_tippable("stool", Vector3(0.36, 0.47, 0.36), 0.24, dining + Vector3(0.0, 0, 0.95), 2.0)
 	# Граммофон: от удара падает со стола и через время сам возвращается (как стулья).
 	gramophone = _tippable("gramophone", Vector3(0.36, 0.14, 0.36), 0.07,
-		dining + Vector3(0.0, 0.8, -0.05), 2.0, -73.0)
+		dining + Vector3(0.0, 0.8, -0.05), 2.0, 107.0) # трубой в комнату, не к стене
 	# Книга, сверху песенник с нотой на обложке, рядом шариковая ручка (tools/blender/decor.py).
 	var books_b := [Color("6b0d14"), Color("1a4d29"), Color("142a80")]
 	_breakable("book_stack_music", dining + Vector3(-0.1, 0.78, -0.45), books_b, 0.4)
