@@ -195,6 +195,66 @@ for k in range(9):
 P.append(cyl(0.05, 1.1, (-1.0, 0, 0.55), GREEN, verts=8))
 export("fence", [join("Fence", P)])
 
+# ---------------- Металлические снаряды-препятствия (по краям площадки) ----------------
+# Окрашенные трубы пастельных цветов, как во дворах 80-х: шведская стенка, «глобус», дуга.
+SKY = mat("PaintSky", (0.3, 0.68, 0.85), 0.55, 0.2)
+PINK = mat("PaintPink", (0.85, 0.52, 0.58), 0.55, 0.2)
+MINT = mat("PaintMint", (0.42, 0.72, 0.48), 0.55, 0.2)
+ORANGE = mat("PaintOrange", (0.92, 0.6, 0.25), 0.55, 0.2)
+
+
+def polyline(pts, r, m, closed=False, verts=6):
+    """Труба по точкам (кольца и дуги — отрезками)."""
+    out = []
+    n = len(pts)
+    for i in range(n if closed else n - 1):
+        out.append(rod(pts[i], pts[(i + 1) % n], r, m, verts=verts))
+    for p in pts:                                                  # шарики на стыках — без щелей
+        bpy.ops.mesh.primitive_uv_sphere_add(segments=verts, ring_count=4, radius=r, location=p)
+        out.append(flat(bpy.context.object, m))
+    return out
+
+
+# Шведская стенка: две стойки 2.6 м, 9 перекладин, сверху перекладина пошире.
+P = []
+for x in (-0.5, 0.5):
+    P.append(rod((x, 0, 0), (x, 0, 2.6), 0.045, SKY, verts=10))
+    P.append(cyl(0.08, 0.06, (x, 0, 0.03), CONCRETE, verts=10))
+for k in range(9):
+    P.append(rod((-0.5, 0, 0.3 + k * 0.27), (0.5, 0, 0.3 + k * 0.27), 0.022, SKY, verts=8))
+P.append(rod((-0.5, 0, 2.6), (0.5, 0, 2.6), 0.04, PINK, verts=8))
+export("wall_bars", [join("WallBars", P)])
+
+# «Глобус»: шар из труб (меридианы и параллели) на шести ножках.
+P = []
+R, CZ = 1.05, 1.45
+for k in range(6):                                                 # меридианы
+    a = k * math.pi / 6
+    pts = [(R * math.sin(t) * math.cos(a), R * math.sin(t) * math.sin(a), CZ + R * math.cos(t))
+           for t in [i * math.pi / 12 for i in range(25)]]
+    P += polyline(pts[:-1], 0.025, SKY, closed=True)
+for z, m in ((0.55, PINK), (0.0, MINT), (-0.55, ORANGE)):          # параллели
+    rr = R * math.sqrt(1 - (z / R) ** 2)
+    pts = [(rr * math.cos(i * math.tau / 24), rr * math.sin(i * math.tau / 24), CZ + z * R / R) for i in range(24)]
+    P += polyline(pts, 0.025, m, closed=True)
+for k in range(6):                                                 # ножки
+    a = k * math.tau / 6 + 0.3
+    top = (0.55 * math.cos(a), 0.55 * math.sin(a), CZ - 0.88)
+    P.append(rod(top, (1.0 * math.cos(a), 1.0 * math.sin(a), 0.0), 0.03, SKY))
+export("climbing_globe", [join("ClimbingGlobe", P)])
+
+# Дуга-лесенка: две полуокружности (радиус 1.1 м) и перекладины между ними.
+P = []
+RA, W2 = 1.1, 0.35
+for y in (-W2, W2):
+    pts = [(RA * math.cos(t), y, RA * math.sin(t)) for t in [i * math.pi / 14 for i in range(15)]]
+    P += polyline(pts, 0.035, SKY)
+for i in range(1, 14):
+    t = i * math.pi / 14
+    P.append(rod((RA * math.cos(t), -W2, RA * math.sin(t)), (RA * math.cos(t), W2, RA * math.sin(t)),
+                 0.02, MINT if i % 2 else ORANGE))
+export("arch_ladder", [join("ArchLadder", P)])
+
 if RENDER:
     scene = bpy.context.scene
     scene.render.engine = "CYCLES"
@@ -211,7 +271,8 @@ if RENDER:
     scene.collection.objects.link(sun)
     place = {"bench": (-6, -1, 0), "sandbox": (-3, 2, 0), "slide": (1.5, 1, 0),
              "swing_frame": (5.5, 2, 0), "swing_seat": (5.5 - 0.6, 2, 2.4), "carousel_base": (-6, 4, 0),
-             "carousel_top": (-6, 4, 0), "fence": (2, -2, 0)}
+             "carousel_top": (-6, 4, 0), "fence": (2, -2, 0),
+             "wall_bars": (-1, -4, 0), "climbing_globe": (2, -4.5, 0), "arch_ladder": (5.5, -4, 0)}
     for name, objs in KEEP:
         for o in objs:
             o.location += Vector(place[name])
