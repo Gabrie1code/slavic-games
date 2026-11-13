@@ -162,6 +162,9 @@ made.append(export("sideboard_door", P))
 P = [cyl(0.07, 0.04, (0, 0, 0.02), GLASS, verts=8)]
 P.append(cyl(0.05, 0.22, (0, 0, 0.15), GLASS, verts=8, r2=0.09))
 P.append(cyl(0.09, 0.04, (0, 0, 0.28), GLASS, verts=8, r2=0.11))
+# Внутри налита вода до 2/3 (голубоватая, чтобы было видно, что это ваза с водой).
+WATER = mat("VaseWater", (0.45, 0.7, 0.85), 0.02, 0.0, 0.55)
+P.append(cyl(0.045, 0.15, (0, 0, 0.115), WATER, verts=8, r2=0.075))
 made.append(export("crystal_vase", P))
 P = [cyl(0.04, 0.01, (0, 0, 0.005), GLASS, verts=8), cyl(0.008, 0.08, (0, 0, 0.05), GLASS, verts=6),
      cyl(0.012, 0.07, (0, 0, 0.12), GLASS, verts=8, r2=0.04)]

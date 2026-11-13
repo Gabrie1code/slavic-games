@@ -452,8 +452,8 @@ export("kitchen_table", P)
 CHROME_WIRE = mat("KettleWire", (0.85, 0.86, 0.88), 0.15, 0.9)
 
 
-def lathe(name, profile, m, segs=32):
-    """Тело вращения вокруг Z: profile — [(радиус, высота)], низ закрыт."""
+def lathe(name, profile, m, segs=32, caps=True):
+    """Тело вращения вокруг Z: profile — [(радиус, высота)]; caps — закрыть низ и верх."""
     bm = bmesh.new()
     rings = []
     for r, z in profile:
@@ -463,8 +463,9 @@ def lathe(name, profile, m, segs=32):
         for i in range(segs):
             j = (i + 1) % segs
             bm.faces.new((rings[k][i], rings[k][j], rings[k + 1][j], rings[k + 1][i]))
-    bm.faces.new(list(reversed(rings[0])))
-    bm.faces.new(rings[-1])
+    if caps:
+        bm.faces.new(list(reversed(rings[0])))
+        bm.faces.new(rings[-1])
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     me = bpy.data.meshes.new(name)
     bm.to_mesh(me)
@@ -535,13 +536,17 @@ LABEL = mat("BottleLabel", (0.8, 0.7, 0.5), 0.8)
 FOIL = mat("BottleFoil", (0.25, 0.01, 0.03), 0.3, 0.6)
 TUMBLER = clear_glass("TumblerGlass", (0.85, 0.92, 0.94), 0.6)               # мутнее
 WINE = mat("DarkWine", (0.2, 0.005, 0.02), 0.1)
-P = [lathe("Bottle", [(0.001, 0.0), (0.036, 0.0), (0.038, 0.006), (0.038, 0.2), (0.034, 0.225),
-                      (0.02, 0.255), (0.014, 0.275), (0.014, 0.31), (0.016, 0.313), (0.016, 0.322),
-                      (0.001, 0.322)], BOTTLE, segs=24)]
+# Бутылка собрана из трёх колец одной поверхности: стекло — этикетка — стекло. Этикетка не
+# надета поверх стекла (раньше две поверхности рядом давали полосы), а заменяет кусок стенки.
+P = [lathe("BottleLow", [(0.001, 0.0), (0.036, 0.0), (0.038, 0.006), (0.038, 0.075)], BOTTLE,
+           segs=24, caps=False),
+     lathe("BottleLabel", [(0.0383, 0.075), (0.0383, 0.145)], LABEL, segs=24, caps=False),
+     lathe("BottleHigh", [(0.038, 0.145), (0.038, 0.2), (0.034, 0.225), (0.02, 0.255),
+                          (0.014, 0.275), (0.014, 0.31), (0.016, 0.313), (0.016, 0.322),
+                          (0.001, 0.322)], BOTTLE, segs=24, caps=False)]
 P.append(lathe("Wine", [(0.001, 0.004), (0.034, 0.004), (0.035, 0.008), (0.035, 0.2),
                         (0.031, 0.222), (0.022, 0.236), (0.001, 0.236)], WINE, segs=24))
-P.append(cyl(0.0398, 0.07, (0, 0, 0.11), LABEL, verts=32, smooth=True))           # этикетка
-P.append(cyl(0.04, 0.012, (0, 0, 0.138), FOIL, verts=32, smooth=True))             # полоса
+P.append(lathe("LabelBand", [(0.0386, 0.13), (0.0386, 0.14)], FOIL, segs=24, caps=False))  # полоса
 P.append(cyl(0.0172, 0.055, (0, 0, 0.295), FOIL, verts=20, smooth=True))           # фольга
 export("kitchen_bottle", P)
 
@@ -566,6 +571,21 @@ def tumbler(name, fill):
 
 tumbler("kitchen_tumbler", None)
 tumbler("kitchen_tumbler_wine", WINE)
+
+# ---------------- Мусорное ведро с педалью (для туалета) ----------------
+# Эмалированное ведро цвета слоновой кости, закрытое крышкой-куполом с ободком, педаль спереди
+# (−Y Blender = +Z Godot), петля крышки сзади. Начало — на полу, в центре.
+BIN = mat("BinEnamel", (0.85, 0.82, 0.72), 0.3)
+BIN_DARK = mat("BinDark", (0.18, 0.18, 0.2), 0.5)
+P = [lathe("BinBody", [(0.0, 0.0), (0.105, 0.0), (0.112, 0.01), (0.122, 0.3), (0.0, 0.3)], BIN, segs=28)]
+P.append(lathe("BinBase", [(0.0, 0.0), (0.108, 0.0), (0.108, 0.02), (0.0, 0.02)], BIN_DARK, segs=28))
+P.append(lathe("BinLid", [(0.0, 0.3), (0.128, 0.3), (0.128, 0.31), (0.115, 0.325), (0.07, 0.345),
+                          (0.0, 0.35)], BIN, segs=28))
+P.append(lathe("BinRim", [(0.124, 0.296), (0.13, 0.296), (0.13, 0.312), (0.124, 0.312)], BIN_DARK, segs=28))
+P.append(box((0.07, 0.06, 0.012), (0, -0.14, 0.03), BIN_DARK))                      # педаль
+P.append(box((0.04, 0.03, 0.02), (0, -0.115, 0.03), BIN_DARK))
+P.append(box((0.06, 0.02, 0.025), (0, 0.125, 0.305), BIN_DARK))                     # петля
+export("trash_bin", P)
 
 # ---------------- Мухобойка (лежит на холодильнике) ----------------
 # Красная пластиковая: рукоятка с дырочкой, тонкий стержень, решётчатая лопатка. Лежит плашмя,

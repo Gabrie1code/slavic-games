@@ -163,6 +163,7 @@ func _build_details() -> void:
 	wire.layers = Apartment.FP_ONLY_LAYER
 	_build_paper_holder()
 	_build_sink()
+	_build_trash_bin()
 	# Газета «Кривда» на гвозде — на стене с дверью (tools/textures/newspaper.py).
 	var paper := MeshInstance3D.new()
 	var sheet := QuadMesh.new()
@@ -214,6 +215,22 @@ func _build_paper_holder() -> void:
 
 
 ## Рукомойник с краном на правой стене у двери, над ним зеркало.
+## Мусорное ведро с педалью в углу у двери и задней стены (модель — tools/blender/kitchen.py).
+func _build_trash_bin() -> void:
+	var bin := StaticBody3D.new()
+	bin.add_child((load("res://assets/models/kitchen/trash_bin.glb") as PackedScene).instantiate())
+	var shape := CollisionShape3D.new()
+	var cylinder := CylinderShape3D.new()
+	cylinder.radius = 0.13
+	cylinder.height = 0.35
+	shape.shape = cylinder
+	shape.position.y = 0.175
+	bin.add_child(shape)
+	bin.position = Vector3(X0 + WALL_T / 2.0 + 0.17, 0, Z0 + 0.17)
+	bin.rotation.y = PI * 0.25 # педалью в комнату, по диагонали угла
+	add_child(bin)
+
+
 func _build_sink() -> void:
 	var z := 3.0
 	# Рукомойник (Sink): чаша с углублением и сливом, краны крутятся, вода набирается.

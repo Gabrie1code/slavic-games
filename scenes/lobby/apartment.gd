@@ -306,18 +306,20 @@ func _build_living_room() -> void:
 	_build_lamp_light()
 	_chandelier(Vector3(-2.4, 0, -0.6), LIVING_SWITCH, -PI / 2)
 
-	# Обеденный стол у перегородки: варенье, ваза, книги; стулья и табурет падают.
-	var dining := Vector3(1.6, 0, 2.0)
-	_solid(_model("table"), Vector3(1.4, 0.8, 0.85), 0.4, dining)
-	_tippable("chair", Vector3(0.45, 0.95, 0.45), 0.47, dining + Vector3(-0.95, 0, 0), 3.0, 90.0)
-	_tippable("chair", Vector3(0.45, 0.95, 0.45), 0.47, dining + Vector3(0, 0, -0.75), 3.0, 0.0)
-	_tippable("stool", Vector3(0.36, 0.47, 0.36), 0.24, dining + Vector3(0.95, 0, 0), 2.0)
-	_breakable("jar_jam", dining + Vector3(-0.35, 0.78, 0.1), [Color("801010"), GLASS], 0.4)
+	# Обеденный стол — вдоль перегородки под плакатом «К звёздам!» (длинной стороной вдоль стены,
+	# от выключателя до угла с туалетом): варенье, граммофон, журналы; стулья с комнатной
+	# стороны, табурет у дальнего торца. Стулья и табурет падают.
+	var dining := Vector3(PARTITION_X - 0.55, 0, 0.88)
+	_solid(_model("table"), Vector3(1.4, 0.8, 0.85), 0.4, dining, PI / 2)
+	for dz: float in [-0.3, 0.3]:
+		_tippable("chair", Vector3(0.45, 0.95, 0.45), 0.47, dining + Vector3(-0.75, 0, dz), 3.0, 90.0)
+	_tippable("stool", Vector3(0.36, 0.47, 0.36), 0.24, dining + Vector3(0.0, 0, 0.95), 2.0)
+	_breakable("jar_jam", dining + Vector3(0.1, 0.78, 0.45), [Color("801010"), GLASS], 0.4)
 	# Граммофон: от удара падает со стола и через время сам возвращается (как стулья).
 	gramophone = _tippable("gramophone", Vector3(0.36, 0.14, 0.36), 0.07,
-		dining + Vector3(0.05, 0.8, -0.05), 2.0, 17.0)
+		dining + Vector3(0.0, 0.8, -0.05), 2.0, -73.0)
 	var books_b := [Color("cc9918"), Color("6a2a6a"), Color("1a4080")]
-	_breakable("book_stack_mags", dining + Vector3(0.45, 0.78, 0.15), books_b, 0.4)
+	_breakable("book_stack_mags", dining + Vector3(-0.1, 0.78, -0.45), books_b, 0.4)
 
 	# Банки с заготовками (огурцы, варенье) — в ряд вдоль левой стены у серванта.
 	for i in 3:
@@ -706,8 +708,8 @@ func _build_rubgame() -> void:
 	# Игровые автоматы 90-х: два у задней стены, один у левой. На экранах — спокойные
 	# пиксельные «демо-игры» (блоки, космос, змейка).
 	var arcades := [
-		[Vector3(-10.9, 0, RUBGAME_BACK_Z + 0.4), 0.0],
-		[Vector3(-10.1, 0, RUBGAME_BACK_Z + 0.4), 0.0],
+		[Vector3(-11.05, 0, RUBGAME_BACK_Z + 0.4), 0.0], # между автоматами — 45 см
+		[Vector3(-9.9, 0, RUBGAME_BACK_Z + 0.4), 0.0],
 		[Vector3(RUBGAME_LEFT_X + 0.4, 0, 2.3), PI / 2],
 	]
 	for i in arcades.size():
