@@ -22,6 +22,7 @@ import os
 import sys
 
 import bpy  # noqa: I001
+import bmesh
 from mathutils import Vector
 
 ARGS = [a for a in sys.argv[1:] if not a.startswith("--")]
@@ -162,7 +163,7 @@ WORKTOP = mat("Worktop", (0.6, 0.62, 0.6), 0.45)
 STEEL = mat("SinkSteel", (0.62, 0.64, 0.66), 0.25, 0.6)
 WOOD = mat("TableWood", (0.55, 0.36, 0.2), 0.6)
 OILCLOTH = mat("Oilcloth", (1, 1, 1), 0.35, image="assets/textures/kitchen/oilcloth.png")
-KETTLE = mat("KettleRed", (0.72, 0.1, 0.08), 0.2)
+KETTLE = mat("KettleRed", (0.85, 0.24, 0.07), 0.12)                # оранжево-красная эмаль
 WHITE = mat("EnamelWhite", (0.95, 0.95, 0.92), 0.25)
 TEA = mat("Tea", (0.35, 0.14, 0.04), 0.1)
 GLASS = mat("TeaGlass", (0.85, 0.92, 0.95), 0.05)
@@ -175,7 +176,44 @@ BULB = mat("KitchenBulb", (1.0, 0.9, 0.6), 0.3, 0, 2.0)
 CORD = mat("Cord", (0.1, 0.1, 0.1), 0.6)
 
 # ---------------- Плита ----------------
-P = [box((0.5, 0.58, 0.84), (0, 0, 0.42), ENAMEL, bevel=0.012, segs=2)]
+# Духовка полая: внутри тёмная эмаль, решётка, стеклянное блюдо с запечённой курицей и лампочка
+# OvenBulb. Дверца — отдельная модель kitchen_oven_door (петля снизу), откидывается вниз.
+OVEN_IN = mat("OvenInside", (0.16, 0.16, 0.18), 0.4)
+DISH = mat("DishGlass", (0.75, 0.88, 0.92), 0.05)
+CHICKEN = mat("RoastChicken", (0.62, 0.3, 0.08), 0.3)
+CHICKEN_DARK = mat("RoastCrust", (0.42, 0.18, 0.05), 0.35)
+BONE = mat("Bone", (0.95, 0.92, 0.84), 0.5)
+OVEN_BULB = mat("OvenBulb", (1.0, 0.85, 0.5), 0.3, 0, 2.0)
+OZ0, OZ1 = 0.17, 0.67                                                              # проём духовки
+P = [box((0.5, 0.03, 0.84), (0, 0.275, 0.42), ENAMEL)]                              # задняя стенка
+for x in (-0.24, 0.24):
+    P.append(box((0.02, 0.58, 0.84), (x, 0.0, 0.42), ENAMEL, bevel=0.006))         # бока
+P.append(box((0.5, 0.58, OZ0), (0, 0.0, OZ0 / 2), ENAMEL, bevel=0.006))           # низ
+P.append(box((0.5, 0.58, 0.84 - OZ1), (0, 0.0, (OZ1 + 0.84) / 2), ENAMEL, bevel=0.006))  # верх
+# Внутри духовки — тёмная эмаль.
+P.append(box((0.46, 0.01, OZ1 - OZ0), (0, 0.255, (OZ0 + OZ1) / 2), OVEN_IN))
+for x in (-0.225, 0.225):
+    P.append(box((0.01, 0.53, OZ1 - OZ0), (x, -0.01, (OZ0 + OZ1) / 2), OVEN_IN))
+for z in (OZ0 + 0.005, OZ1 - 0.005):
+    P.append(box((0.46, 0.53, 0.01), (0, -0.01, z), OVEN_IN))
+for k in range(9):                                                                 # решётка
+    P.append(box((0.44, 0.006, 0.006), (0, -0.23 + k * 0.058, 0.3), CHROME))
+for x in (-0.2, 0.2):
+    P.append(box((0.006, 0.5, 0.006), (x, -0.01, 0.3), CHROME))
+# Стеклянное блюдо (овальное) и курица.
+bpy.ops.mesh.primitive_cylinder_add(vertices=24, radius=1.0, depth=1.0, location=(0, 0.0, 0.32))
+dish = bpy.context.object
+dish.scale = (0.15, 0.11, 0.03)
+bpy.ops.object.transform_apply(scale=True, location=False)
+P.append(finish(dish, DISH, smooth=True))
+P.append(sphere(1.0, (0, 0.01, 0.385), CHICKEN, scale=(0.095, 0.07, 0.055), segs=20, rings=12))
+P.append(sphere(1.0, (0, 0.01, 0.42), CHICKEN_DARK, scale=(0.06, 0.045, 0.025)))  # румяная спинка
+for side in (-1, 1):
+    P.append(sphere(1.0, (side * 0.045, -0.07, 0.37), CHICKEN, scale=(0.03, 0.055, 0.03)))  # ножки
+    P.append(cyl(0.008, 0.03, (side * 0.05, -0.125, 0.375), BONE, verts=8, rot=(math.radians(90), 0, 0)))
+    P.append(sphere(1.0, (side * 0.09, 0.03, 0.38), CHICKEN_DARK, scale=(0.025, 0.04, 0.02)))  # крылья
+P.append(sphere(0.022, (0.17, 0.2, OZ1 - 0.04), OVEN_BULB))                         # лампочка
+# Варочная поверхность, щиток, ручки (как было).
 P.append(box((0.48, 0.56, 0.012), (0, 0.005, 0.846), mat("Cooktop", (0.85, 0.84, 0.8), 0.3)))
 for x in (-0.12, 0.12):
     for y in (-0.12, 0.14):
@@ -188,13 +226,18 @@ P.append(box((0.46, 0.02, 0.07), (0, -0.295, 0.79), ENAMEL))                    
 for k in range(4):
     P.append(cyl(0.018, 0.03, (-0.15 + k * 0.1, -0.31, 0.79), BLACK, verts=12, rot=(math.radians(90), 0, 0)))
 P.append(box((0.05, 0.022, 0.02), (0.19, -0.3, 0.79), BADGE))                    # шильдик
-P.append(box((0.44, 0.02, 0.5), (0, -0.295, 0.42), ENAMEL, bevel=0.01))           # дверца духовки
-P.append(box((0.28, 0.022, 0.16), (0, -0.3, 0.44), GLASS_DARK))                   # окошко
-P.append(cyl(0.01, 0.36, (0, -0.33, 0.645), CHROME, verts=8, rot=(0, math.radians(90), 0)))
-for x in (-0.17, 0.17):
-    P.append(box((0.02, 0.04, 0.02), (x, -0.315, 0.645), CHROME))
 P.append(box((0.46, 0.02, 0.1), (0, -0.295, 0.08), mat("Plinth", (0.3, 0.3, 0.32), 0.6)))
 export("kitchen_stove", P)
+# Дверца духовки: петля — нижний передний край (z = OZ0, y = −0.295), откидывается вниз.
+P = [box((0.44, 0.02, OZ1 - OZ0), (0, -0.295, (OZ0 + OZ1) / 2), ENAMEL, bevel=0.01),
+     box((0.28, 0.022, 0.16), (0, -0.3, 0.44), GLASS_DARK),                           # окошко
+     cyl(0.01, 0.36, (0, -0.33, 0.645), CHROME, verts=8, rot=(0, math.radians(90), 0))]
+for x in (-0.17, 0.17):
+    P.append(box((0.02, 0.04, 0.02), (x, -0.315, 0.645), CHROME))
+for o in P:
+    o.location -= Vector((0, -0.295, OZ0))
+    bpy.context.view_layer.update()
+export("kitchen_oven_door", P)
 
 # ---------------- Холодильник ----------------
 P = [box((0.6, 0.6, 1.5), (0, 0.01, 0.75), ENAMEL, bevel=0.07, segs=4)]
@@ -321,19 +364,21 @@ P.append(box((W + 0.2, 0.3, 0.04), (0, -0.17, -0.02), FRAME, bevel=0.006))      
 export("kitchen_window", P)
 
 # ---------------- Стол с клеёнкой ----------------
-def cloth(size, loc):
-    """Кусок клеёнки: клетка мельче (UV ×4 — иначе на весь стол 2×2 огромные клетки)."""
-    o = box(size, loc, OILCLOTH)
-    for loop in o.data.uv_layers.active.data:
-        loop.uv = loop.uv * 4.0
-    return o
-
-
-P = [cloth((1.0, 0.7, 0.03), (0, 0, 0.735))]
-for x in (-0.505, 0.505):                                                          # свес по бокам
-    P.append(cloth((0.012, 0.72, 0.09), (x, 0, 0.7)))
-for y in (-0.355, 0.355):
-    P.append(cloth((1.022, 0.012, 0.09), (0, y, 0.7)))
+# Столешница — дерево, сверху клеёнка (только сверху), по кромке — тонкая красная полоса
+# (раньше клеёнка свисала по бокам, и на торцах была «шахматная доска»).
+HEM = mat("OilclothHem", (0.77, 0.16, 0.14), 0.4)
+P = [box((1.0, 0.7, 0.03), (0, 0, 0.735), WOOD)]
+bpy.ops.mesh.primitive_plane_add(size=1.0, location=(0, 0, 0.7505))
+top = bpy.context.object
+top.scale = (1.0, 0.7, 1.0)
+bpy.ops.object.transform_apply(scale=True, location=False)
+for loop in top.data.uv_layers.active.data:
+    loop.uv = Vector((loop.uv.x * 1.25, loop.uv.y * 0.875))                    # клетка ~8 см
+P.append(finish(top, OILCLOTH))
+for y in (-0.351, 0.351):
+    P.append(box((1.004, 0.004, 0.012), (0, y, 0.744), HEM))
+for x in (-0.501, 0.501):
+    P.append(box((0.004, 0.706, 0.012), (x, 0, 0.744), HEM))
 P.append(box((0.92, 0.62, 0.06), (0, 0, 0.69), WOOD))                             # царга
 for x in (-0.44, 0.44):
     for y in (-0.29, 0.29):
@@ -341,18 +386,74 @@ for x in (-0.44, 0.44):
 export("kitchen_table", P)
 
 # ---------------- Чайник ----------------
-P = [cyl(0.095, 0.13, (0, 0, 0.065), KETTLE, verts=24, r2=0.07, smooth=True)]
-P.append(cyl(0.07, 0.02, (0, 0, 0.14), KETTLE, verts=24, r2=0.05, smooth=True))
-P.append(sphere(0.016, (0, 0, 0.158), BLACK))
-P.append(cyl(0.022, 0.13, (0, -0.11, 0.1), KETTLE, verts=12, r2=0.009,
-             rot=(math.radians(-55), 0, 0), smooth=True))                         # носик
-P.append(cyl(0.006, 0.02, (0, -0.165, 0.142), BLACK, verts=8, rot=(math.radians(-55), 0, 0)))
-for y0, y1 in ((0.06, 0.06), (-0.04, -0.04)):
-    P.append(cyl(0.007, 0.08, (0, y0, 0.18), BLACK, verts=8))                      # стойки ручки
-P.append(cyl(0.009, 0.12, (0, 0.01, 0.22), BLACK, verts=8, rot=(math.radians(90), 0, 0)))
-for k in range(5):                                                                 # белые горошины
-    a = math.radians(30 + k * 72)
-    P.append(sphere(0.012, (0.088 * math.cos(a), 0.088 * math.sin(a), 0.06), WHITE, scale=(1, 1, 0.5)))
+# Эмалированный чайник как на фото владельца: широкий низ с ободком, купол, крышка с чёрной
+# кнопкой, изогнутый носик-«гусак», проволочная ручка с чёрной рукояткой поверх.
+CHROME_WIRE = mat("KettleWire", (0.85, 0.86, 0.88), 0.15, 0.9)
+
+
+def lathe(name, profile, m, segs=32):
+    """Тело вращения вокруг Z: profile — [(радиус, высота)], низ закрыт."""
+    bm = bmesh.new()
+    rings = []
+    for r, z in profile:
+        rings.append([bm.verts.new((r * math.cos(2 * math.pi * i / segs),
+                                    r * math.sin(2 * math.pi * i / segs), z)) for i in range(segs)])
+    for k in range(len(rings) - 1):
+        for i in range(segs):
+            j = (i + 1) % segs
+            bm.faces.new((rings[k][i], rings[k][j], rings[k + 1][j], rings[k + 1][i]))
+    bm.faces.new(list(reversed(rings[0])))
+    bm.faces.new(rings[-1])
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    me = bpy.data.meshes.new(name)
+    bm.to_mesh(me)
+    o = bpy.data.objects.new(name, me)
+    bpy.context.scene.collection.objects.link(o)
+    return finish(o, m, smooth=True)
+
+
+def tube(name, pts, radius, m, taper=None):
+    """Изогнутая трубка по точкам (носик, проволока); taper — радиусы по точкам (доли)."""
+    curve = bpy.data.curves.new(name, "CURVE")
+    curve.dimensions = "3D"
+    curve.bevel_depth = radius
+    curve.bevel_resolution = 4
+    spline = curve.splines.new("NURBS")
+    spline.points.add(len(pts) - 1)
+    for k, (p, pt) in enumerate(zip(spline.points, pts)):
+        p.co = (*pt, 1)
+        p.radius = taper[k] if taper else 1.0
+    spline.use_endpoint_u = True
+    spline.order_u = 3
+    o = bpy.data.objects.new(name, curve)
+    bpy.context.scene.collection.objects.link(o)
+    bpy.context.view_layer.objects.active = o
+    bpy.ops.object.select_all(action="DESELECT")
+    o.select_set(True)
+    bpy.ops.object.convert(target="MESH")
+    o = bpy.context.object
+    o.data.materials.clear()
+    return finish(o, m, smooth=True)
+
+
+P = [lathe("KettleBody", [(0.001, 0.0), (0.094, 0.0), (0.096, 0.004), (0.096, 0.042),
+                          (0.092, 0.046), (0.095, 0.05), (0.097, 0.075), (0.093, 0.11),
+                          (0.08, 0.14), (0.062, 0.158), (0.058, 0.162), (0.001, 0.162)], KETTLE)]
+P.append(lathe("KettleLid", [(0.001, 0.158), (0.064, 0.158), (0.062, 0.166), (0.05, 0.18),
+                             (0.025, 0.19), (0.001, 0.192)], KETTLE))
+P.append(lathe("KettleKnob", [(0.001, 0.188), (0.012, 0.188), (0.016, 0.2), (0.019, 0.208),
+                              (0.014, 0.215), (0.001, 0.216)], BLACK, segs=8))
+P.append(tube("Spout", [(0, -0.085, 0.06), (0, -0.115, 0.075), (0, -0.135, 0.105),
+                        (0, -0.14, 0.14), (0, -0.155, 0.165), (0, -0.175, 0.172)],
+              0.02, KETTLE, taper=[1.0, 0.8, 0.6, 0.5, 0.45, 0.45]))
+for y in (0.062, -0.062):                                                           # ушки ручки
+    P.append(box((0.012, 0.012, 0.022), (0, y * 1.04, 0.168), KETTLE))
+P.append(tube("WireA", [(0, 0.066, 0.175), (0, 0.1, 0.23), (0, 0.11, 0.28), (0, 0.1, 0.305)],
+              0.0032, CHROME_WIRE))
+P.append(tube("WireB", [(0, -0.066, 0.175), (0, -0.1, 0.23), (0, -0.11, 0.28), (0, -0.1, 0.305)],
+              0.0032, CHROME_WIRE))
+P.append(tube("Grip", [(0, 0.104, 0.302), (0, 0.04, 0.315), (0, -0.04, 0.315), (0, -0.104, 0.302)],
+              0.011, BLACK))
 export("kitchen_kettle", P)
 
 # ---------------- Стакан в подстаканнике ----------------

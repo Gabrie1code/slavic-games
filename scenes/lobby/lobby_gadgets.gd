@@ -535,18 +535,26 @@ func _use_sideboard(p: PlayerData) -> bool:
 	return _use_kitchen_cabinet(p)
 
 
-## Навесной шкафчик на кухне: открыть правую дверцу / закрыть. true — нажатие использовано.
+## Дверцы на кухне (навесной шкафчик, духовка): открыть / закрыть. true — нажатие использовано.
 func _use_kitchen_cabinet(p: PlayerData) -> bool:
-	var kitchen := apartment.kitchen_room.cabinet
-	if not _near(p, kitchen.front_point(), SIDEBOARD_RADIUS):
+	var prop := _near_hinged(p)
+	if prop == null:
 		return false
-	if kitchen.can_open():
-		kitchen.open()
+	if prop.can_open():
+		prop.open()
 		return true
-	if kitchen.can_close():
-		kitchen.close()
+	if prop.can_close():
+		prop.close()
 		return true
 	return false
+
+
+## Шкафчик или духовка на кухне, к которым подошли лицом (null — далеко).
+func _near_hinged(p: PlayerData) -> HingedProp:
+	for prop: HingedProp in [apartment.kitchen_room.cabinet, apartment.kitchen_room.oven]:
+		if prop and _near(p, prop.front_point(), SIDEBOARD_RADIUS):
+			return prop
+	return null
 
 
 func _sideboard_hint(p: PlayerData) -> Array[Dictionary]:
@@ -563,12 +571,12 @@ func _sideboard_hint(p: PlayerData) -> Array[Dictionary]:
 			result.append(entry(confirm_key(p), "Открыть тумбу"))
 		elif cabinet.can_close():
 			result.append(entry(confirm_key(p), "Закрыть тумбу"))
-	elif _near(p, apartment.kitchen_room.cabinet.front_point(), SIDEBOARD_RADIUS):
-		var kitchen := apartment.kitchen_room.cabinet
-		if kitchen.can_open():
-			result.append(entry(confirm_key(p), "Открыть шкафчик"))
-		elif kitchen.can_close():
-			result.append(entry(confirm_key(p), "Закрыть шкафчик"))
+	elif _near_hinged(p):
+		var prop := _near_hinged(p)
+		if prop.can_open():
+			result.append(entry(confirm_key(p), prop.open_text))
+		elif prop.can_close():
+			result.append(entry(confirm_key(p), prop.close_text))
 	return result
 
 

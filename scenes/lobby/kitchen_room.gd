@@ -41,6 +41,7 @@ var apartment: Apartment
 ## Мойка, навесной шкафчик, стёкла окна (их ищет лобби: подсказки, удар молотком).
 var sink: KitchenSink
 var cabinet: KitchenCabinet
+var oven: KitchenOven
 var window_glass: WindowGlass
 
 var _tile_mat: StandardMaterial3D
@@ -173,9 +174,11 @@ func _build_window() -> void:
 
 func _build_furniture() -> void:
 	# Вдоль левой стены (лицом в кухню, +X): холодильник у двери, плита.
-	_furniture("kitchen_fridge", Vector3(X0 + 0.32, 0, 4.15), PI / 2, Vector3(0.62, 1.5, 0.6))
+	_furniture("kitchen_fridge", Vector3(X0 + 0.32, 0, 4.15), PI / 2, Vector3(0.6, 1.5, 0.62))
 	var stove := _furniture("kitchen_stove", Vector3(X0 + 0.3, 0, 5.0), PI / 2,
-		Vector3(0.58, 0.88, 0.5))
+		Vector3(0.5, 0.88, 0.58))
+	oven = KitchenOven.new() # дверца духовки откидывается, внутри — курица
+	stove.add_child(oven)
 	# Под окном — мойка (лицом от окна, −Z), правее — навесной шкафчик.
 	sink = KitchenSink.new()
 	sink.position = Vector3(WINDOW_X, 0, Z1 - 0.31)
