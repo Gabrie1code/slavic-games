@@ -33,7 +33,7 @@ def mat(name, color, rough=0.4, metal=0.0):
 
 PORCELAIN = mat("Porcelain", (0.93, 0.93, 0.9), 0.25)
 SEAT = mat("Seat", (0.95, 0.94, 0.9), 0.4)
-CHROME = mat("Chrome", (0.8, 0.8, 0.82), 0.2, 1.0)
+CHROME = mat("Chrome", (0.86, 0.87, 0.9), 0.22, 0.35) # не чистый металл — иначе в игре чёрный
 WATER = mat("Water", (0.45, 0.75, 0.95), 0.05)
 SHADOW = mat("BowlInside", (0.82, 0.83, 0.82), 0.3)
 

@@ -9,7 +9,7 @@ const MODEL := preload("res://assets/models/apartment/sink.glb")
 const COOLDOWN := 15.0
 ## Носик крана и уровни воды (в координатах раковины).
 const NOZZLE := Vector3(0, 0.985, 0.175)
-const WATER_LOW := 0.768
+const WATER_LOW := 0.769
 const WATER_HIGH := 0.85
 ## Вода в воронке шире, чем выше уровень (дно — 0.07 м, у края — 0.2 м).
 const WATER_WIDE := 2.4
@@ -39,6 +39,12 @@ func _ready() -> void:
 	_tap_cold = model.find_child("TapCold", true, false) as Node3D
 	_water = model.find_child("SinkWater", true, false) as Node3D
 	_water.visible = false
+	# Вода того же голубого цвета, что и в унитазе.
+	var water_mat := StandardMaterial3D.new()
+	water_mat.albedo_color = Toilet.BLUE
+	water_mat.roughness = 0.05
+	water_mat.metallic_specular = 0.9
+	(_water as MeshInstance3D).material_override = water_mat
 	var shape := CollisionShape3D.new()
 	var box := BoxShape3D.new()
 	box.size = Vector3(0.52, 0.88, 0.42)
@@ -52,7 +58,7 @@ func _ready() -> void:
 	_stream_mesh.radial_segments = 8
 	_stream.mesh = _stream_mesh
 	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color(0.7, 0.88, 1.0, 0.7)
+	mat.albedo_color = Color(Toilet.BLUE.lightened(0.25), 0.75) # как вода в унитазе, чуть светлее
 	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	mat.roughness = 0.05
 	_stream.material_override = mat

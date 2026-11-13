@@ -31,7 +31,8 @@ def mat(name, color, rough=0.3, metal=0.0):
 
 
 PORCELAIN = mat("Porcelain", (0.93, 0.93, 0.9), 0.2)
-CHROME = mat("Chrome", (0.8, 0.8, 0.82), 0.15, 1.0)
+# Хром — не полностью металл: в игре без отражений «чистый металл» выглядит чёрным.
+CHROME = mat("Chrome", (0.86, 0.87, 0.9), 0.22, 0.35)
 DARK = mat("DrainDark", (0.08, 0.08, 0.08), 0.5)
 RED = mat("TapRed", (0.8, 0.12, 0.1), 0.3)
 BLUE = mat("TapBlue", (0.15, 0.35, 0.85), 0.3)
@@ -159,6 +160,8 @@ water = finish(bpy.context.object, WATER)
 water.scale = (1.0, 0.78, 1.0)
 bpy.ops.object.transform_apply(scale=True)
 water.name = "SinkWater"
+# Точка воды — в её центре (в игре её поднимают и расширяют вокруг этой точки).
+bpy.ops.object.origin_set(type="ORIGIN_GEOMETRY", center="BOUNDS")
 
 bpy.ops.object.select_all(action="DESELECT")
 for o in (body, hot, cold, water):

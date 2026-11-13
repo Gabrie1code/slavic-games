@@ -164,7 +164,7 @@ func _build_details() -> void:
 ## Держатель туалетной бумаги на задней стене справа от унитаза: кронштейн, палочка, рулон.
 func _build_paper_holder() -> void:
 	var chrome := _mat(Color(0.8, 0.8, 0.82))
-	chrome.metallic = 0.9
+	chrome.metallic = 0.35 # полностью металл без отражений выглядит чёрным
 	chrome.roughness = 0.25
 	var pos := Vector3(toilet.position.x + 0.5, 0.7, Z0)
 	_box(Vector3(0.16, 0.04, 0.02), pos + Vector3(0, 0, 0.03), chrome) # планка на стене
