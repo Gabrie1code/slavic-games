@@ -47,6 +47,22 @@ static func _run(character: PlayerCharacter, stream: CPUParticles3D) -> void:
 			stream.get_tree().create_timer(1.0).timeout.connect(stream.queue_free))
 
 
+## Губка трёт рядом с point: лужи в радиусе бледнеют и пропадают (~1 сек оттирания).
+static func scrub(tree: SceneTree, point: Vector3, radius: float, delta: float) -> void:
+	for node in tree.get_nodes_in_group("vomit_puddle"):
+		var puddle := node as MeshInstance3D
+		var flat := Vector2(puddle.global_position.x - point.x, puddle.global_position.z - point.z)
+		if flat.length() > radius + 0.25 * puddle.scale.x:
+			continue
+		var dirt: float = puddle.get_meta("dirt", 1.0) - delta * 1.2
+		puddle.set_meta("dirt", dirt)
+		var mat := puddle.material_override as StandardMaterial3D
+		mat.albedo_color.a = minf(mat.albedo_color.a, maxf(dirt, 0.0))
+		if dirt <= 0.0:
+			puddle.remove_from_group("vomit_puddle")
+			puddle.queue_free()
+
+
 static func _stream() -> CPUParticles3D:
 	var stream := CPUParticles3D.new()
 	stream.emitting = false
@@ -92,6 +108,8 @@ static func _puddle(world: Node3D, at: Vector3) -> void:
 	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	puddle.material_override = mat
 	puddle.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	puddle.add_to_group("vomit_puddle") # губка оттирает (Sponge.scrub_at → VomitFx.scrub)
+	puddle.set_meta("dirt", 1.0)
 	world.add_child(puddle)
 	puddle.global_position = Vector3(at.x, 0.012, at.z)
 	puddle.scale = Vector3(0.2, 1.0, 0.2)

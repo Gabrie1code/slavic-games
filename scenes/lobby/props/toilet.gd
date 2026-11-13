@@ -11,7 +11,7 @@ extends StaticBody3D
 ## Модель — tools/blender/toilet.py (части ToiletBody, Lid, Water, FlushButton).
 
 const MODEL := preload("res://assets/models/apartment/toilet.glb")
-const LID_OPEN_ANGLE := -1.6 # ≈ −92°: крышка опирается на бачок
+const LID_OPEN_ANGLE := -1.42 # ≈ −81°: крышка чуть не доходит до бачка (на −92° залезала в него)
 const LID_CLOSE_AFTER := 20.0
 const COOLDOWN := 60.0
 const FLUSH_TIME := 2.6

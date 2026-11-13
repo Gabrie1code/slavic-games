@@ -113,6 +113,7 @@ func drop(character: PlayerCharacter, world: Node3D, dir: Vector3 = Vector3.ZERO
 ## Оттереть всё в точке point: краску баллончика (и на людях, и на стенах) и лужи у туалета.
 func scrub_at(point: Vector3, toilet: Toilet) -> void:
 	SprayCan.erase_near(point, SCRUB_RADIUS)
+	VomitFx.scrub(get_tree(), point, SCRUB_RADIUS, get_process_delta_time())
 	if toilet:
 		toilet.scrub(point, SCRUB_RADIUS + 0.1)
 	_foam.global_position = point
