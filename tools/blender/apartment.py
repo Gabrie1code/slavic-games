@@ -448,39 +448,48 @@ for x in (-0.95, 0.95):
 made.append(export("curtains", P))
 
 # ---------------- Ковёр на пол (лежит, узором вверх) ----------------
-# Не повторяет красный ковёр на стене: тёмно-зелёное поле, бежевая кайма с цепочкой бордовых
-# ромбов, в центре — восьмиугольный медальон (бордо, охра, крем), по углам — охристые «уголки»,
-# на коротких сторонах — бахрома.
-RUG_GREEN = mat("RugGreen", (0.05, 0.16, 0.1), 0.95)
-RUG_BEIGE = mat("RugBeige", (0.72, 0.6, 0.42), 0.95)
-RUG_MAROON = mat("RugMaroon", (0.3, 0.04, 0.05), 0.95)
-RUG_OCHRE = mat("RugOchre", (0.7, 0.42, 0.1), 0.95)
+# Тёмно-синее поле с ромбической решёткой кремовыми линиями, по центру — ступенчатый бордовый
+# ромб с кремовой серединкой, кайма кремовая с синим зигзагом, по углам — бордовые квадраты.
+RUG_NAVY = mat("RugNavy", (0.02, 0.04, 0.12), 0.95)
+RUG_CREAM = mat("RugCream", (0.75, 0.66, 0.48), 0.95)
+RUG_WINE = mat("RugWine", (0.32, 0.03, 0.05), 0.95)
 W, D = 3.0, 2.1
-P = [box((W, D, 0.02), (0, 0, 0.01), RUG_BEIGE)]
-P.append(box((W - 0.3, D - 0.3, 0.024), (0, 0, 0.012), RUG_MAROON))
-P.append(box((W - 0.36, D - 0.36, 0.027), (0, 0, 0.0135), RUG_GREEN))
-for k in range(14):                                                    # ромбы по длинной кайме
-    x = -W / 2 + 0.2 + k * (W - 0.4) / 13
-    for y in (-D / 2 + 0.075, D / 2 - 0.075):
-        P.append(box((0.07, 0.07, 0.024), (x, y, 0.012), RUG_MAROON, rot=(0, 0, math.radians(45))))
-for k in range(9):                                                     # и по короткой
-    y = -D / 2 + 0.25 + k * (D - 0.5) / 8
-    for x in (-W / 2 + 0.075, W / 2 - 0.075):
-        P.append(box((0.07, 0.07, 0.024), (x, y, 0.012), RUG_MAROON, rot=(0, 0, math.radians(45))))
-for r, c, h in ((0.5, RUG_OCHRE, 0.03), (0.42, RUG_MAROON, 0.032), (0.3, RUG_BEIGE, 0.034),
-                (0.18, RUG_OCHRE, 0.036), (0.08, RUG_MAROON, 0.038)):          # медальон
-    P.append(cyl(r, h, (0, 0, h / 2), c, verts=8, rot=(0, 0, math.radians(22.5))))
-for x in (-0.9, 0.9):                                                  # «листья» по бокам медальона
-    P.append(box((0.3, 0.12, 0.03), (x, 0, 0.015), RUG_OCHRE, rot=(0, 0, math.radians(45))))
-    P.append(box((0.16, 0.06, 0.032), (x, 0, 0.016), RUG_MAROON, rot=(0, 0, math.radians(45))))
-for x in (-1.1, 1.1):                                                  # уголки
-    for y in (-0.7, 0.7):
-        P.append(box((0.22, 0.05, 0.03), (x, y, 0.015), RUG_OCHRE))
-        P.append(box((0.05, 0.22, 0.03), (x, y, 0.015), RUG_OCHRE))
-for k in range(24):                                                    # бахрома
+P = [box((W, D, 0.02), (0, 0, 0.01), RUG_CREAM)]
+P.append(box((W - 0.34, D - 0.34, 0.024), (0, 0, 0.012), RUG_NAVY))
+for k in range(40):                                                      # зигзаг по длинной кайме
+    x = -W / 2 + 0.13 + k * (W - 0.26) / 39
+    for y in (-D / 2 + 0.085, D / 2 - 0.085):
+        P.append(box((0.06, 0.012, 0.024), (x, y, 0.012), RUG_NAVY, rot=(0, 0, math.radians(45 if k % 2 else -45))))
+for k in range(28):                                                      # и по короткой
+    y = -D / 2 + 0.13 + k * (D - 0.26) / 27
+    for x in (-W / 2 + 0.085, W / 2 - 0.085):
+        P.append(box((0.012, 0.06, 0.024), (x, y, 0.012), RUG_NAVY, rot=(0, 0, math.radians(45 if k % 2 else -45))))
+# Решётка ромбов — короткими отрезками между узлами сетки, только внутри поля.
+FX, FY = (W - 0.44) / 2, (D - 0.44) / 2
+SX, SY = 0.24, 0.17
+nodes = {}
+for i in range(-6, 7):
+    for j in range(-6, 7):
+        if (i + j) % 2 == 0 and abs(i * SX) <= FX + 1e-6 and abs(j * SY) <= FY + 1e-6:
+            nodes[(i, j)] = (i * SX, j * SY)
+for (i, j), (x0, y0) in nodes.items():
+    for di, dj in ((1, 1), (1, -1)):
+        if (i + di, j + dj) in nodes:
+            x1, y1 = nodes[(i + di, j + dj)]
+            ln = math.hypot(x1 - x0, y1 - y0)
+            P.append(box((ln, 0.012, 0.026), ((x0 + x1) / 2, (y0 + y1) / 2, 0.013), RUG_CREAM,
+                         rot=(0, 0, math.atan2(y1 - y0, x1 - x0))))
+for sz, c, h in ((1.0, RUG_CREAM, 0.032), (0.9, RUG_WINE, 0.034), (0.66, RUG_CREAM, 0.036),
+                 (0.56, RUG_WINE, 0.038), (0.3, RUG_CREAM, 0.04), (0.16, RUG_NAVY, 0.042)):  # ромб
+    P.append(box((sz, sz * 0.7, h), (0, 0, h / 2), c, rot=(0, 0, math.radians(45))))
+for x in (-W / 2 + 0.35, W / 2 - 0.35):                                  # угловые квадраты
+    for y in (-D / 2 + 0.35, D / 2 - 0.35):
+        P.append(box((0.2, 0.2, 0.034), (x, y, 0.017), RUG_WINE))
+        P.append(box((0.09, 0.09, 0.036), (x, y, 0.018), RUG_CREAM, rot=(0, 0, math.radians(45))))
+for k in range(24):                                                      # бахрома
     y = -D / 2 + 0.06 + k * (D - 0.12) / 23
     for x in (-W / 2 - 0.04, W / 2 + 0.04):
-        P.append(box((0.08, 0.012, 0.006), (x, y, 0.003), RUG_BEIGE))
+        P.append(box((0.08, 0.012, 0.006), (x, y, 0.003), RUG_CREAM))
 made.append(export("floor_rug", P))
 
 if not RENDER:
