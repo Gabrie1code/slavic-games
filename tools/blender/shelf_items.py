@@ -331,10 +331,17 @@ for k in range(25):
     p_local.rotate(__import__("mathutils").Euler((0, TILT, 0)))
     arc_pts.append(tuple(GC + p_local))
 P.append(tube(arc_pts, 0.0028, GLOBE_GOLD))
+AXIS = Vector((0, 0, 1))
+AXIS.rotate(__import__("mathutils").Euler((0, TILT, 0)))
 for sign in (-1, 1):                                                                   # шпильки оси
-    tip = Vector((0, 0, sign * 0.06))
-    tip.rotate(__import__("mathutils").Euler((0, TILT, 0)))
-    P.append(ball(0.004, tuple(GC + tip), GLOBE_GOLD))
+    # Стержень от шара (чуть внутри) до дуги-меридиана — на нём шар и держится.
+    P.append(tube([tuple(GC + AXIS * sign * 0.044), tuple(GC + AXIS * sign * 0.053),
+                   tuple(GC + AXIS * sign * 0.063)], 0.0022, GLOBE_GOLD))
+    P.append(ball(0.0042, tuple(GC + AXIS * sign * 0.0605), GLOBE_GOLD))           # втулка на дуге
+    P.append(ball(0.0035, tuple(GC + AXIS * sign * 0.053), GLOBE_GOLD))            # шляпка у шара
+# Нижний конец дуги — к ножке подставки.
+P.append(tube([(0, 0, 0.046), tuple((Vector((0, 0, 0.046)) + Vector(arc_pts[0])) / 2),
+               arc_pts[0]], 0.0028, GLOBE_GOLD))
 export("shelf_globe", P)
 
 # ---------------- Фото в рамке ----------------
