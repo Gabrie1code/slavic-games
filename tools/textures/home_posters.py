@@ -13,6 +13,7 @@ import sys
 from PIL import Image, ImageDraw, ImageFont
 
 OUT = sys.argv[1] if len(sys.argv) > 1 else "."
+random.seed(11)
 os.makedirs(OUT, exist_ok=True)
 BOLD = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
 REG = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
@@ -37,17 +38,14 @@ def big_text(d, text, y, size, fill, stroke=None):
 
 
 def finish(img, name):
-    """Бумага: светлая кайма, потёртости, скотч по верхним углам (прозрачный фон за скотчем)."""
+    """Бумага: светлая кайма, потёртости (скотч — в игре, Apartment._poster)."""
     img = img.convert("RGBA")
     d = ImageDraw.Draw(img)
     d.rectangle((0, 0, W - 1, H - 1), outline=(245, 238, 218, 255), width=12)
     for _ in range(160):
         x, y = random.randint(0, W), random.randint(0, H)
         d.point((x, y), fill=(255, 250, 235, random.randint(40, 110)))
-    for cx, cy, a in ((38, 18, -20), (W - 38, 18, 20)):
-        tape = Image.new("RGBA", (100, 30), (240, 232, 196, 170))
-        tape = tape.rotate(a, expand=True)
-        img.alpha_composite(tape, (int(cx - tape.width / 2), int(cy - tape.height / 2)))
+    # Скотч — в игре отдельными полосками поверх углов, заходящими на стену (Apartment._poster).
     img.save(os.path.join(OUT, name + ".png"))
     print("SAVED", name)
 

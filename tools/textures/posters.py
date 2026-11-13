@@ -54,17 +54,15 @@ def footer(img, text, color=(255, 230, 120)):
 
 
 def finish(img, name):
-    """Старая бумага: светлая рамка, лёгкая потёртость, скотч по углам."""
+    """Старая бумага: светлая рамка, лёгкая потёртость (скотч — в игре, Apartment._poster)."""
     img = img.convert("RGBA")
     d = ImageDraw.Draw(img)
     d.rectangle((0, 0, W - 1, H - 1), outline=(245, 235, 210, 255), width=14)
     for _ in range(140):                                                       # потёртости
         x, y = random.randint(0, W), random.randint(0, H)
         d.point((x, y), fill=(255, 250, 235, random.randint(40, 110)))
-    for cx, cy, a in ((40, 20, -20), (W - 40, 20, 20)):                          # скотч
-        tape = Image.new("RGBA", (110, 34), (240, 230, 190, 170))
-        tape = tape.rotate(a, expand=True)
-        img.alpha_composite(tape, (int(cx - tape.width / 2), int(cy - tape.height / 2)))
+    # Скотча на картинке нет: в игре он — отдельные полоски поверх углов, заходящие на стену
+    # (Apartment._poster); нарисованный обрезался краем листа.
     img.save(os.path.join(OUT, name + ".png"))
 
 

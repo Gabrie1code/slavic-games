@@ -116,6 +116,8 @@ var _hanging_top: Array[Dictionary] = []
 var _sun: DirectionalLight3D
 ## Текстура мягкой тени под мебелью (одна на всю квартиру).
 var _shadow_tex: GradientTexture2D
+## Полупрозрачный скотч постеров (один на все).
+var _tape_mat: StandardMaterial3D
 var _sun_energy := 1.0
 var _time := 0.0
 ## Модель окна гостиной (у неё прячем «небо», чтобы видеть вид за проёмом).
@@ -712,7 +714,6 @@ func _poster(poster_name: String, size: Vector2, pos: Vector3, yaw: float) -> vo
 	quad.mesh = mesh
 	var poster_mat := StandardMaterial3D.new()
 	poster_mat.albedo_texture = load("res://assets/textures/posters/%s.png" % poster_name)
-	poster_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR # скотч по углам
 	poster_mat.roughness = 0.85
 	poster_mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
 	quad.material_override = poster_mat
@@ -720,6 +721,24 @@ func _poster(poster_name: String, size: Vector2, pos: Vector3, yaw: float) -> vo
 	quad.position = pos
 	quad.rotation.y = yaw
 	add_child(quad)
+	# Скотч на четырёх углах: полоска наискосок через угол, половина — на стене (раньше скотч
+	# был нарисован на самом постере и обрывался по краю листа).
+	if _tape_mat == null:
+		_tape_mat = StandardMaterial3D.new()
+		_tape_mat.albedo_color = Color(0.95, 0.91, 0.76, 0.62)
+		_tape_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		_tape_mat.roughness = 0.35
+	for corner: Vector2 in [Vector2(-1, 1), Vector2(1, 1), Vector2(-1, -1), Vector2(1, -1)]:
+		var tape := MeshInstance3D.new()
+		var tape_mesh := QuadMesh.new()
+		tape_mesh.size = Vector2(size.x * 0.24, size.x * 0.07)
+		tape.mesh = tape_mesh
+		tape.material_override = _tape_mat
+		tape.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		tape.position = Vector3(corner.x * (size.x / 2.0 - size.x * 0.03),
+			corner.y * (size.y / 2.0 - size.x * 0.02), 0.002)
+		tape.rotation.z = -corner.x * corner.y * deg_to_rad(35.0) # поперёк угла
+		quad.add_child(tape)
 
 
 func _neon(text: String, pos: Vector3, yaw: float, font_size: int) -> void:
