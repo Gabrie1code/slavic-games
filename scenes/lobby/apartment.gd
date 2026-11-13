@@ -97,6 +97,8 @@ var arcade_screens: Array[ArcadeScreen] = []
 var cat: LobbyCat
 ## Пульт от телевизора (лежит на диване, его можно взять и бросить).
 var tv_remote: TvRemote
+## Музыка радио на полке (кнопкой включить / выключить).
+var radio_music: RadioMusic
 
 ## Ночник на тумбочке в спальне; разбили — не светит, пока не восстановится.
 var night_lamp: Breakable
@@ -501,20 +503,8 @@ func _build_decor() -> void:
 ## Разбили — замолкает; через 5 сек радио появляется снова и опять играет.
 func _radio_music(radio: Breakable) -> void:
 	radio.respawn_time = 5.0
-	var stream := load("res://assets/audio/radio_music.wav") as AudioStreamWAV
-	stream.loop_mode = AudioStreamWAV.LOOP_FORWARD
-	stream.loop_begin = 0
-	stream.loop_end = int(stream.get_length() * stream.mix_rate)
-	var player := AudioStreamPlayer3D.new()
-	player.stream = stream
-	player.volume_db = -8.0
-	player.unit_size = 3.0
-	player.max_distance = 14.0
-	player.position = Vector3(0, 0.12, 0)
-	radio.add_child(player)
-	player.play()
-	radio.broken.connect(player.stop)
-	radio.restored.connect(func() -> void: player.play())
+	radio_music = RadioMusic.new(radio)
+	add_child(radio_music)
 
 
 ## Ковёр-картина на стене: тонкая основа и картинка спереди, снизу — бахрома.

@@ -163,10 +163,11 @@ func _build_details() -> void:
 	paper_mat.roughness = 0.9
 	paper_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
 	paper.material_override = paper_mat
-	paper.position = Vector3(X0 + 0.075, 0.95, Z0 + 0.35)
+	# Перед покраской стены (её слой — до X0 + 0.08), иначе газета пряталась внутри, торчал гвоздь.
+	paper.position = Vector3(X0 + 0.086, 0.95, Z0 + 0.35)
 	paper.rotation = Vector3(0.0, PI / 2.0, 0.05) # лицом в туалет, чуть криво висит
 	add_child(paper)
-	_box(Vector3(0.02, 0.012, 0.012), Vector3(X0 + 0.075, 1.115, Z0 + 0.35), _mat(Color("444444")))
+	_box(Vector3(0.02, 0.012, 0.012), Vector3(X0 + 0.088, 1.115, Z0 + 0.35), _mat(Color("444444")))
 
 
 ## Держатель туалетной бумаги на задней стене справа от унитаза: кронштейн, палочка, рулон.

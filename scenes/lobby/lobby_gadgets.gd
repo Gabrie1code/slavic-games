@@ -14,6 +14,7 @@ const LOOK_ANGLE := 50.0
 const GRAMOPHONE_RADIUS := 1.4
 const LAMP_RADIUS := 1.2
 const SWITCH_RADIUS := 1.0
+const RADIO_RADIUS := 0.9
 const ARCADE_RADIUS := 1.1
 const TOILET_RADIUS := 1.2
 const SINK_RADIUS := 1.0
@@ -498,7 +499,8 @@ func try_secondary(p: PlayerData) -> bool:
 	return true
 
 
-## Торшер и выключатели люстр: днём свет включают, вечером выключают (на время, см. LobbyLamp).
+## Торшер, выключатели люстр и радио. Свет днём включают, вечером выключают
+## (на время, см. LobbyLamp).
 func _light_hint(p: PlayerData) -> Array[Dictionary]:
 	var result: Array[Dictionary] = []
 	if _near_tippable(p, apartment.floor_lamp, LAMP_RADIUS):
@@ -509,7 +511,16 @@ func _light_hint(p: PlayerData) -> Array[Dictionary]:
 	if chandelier:
 		var lit := chandelier.is_on()
 		result.append(entry(confirm_key(p), "Выключить свет" if lit else "Включить свет"))
+	elif _near_radio(p):
+		var music := apartment.radio_music.switched_on
+		result.append(entry(confirm_key(p), "Выключить радио" if music else "Включить радио"))
 	return result
+
+
+## Целое радио на полке, на которое смотрит игрок.
+func _near_radio(p: PlayerData) -> bool:
+	var radio := apartment.radio_music.radio
+	return not radio.is_broken() and _near(p, radio.global_position, RADIO_RADIUS)
 
 
 ## Выключатель люстры, к которому подошли лицом (null — нет рядом).
@@ -585,6 +596,8 @@ func _use_switch(p: PlayerData) -> bool:
 		apartment.floor_lamp_light.toggle()
 	elif chandelier:
 		chandelier.toggle()
+	elif _near_radio(p):
+		apartment.radio_music.toggle()
 	elif sink and sink.can_use(p):
 		sink.use(p, characters[p.id])
 	elif toilet and toilet.can_flush():
