@@ -42,7 +42,6 @@ const PUNCH_COOLDOWN := 0.35
 const PUNCH_PUSH := 3.0
 
 var _characters: Dictionary = {} # PlayerData.id -> персонаж
-var _slot_panels: Array[PanelContainer] = []
 
 ## Окно «Добавить ботов?»
 var _bot_dialog: PanelContainer
@@ -116,7 +115,6 @@ func _ready() -> void:
 	# Игроки, которые уже вошли раньше (например, вернулись в лобби).
 	for p in PlayerManager.players:
 		_on_player_joined(p)
-	_refresh_slots()
 	_apply_view()
 
 
@@ -440,7 +438,6 @@ func _open_wardrobe(p: PlayerData) -> void:
 	room.setup(p, character)
 	room.closed.connect(_on_room_closed)
 	room.color_changed.connect(func(changed: PlayerData) -> void:
-		_refresh_slots()
 		_update_fist_color(changed))
 	_rooms_root.add_child(room)
 	_rooms[p.id] = room
@@ -841,7 +838,6 @@ func _on_player_joined(p: PlayerData) -> void:
 		_cancel_countdown() # новый игрок пришёл — пусть тоже подтвердит готовность
 	else:
 		_place_bot(p, character as PlayerCharacter)
-	_refresh_slots()
 
 
 ## Бот перед игрой садится на свободное место — диван, потом кресло (каждый на своё —
@@ -872,7 +868,6 @@ func _on_player_left(p: PlayerData) -> void:
 	if _characters.has(p.id):
 		_characters[p.id].queue_free()
 		_characters.erase(p.id)
-	_refresh_slots()
 
 
 # ---------------- Интерфейс ----------------
@@ -900,7 +895,8 @@ func _build_ui() -> void:
 	var hint := Label.new()
 	hint.text = ("Вход: Пробел (WASD) · Enter (стрелки) · A (геймпад)\n"
 		+ "Прыжок: та же кнопка · Выйти: Q / Backspace / B · Закрыть игру: Esc\n"
-		+ "ШКАФ в спальне · диван · ТЕЛЕВИЗОР — старт · Удар: F/ЛКМ, /, X · F2 — вид")
+		+ "ШКАФ в спальне · диван · ТЕЛЕВИЗОР — старт · Удар: F/ЛКМ, /, X · F2 — вид\n"
+		+ "Tab (Back на геймпаде) — список игроков")
 	hint.add_theme_font_size_override("font_size", 22)
 	hint.add_theme_color_override("font_outline_color", Color.BLACK)
 	hint.add_theme_constant_override("outline_size", 8)
@@ -933,38 +929,10 @@ func _build_ui() -> void:
 	_rooms_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	rooms_layer.add_child(_rooms_root)
 
-	var slots := HBoxContainer.new()
-	slots.add_theme_constant_override("separation", 12)
-	slots.alignment = BoxContainer.ALIGNMENT_CENTER
-	column.add_child(slots)
-	for i in PlayerManager.MAX_PLAYERS:
-		var panel := PanelContainer.new()
-		panel.custom_minimum_size = Vector2(280, 90)
-		var label := Label.new()
-		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		label.add_theme_font_size_override("font_size", 18)
-		panel.add_child(label)
-		slots.add_child(panel)
-		_slot_panels.append(panel)
-
-
-func _refresh_slots() -> void:
-	for i in _slot_panels.size():
-		var panel := _slot_panels[i]
-		var label := panel.get_child(0) as Label
-		var p := PlayerManager.get_by_slot(i)
-		var style := StyleBoxFlat.new()
-		style.set_corner_radius_all(10)
-		if p:
-			style.bg_color = p.color.darkened(0.25)
-			label.text = "%s\n%s" % [p.display_name, p.device_label()]
-			label.add_theme_color_override("font_color", Color.WHITE)
-		else:
-			style.bg_color = Color(0, 0, 0, 0.45)
-			label.text = "Свободно"
-			label.add_theme_color_override("font_color", Color(1, 1, 1, 0.5))
-		panel.add_theme_stylebox_override("panel", style)
+	# Слоты игроков — в меню по Tab (раньше полоска внизу экрана).
+	var players_menu := PlayersMenu.new()
+	players_menu.is_ready = func(p: PlayerData) -> bool: return _ready_marks.has(p.id)
+	_ui.add_child(players_menu)
 
 
 func _build_bot_dialog() -> void:
