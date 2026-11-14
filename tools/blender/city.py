@@ -34,7 +34,10 @@ _mats = {}
 MADE = []
 
 
-def mat(name, color, rough=0.7, metal=0.0):
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+
+def mat(name, color, rough=0.7, metal=0.0, image=None):
     if name in _mats:
         return _mats[name]
     m = bpy.data.materials.new(name)
@@ -43,6 +46,10 @@ def mat(name, color, rough=0.7, metal=0.0):
     b.inputs["Base Color"].default_value = (*color, 1)
     b.inputs["Roughness"].default_value = rough
     b.inputs["Metallic"].default_value = metal
+    if image:
+        tex = m.node_tree.nodes.new("ShaderNodeTexImage")
+        tex.image = bpy.data.images.load(os.path.join(ROOT, image))
+        m.node_tree.links.new(tex.outputs["Color"], b.inputs["Base Color"])
     _mats[name] = m
     return m
 
@@ -52,6 +59,7 @@ class Builder:
 
     def __init__(self):
         self.verts, self.faces, self.mats, self.mat_list = [], [], [], []
+        self.uvs = {}                                                   # номер грани -> UV вершин
 
     def _mi(self, m):
         if m not in self.mat_list:
@@ -90,6 +98,16 @@ class Builder:
         self.faces.append(tuple(base + n + k for k in range(n)))
         self.mats.append(mi)
 
+    def quad(self, corners, uv_rect, m):
+        """Плоский четырёхугольник с картинкой: corners — 4 точки (левый-низ, правый-низ, правый-верх,
+        левый-верх), uv_rect — (u0, v0, u1, v1) участок картинки."""
+        base = len(self.verts)
+        self.verts += [tuple(c) for c in corners]
+        u0, v0, u1, v1 = uv_rect
+        self.uvs[len(self.faces)] = [(u0, v0), (u1, v0), (u1, v1), (u0, v1)]
+        self.faces.append((base, base + 1, base + 2, base + 3))
+        self.mats.append(self._mi(m))
+
     def poly(self, pts, faces, m):
         base = len(self.verts)
         self.verts += [tuple(p) for p in pts]
@@ -106,6 +124,11 @@ class Builder:
         for p, mi in zip(me.polygons, self.mats):
             p.material_index = mi
             p.use_smooth = False
+        if self.uvs:
+            uv = me.uv_layers.new(name="UVMap")
+            for fi, coords in self.uvs.items():
+                for k, li in enumerate(me.polygons[fi].loop_indices):
+                    uv.data[li].uv = coords[k]
         me.validate()
         o = bpy.data.objects.new(name, me)
         bpy.context.scene.collection.objects.link(o)
@@ -130,6 +153,19 @@ FRAME_W = mat("CFrameWhite", (0.86, 0.85, 0.8))
 FRAME_WOOD = mat("CFrameWood", (0.42, 0.27, 0.14))
 GLASS = mat("CGlass", (0.16, 0.22, 0.28), 0.15)
 GLASS_SKY = mat("CGlassSky", (0.4, 0.52, 0.6), 0.1)
+# Стекло застеклённых балконов: картинка «что за стеклом» (tools/textures/balcony_glass.py, 8 вариантов).
+BALCONY_GLASS = mat("CBalconyGlass", (1, 1, 1), 0.15, image="assets/textures/city/balcony_glass.png")
+
+
+# Стекло обычных окон: комната за стеклом (tools/textures/window_glass.py, 8 вариантов).
+WINDOW_GLASS = mat("CWindowGlass", (1, 1, 1), 0.15, image="assets/textures/city/window_glass.png")
+
+
+def glass_tile(rng):
+    """Случайный вариант из атласа 4 × 2: (u0, v0, u1, v1)."""
+    k = rng.randrange(8)
+    u, v = (k % 4) * 0.25, (k // 4) * 0.5
+    return (u, v, u + 0.25, v + 0.5)
 DARK = mat("CDark", (0.05, 0.05, 0.06), 0.6)
 METAL = mat("CMetal", (0.5, 0.52, 0.54), 0.45, 0.6)
 RAIL = mat("CRail", (0.18, 0.2, 0.2), 0.6, 0.3)
@@ -161,6 +197,12 @@ def window(B, rng, x, y, z, w, h, frame=FRAME_W, dress=True, out=-1, reveal=0.0)
     f = out
     B.box((w + 0.16, 0.08, h + 0.16), (x, y + f * 0.02, z), frame)
     B.box((w, 0.1, h), (x, y + f * 0.03, z), GLASS)
+    gy = y + f * 0.081                                                            # картинка на стекле
+    pts = [(x - w / 2, gy, z - h / 2), (x + w / 2, gy, z - h / 2), (x + w / 2, gy, z + h / 2),
+           (x - w / 2, gy, z + h / 2)]
+    if f > 0:                                                                     # окно смотрит в +Y
+        pts = [pts[1], pts[0], pts[3], pts[2]]
+    B.quad(pts, glass_tile(rng), WINDOW_GLASS)
     B.box((0.06, 0.12, h), (x - w * 0.15, y + f * 0.03, z), frame)              # переплёт
     B.box((w * 0.35, 0.12, 0.05), (x - w * 0.32, y + f * 0.03, z + h * 0.2), frame)  # форточка
     B.box((w + 0.3, 0.2, 0.05), (x, y + f * 0.1, z - h / 2 - 0.08), WHITE)          # отлив
@@ -221,14 +263,20 @@ def balcony(B, rng, x, y, z_floor, w=2.4, depth=1.1, style=None, out=-1):
             B.box((0.06, depth, H), (x + s * w / 2, yc, z_floor + H / 2), low)
         top = 2.55
         frame = rng.choice([FRAME_WOOD, FRAME_W, FRAME_WOOD])
-        B.box((w + 0.04, 0.06, top - H), (x, yf, z_floor + (H + top) / 2), GLASS_SKY)
+        z0, z1 = z_floor + H, z_floor + top
+        gy = yf + f * 0.005                                                         # перед: картинка
+        B.quad([(x - w / 2, gy, z0), (x + w / 2, gy, z0), (x + w / 2, gy, z1), (x - w / 2, gy, z1)],
+               glass_tile(rng), BALCONY_GLASS)                                      # лицом в −Y
         panes = rng.randint(3, 5)
         for k in range(panes + 1):
             B.box((0.05, 0.08, top - H), (x - w / 2 + k * w / panes, yf, z_floor + (H + top) / 2), frame)
         for zz in (H, top):
             B.box((w + 0.06, 0.09, 0.06), (x, yf, z_floor + zz), frame)
         for s in (-1, 1):
-            B.box((0.06, depth, top - H), (x + s * w / 2, yc, z_floor + (H + top) / 2), GLASS_SKY)
+            sx = x + s * (w / 2 + 0.035)                                             # бока: тоже картинка
+            near, far = (y, yf) if s < 0 else (yf, y)                               # лицом наружу (±X)
+            B.quad([(sx, near, z0), (sx, far, z0), (sx, far, z1), (sx, near, z1)], glass_tile(rng),
+                   BALCONY_GLASS)
         B.box((w + 0.2, depth + 0.15, 0.06), (x, yc, z_floor + top + 0.03), rng.choice(CLAD))  # козырёк
         if rng.random() < 0.4:                                                       # шторка внутри
             B.box((w * 0.3, 0.01, top - H - 0.1), (x - w * 0.3, yf - f * 0.05, z_floor + (H + top) / 2),
