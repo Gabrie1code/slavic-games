@@ -13,6 +13,8 @@ const DIAL_TILT := deg_to_rad(16.0)
 const HANDSET_POS := Vector3(0, 0.16, -0.07)
 ## Трубка у правого уха (координаты в части Head персонажа).
 const EAR_POS := Vector3(0.31, 0.27, 0.0)
+## Куда тянется кулак с трубкой (координаты модели персонажа): у правого уха.
+const EAR_HAND := Vector3(0.27, 1.27, 0.0)
 ## Откуда выходит провод (сбоку корпуса) и на какой длине трубка вырывается.
 const CORD_ANCHOR := Vector3(-0.11, 0.05, 0.0)
 ## Провод сначала уходит от телефона вбок на столько метров (за край тумбочки).
@@ -119,7 +121,8 @@ func pick_up(p: PlayerData, character: PlayerCharacter) -> void:
 	character.attach_to_part("Head", _handset)
 	_handset.position = EAR_POS
 	_handset.rotation = Vector3(0, 0, PI / 2) # трубка вертикально у щеки
-	character.set_arm_pose(2.45, 0.35, 0.25)
+	# Кулак — у трубки возле уха (у модели со скелетом локоть гнётся сам).
+	character.set_arm_pose(2.45, 0.35, 0.25, CharacterRig.DEFAULT_REACH, EAR_HAND)
 	_show_cord(_cord, true)
 	_update_cord(_cord, _handset.to_global(HANDSET_END))
 

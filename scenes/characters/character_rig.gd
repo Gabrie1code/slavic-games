@@ -44,19 +44,31 @@ const HEAD_CENTER_NEW := 0.225
 ## кисть ниже (рука длиннее): прежняя точка «в руке» −0.42 → −0.58.
 const HEAD_SOCKET_SCALE := 0.88
 const HAND_DROP := 0.16
+## «Точка в руке» в рамке кисти (как у прежней прямой руки: гнездо −HAND_DROP, кисть ещё −0.42).
+const HAND_POINT := Vector3(0, -0.42 - 0.16, 0)
+## Обычное расстояние плечо — кулак, когда рука держит предмет (м): локоть заметно согнут.
+const DEFAULT_REACH := 0.4
 
 ## Управляющие узлы-части (их крутит код игры).
 var parts: Dictionary = {}
 ## Узлы, повторяющие итоговую позу кости, — на них одежда и предметы.
 var frames: Dictionary = {}
-## Гнёзда для предметов (внутри рамок).
+## Гнёзда для предметов (внутри рамок; у рук — в рамке предплечья, предмет идёт за кистью).
 var sockets: Dictionary = {}
+## Рамки кистей (ArmL / ArmR): в них гнёзда для предметов — предмет всегда в кулаке.
+var hands: Dictionary = {}
+## Насколько далеко от плеча кисть, когда рукой управляет код (м); короче руки — локоть согнут.
+var arm_reach: Dictionary = {"ArmR": DEFAULT_REACH, "ArmL": DEFAULT_REACH}
+## Точка, куда тянется кулак (в координатах модели персонажа), — вместо направления части;
+## Vector3.INF — нет точки (телефон у уха, бутылка у рта).
+var arm_target: Dictionary = {"ArmR": Vector3.INF, "ArmL": Vector3.INF}
 ## Вес позы от кода для рук и ног (0 — анимация, 1 — код).
 var weights: Dictionary = {"ArmL": 0.0, "ArmR": 0.0, "LegL": 0.0, "LegR": 0.0}
 ## Гасить подъём тела из анимации (прыжок: высоту даёт физика).
 var lock_root := false
 
 var _skeleton: Skeleton3D
+var _model_node: Node3D
 var _anim: AnimationPlayer
 var _to_model: Transform3D
 var _root_bone := -1
@@ -84,6 +96,7 @@ func setup(model: Node3D) -> bool:
 		for anim_name in LOOPS:
 			if _anim.has_animation(anim_name):
 				_anim.get_animation(anim_name).loop_mode = Animation.LOOP_LINEAR
+	_model_node = model
 	_to_model = model.global_transform.affine_inverse() * _skeleton.global_transform
 	# Корень тела — родитель таза (кость «Body»; при импорте её могут переименовать в «Body_2»,
 	# потому что так же называется сетка модели).
@@ -98,13 +111,14 @@ func setup(model: Node3D) -> bool:
 	for part_name: String in frames:
 		var socket := Node3D.new()
 		socket.name = part_name + "Socket"
-		(frames[part_name] as Node3D).add_child(socket)
+		(hands.get(part_name, frames[part_name]) as Node3D).add_child(socket)
 		sockets[part_name] = socket
 	var head_socket := sockets["Head"] as Node3D
 	head_socket.scale = Vector3.ONE * HEAD_SOCKET_SCALE
 	head_socket.position.y = HEAD_CENTER_NEW - HEAD_CENTER_OLD * HEAD_SOCKET_SCALE
-	(sockets["ArmR"] as Node3D).position.y = -HAND_DROP
-	(sockets["ArmL"] as Node3D).position.y = -HAND_DROP
+	# Гнёзда кистей: «точка в руке» прежнего тела (−0.42 от гнезда) попадает в кулак.
+	for arm in ["ArmR", "ArmL"]:
+		(sockets[arm] as Node3D).position.y = -HAND_DROP
 	if _anim:
 		play("Idle", 1.0, 0.0)
 	return true
@@ -159,8 +173,8 @@ static func fit(part_name: String, layer: Vector3) -> Transform3D:
 
 
 ## Кадр: анимация, поверх неё позы частей, затем рамки одежды — по итоговым костям.
-## elbow_bend / knee_bend — сгиб локтей и коленей от кода (рад) по частям.
-func update(delta: float, elbow_bend: Dictionary, knee_bend: Dictionary) -> void:
+## knee_bend — сгиб коленей от кода (рад) по частям; руки от кода гнутся сами (IK, arm_reach).
+func update(delta: float, knee_bend: Dictionary) -> void:
 	if _anim:
 		_anim.advance(delta)
 	_unlock_left = maxf(0.0, _unlock_left - delta)
@@ -185,20 +199,94 @@ func update(delta: float, elbow_bend: Dictionary, knee_bend: Dictionary) -> void
 		_skeleton.set_bone_global_pose(bone, final_xf)
 		(frames[part_name] as Node3D).transform = _to_model * final_xf * offset.affine_inverse()
 		var lower := int(link.get("lower", -1))
-		if lower < 0 or w <= 0.0:
-			continue
-		# Локоть / колено и ступня от кода — смешиваются с анимацией по тому же весу.
-		var bend := float(elbow_bend.get(part_name, knee_bend.get(part_name, 0.0)))
-		var lower_xf: Transform3D = proc_xf * (link["lower_rest"] as Transform3D)
-		var axis := (skel_inv.basis * part.global_basis * Vector3.RIGHT).normalized()
-		lower_xf.basis = Basis(axis, bend) * lower_xf.basis
-		_skeleton.set_bone_global_pose(lower,
-			_skeleton.get_bone_global_pose(lower).interpolate_with(lower_xf, w))
-		var foot := int(link.get("foot", -1))
-		if foot >= 0:
-			var foot_xf: Transform3D = lower_xf * (link["foot_rest"] as Transform3D)
-			_skeleton.set_bone_global_pose(foot,
-				_skeleton.get_bone_global_pose(foot).interpolate_with(foot_xf, w))
+		if hands.has(part_name):
+			if w > 0.0:
+				_reach_arm(part_name, link, part, w, skel_inv)
+			_place_hand(part_name, link, part, w)
+		elif lower >= 0 and w > 0.0:
+			_pose_lower(link, part, proc_xf, w, skel_inv, float(knee_bend.get(part_name, 0.0)))
+
+
+## Колено (и ступня) от кода — смешиваются с анимацией по весу w.
+func _pose_lower(link: Dictionary, part: Node3D, proc_xf: Transform3D, w: float,
+		skel_inv: Transform3D, bend: float) -> void:
+	var axis := (skel_inv.basis * part.global_basis * Vector3.RIGHT).normalized()
+	var lower := int(link["lower"])
+	var lower_xf: Transform3D = proc_xf * (link["lower_rest"] as Transform3D)
+	lower_xf.basis = Basis(axis, bend) * lower_xf.basis
+	_skeleton.set_bone_global_pose(lower,
+		_skeleton.get_bone_global_pose(lower).interpolate_with(lower_xf, w))
+	var foot := int(link.get("foot", -1))
+	if foot >= 0:
+		var foot_xf: Transform3D = lower_xf * (link["foot_rest"] as Transform3D)
+		_skeleton.set_bone_global_pose(foot,
+			_skeleton.get_bone_global_pose(foot).interpolate_with(foot_xf, w))
+
+
+## Рука от кода — через кисть (IK из двух костей): часть задаёт направление, кисть ставится на
+## расстоянии reach от плеча по этому направлению, а плечо и предплечье сгибаются в локте, чтобы
+## до неё дотянуться. Локоть смотрит вниз-наружу-назад, как у человека.
+func _reach_arm(part_name: String, link: Dictionary, part: Node3D, w: float,
+		skel_inv: Transform3D) -> void:
+	var bone := int(link["bone"])
+	var lower := int(link["lower"])
+	var side := 1.0 if part_name == "ArmR" else -1.0
+	var reach := float(arm_reach.get(part_name, DEFAULT_REACH))
+	var aim: Vector3 = arm_target.get(part_name, Vector3.INF)
+	var target := skel_inv * (part.global_transform * Vector3(0, -reach, 0))
+	if aim.is_finite():
+		target = skel_inv * (_model_node.global_transform * aim)
+	var pole := skel_inv.basis * (_model_basis() * Vector3(side, -0.7, 0.45))
+	var upper_xf := _skeleton.get_bone_global_pose(bone)
+	var shoulder := upper_xf.origin
+	var a := float(link["upper_skel"])
+	var b := float(link["fore_skel"])
+	var to_t := target - shoulder
+	var d := clampf(to_t.length(), absf(a - b) + 0.001, a + b - 0.001)
+	var dir := to_t.normalized()
+	var cos_a := clampf((a * a + d * d - b * b) / (2.0 * a * d), -1.0, 1.0)
+	var bend_dir := (pole - dir * pole.dot(dir)).normalized()
+	var elbow := shoulder + (dir * cos_a + bend_dir * sqrt(1.0 - cos_a * cos_a)) * a
+	var hand := shoulder + dir * d
+	# Кости поворачиваем так, чтобы их ось (Y) смотрела на локоть / на кисть; крутка — как у части.
+	var proc_xf := skel_inv * part.global_transform * (link["offset"] as Transform3D)
+	var up_basis := _aim(proc_xf.basis, elbow - shoulder)
+	var ik_upper := Transform3D(up_basis, shoulder)
+	_skeleton.set_bone_global_pose(bone, upper_xf.interpolate_with(ik_upper, w))
+	(frames[part_name] as Node3D).transform = _to_model * _skeleton.get_bone_global_pose(bone) \
+		* (link["offset"] as Transform3D).affine_inverse()
+	var fore := ik_upper * (link["lower_rest"] as Transform3D)
+	fore = Transform3D(_aim(fore.basis, hand - elbow), elbow)
+	_skeleton.set_bone_global_pose(lower,
+		_skeleton.get_bone_global_pose(lower).interpolate_with(fore, w))
+
+
+## Рамка кисти: ориентация — как у части (предметы стоят в кулаке так же, как раньше), а точка
+## «в руке» — там, где сейчас кулак (от кода — цель IK, в анимации — кулак анимации).
+func _place_hand(part_name: String, link: Dictionary, part: Node3D, w: float) -> void:
+	var fist := int(link["fist"])
+	var fist_xf := _skeleton.get_bone_global_pose(fist)
+	var fist_model := _to_model * (fist_xf.origin + fist_xf.basis.y * float(link["fist_half"]))
+	var model_inv := _model_node.global_transform.affine_inverse()
+	var arm_basis := (frames[part_name] as Node3D).transform.basis
+	var part_basis := (model_inv * part.global_transform).basis
+	var basis := part_basis if w > 0.5 else arm_basis
+	var hand := hands[part_name] as Node3D
+	var b := basis.orthonormalized()
+	hand.transform = Transform3D(b, fist_model - b * HAND_POINT)
+
+
+func _model_basis() -> Basis:
+	return _model_node.global_basis.orthonormalized()
+
+
+## Повернуть basis так, чтобы его ось Y смотрела вдоль along (кратчайшим поворотом).
+static func _aim(basis: Basis, along: Vector3) -> Basis:
+	var y := basis.y.normalized()
+	var to := along.normalized()
+	if y.dot(to) > 0.99999:
+		return basis
+	return Basis(Quaternion(y, to)) * basis
 
 
 ## Прыжок делает физика: подъём корня тела из анимации убираем (вместе со ступнями) — сдвигом
@@ -256,6 +344,20 @@ func _make_part(model: Node3D, parent: Node3D, part_name: String) -> Node3D:
 		var lower_rest := _skeleton.get_bone_global_rest(lower)
 		link["lower"] = lower
 		link["lower_rest"] = rest.affine_inverse() * lower_rest
+		if part_name.begins_with("Arm"):
+			# Длины для IK (в единицах скелета): плечо и предплечье до середины кулака.
+			var fist := _find_bone("Fist." + part_name.substr(3))
+			var fist_rest := _skeleton.get_bone_global_rest(fist)
+			var fist_len := 0.15 / _to_model.basis.get_scale().x
+			link["fist"] = fist
+			link["fist_half"] = fist_len * 0.5
+			link["upper_skel"] = (lower_rest.origin - rest.origin).length()
+			link["fore_skel"] = (fist_rest.origin - lower_rest.origin).length() + fist_len * 0.5
+			var hand := Node3D.new()
+			hand.name = part_name + "Hand"
+			model.add_child(hand)
+			hand.transform = bind_model
+			hands[part_name] = hand
 		var foot := _find_bone(String(FEET.get(part_name, "")))
 		if foot >= 0:
 			link["foot"] = foot

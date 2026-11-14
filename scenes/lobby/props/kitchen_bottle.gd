@@ -12,6 +12,8 @@ const MODEL := preload("res://assets/models/kitchen/kitchen_bottle.glb")
 const FLOOR_LIFE := 7.0
 ## Где бутылку сжимает кулак (над дном).
 const GRIP := 0.12
+## Куда тянется кулак с бутылкой, когда пьёт (координаты модели персонажа): перед ртом.
+const MOUTH_HAND := Vector3(0.06, 1.1, -0.32)
 
 var state := State.HOME
 var holder: PlayerData
@@ -83,7 +85,8 @@ func drink(character: PlayerCharacter, view: Node3D, done: Callable) -> void:
 	if drinking:
 		return
 	drinking = true
-	character.set_arm_pose(0.5, 2.15, 0.3)
+	# Кулак с бутылкой — перед ртом (у модели со скелетом локоть гнётся сам).
+	character.set_arm_pose(0.5, 2.15, 0.3, CharacterRig.DEFAULT_REACH, MOUTH_HAND)
 	var tween := create_tween()
 	# Поднести ко рту, запрокинуть.
 	tween.tween_property(self, "_tilt", -1.3, 0.3).set_trans(Tween.TRANS_SINE)
