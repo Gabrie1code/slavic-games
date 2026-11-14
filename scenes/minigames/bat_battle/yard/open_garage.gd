@@ -47,8 +47,9 @@ func _build_room() -> void:
 	var front := SIZE.z / 2.0 - 0.2
 	var back := front - ROOM_DEPTH
 	var inner := SIZE.x - 0.4
-	_box(Vector3(inner, 0.04, ROOM_DEPTH),
-		Vector3(0, 0.02, (front + back) / 2.0), _mat(Color(0.46, 0.45, 0.42), 0.95))
+	# Пол до самого порога: под проёмом ворот (толщина стены) иначе виднелась трава.
+	_box(Vector3(inner, 0.04, ROOM_DEPTH + 0.2),
+		Vector3(0, 0.02, (front + back) / 2.0 + 0.1), _mat(Color(0.46, 0.45, 0.42), 0.95))
 	_box(Vector3(1.2, 0.01, 0.7),
 		Vector3(-0.1, 0.045, front - 2.4), _mat(Color(0.2, 0.2, 0.2), 0.4)) # масло
 	_box(Vector3(inner, SIZE.y - 0.2, 0.1),

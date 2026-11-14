@@ -28,7 +28,8 @@ def fit_font(draw, lines, max_w, max_h, start=260):
     return ImageFont.truetype(FONT, size)
 
 
-def graffiti(name, text, fill, outline=(15, 12, 12), tilt=-4):
+def graffiti(name, text, fill, outline=(15, 12, 12), tilt=-4, accent=None):
+    """accent — (слово, цвет): это слово перекрашивается (например, «ПРОДАМ» красным)."""
     w, h = 1024, 512
     lines = text.split("\n")
     probe = ImageDraw.Draw(Image.new("RGBA", (w, h)))
@@ -48,6 +49,11 @@ def graffiti(name, text, fill, outline=(15, 12, 12), tilt=-4):
         y = top + i * line_h
         d.text((w / 2, y), line, font=font, fill=fill + (255,), anchor="mm",
                stroke_width=int(font.size * 0.09), stroke_fill=outline + (255,))
+        if accent and accent[0] in line:
+            left = w / 2 - d.textlength(line, font=font) / 2
+            x = left + d.textlength(line[:line.index(accent[0])], font=font)
+            d.text((x, y), accent[0], font=font, fill=accent[1] + (255,), anchor="lm",
+                   stroke_width=int(font.size * 0.09), stroke_fill=outline + (255,))
     # Подтёки краски вниз от букв.
     bbox = art.getbbox()
     if bbox:
@@ -93,7 +99,7 @@ graffiti("graffiti_tsoi", "ЦОЙ ЖИВ", (240, 240, 235), tilt=-5)
 graffiti("graffiti_spartak", "СПАРТАК —\nЧЕМПИОН", (220, 40, 40), tilt=3)
 graffiti("graffiti_vasya", "Здесь был\nВася", (70, 150, 255), tilt=-3)
 graffiti("graffiti_kino", "КИНО", (255, 210, 40), tilt=6)
-graffiti("graffiti_sale", "ПРОДАМ ГАРАЖ\nт. 2-15-48", (245, 245, 240), tilt=-2)
+graffiti("graffiti_sale", "ПРОДАМ ГАРАЖ\nт. 2-15-48", (245, 245, 240), tilt=-2, accent=("ПРОДАМ", (225, 35, 35)))
 for n in (17, 18, 21, 23):
     plate(n)
 print("DONE")
