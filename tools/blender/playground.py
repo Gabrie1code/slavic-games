@@ -209,12 +209,12 @@ for o in (cap, under):
     o.location = (MX, MY, 0)
     bpy.context.view_layer.update()
 P += [cap, under]
-for k in range(8):
-    a = k * math.tau / 8
-    for (r0, z0), (r1, z1) in zip(cap_top[1:], cap_top[2:]):
-        P.append(rod((MX + math.cos(a) * r0, MY + math.sin(a) * r0, z0 - 0.045),
-                     (MX + math.cos(a) * r1, MY + math.sin(a) * r1, z1 - 0.045), 0.012, WOOD, verts=5))
-    P.append(rod((MX, MY, 2.08), (MX + math.cos(a) * 0.25, MY + math.sin(a) * 0.25, 2.455), 0.012, WOOD, verts=5))
+for k in range(8):                                                          # спицы — в цвет шляпки,
+    a = k * math.tau / 8                                                    # не доходят до края
+    for (r0, z0), (r1, z1) in zip(cap_top[1:-1], cap_top[2:-1]):
+        P.append(rod((MX + math.cos(a) * r0, MY + math.sin(a) * r0, z0 - 0.042),
+                     (MX + math.cos(a) * r1, MY + math.sin(a) * r1, z1 - 0.042), 0.01, CAP, verts=5))
+    P.append(rod((MX, MY, 2.08), (MX + math.cos(a) * 0.25, MY + math.sin(a) * 0.25, 2.458), 0.01, CAP, verts=5))
 P.append(cyl(0.075, 0.04, (MX, MY, 2.08), WOOD, verts=14))                 # шляпка садится на ножку
 
 
@@ -245,37 +245,70 @@ TOY_RED = mat("ToyRed", (0.78, 0.14, 0.12), 0.45)
 TOY_BLUE = mat("ToyBlue", (0.2, 0.42, 0.8), 0.45)
 TOY_YELLOW = mat("ToyYellow", (0.95, 0.78, 0.2), 0.45)
 WET_SAND = mat("SandCake", (0.78, 0.66, 0.44), 1.0)
-bx, by = 0.6, 0.4                                                           # ведёрко (наклонное дно)
-bz = sand_h(bx, by)
-P.append(lathe_mesh([(0.0, bz), (0.09, bz), (0.125, bz + 0.2), (0.135, bz + 0.21), (0.135, bz + 0.225),
-                     (0.122, bz + 0.225), (0.112, bz + 0.03), (0.0, bz + 0.03)], TOY_RED, n=20))
-bpy.ops.mesh.primitive_torus_add(major_radius=0.13, minor_radius=0.006, major_segments=20, minor_segments=5,
-                                 location=(bx, by, bz + 0.21), rotation=(math.pi / 2, 0, 0.4))
-bpy.ops.object.transform_apply(rotation=True)
-handle = flat(bpy.context.object, TOY_YELLOW)
-bm = bmesh.new(); bm.from_mesh(handle.data)
-bmesh.ops.delete(bm, geom=[v for v in bm.verts if v.co.z < -0.005], context="VERTS")
-bm.to_mesh(handle.data); bm.free()
-P.append(handle)
-P[-2].location = (bx, by, 0)
-# Лопатка: черенок с ручкой-перекладиной и вогнутый совок, лежит наискосок.
+bx, by = 0.6, 0.4                                                           # ведёрко
+bz = sand_h(bx, by) - 0.01
+bucket = lathe_mesh([(0.0, 0.0), (0.09, 0.0), (0.125, 0.2), (0.135, 0.21), (0.135, 0.225),
+                     (0.122, 0.225), (0.112, 0.03), (0.0, 0.03)], TOY_RED, n=24)
+bucket.location = (bx, by, bz)
+P.append(bucket)
+fill = lathe_mesh([(0.0, 0.03), (0.1, 0.03), (0.105, 0.09), (0.0, 0.092)], WET_SAND, n=24)   # песок на 2/5
+fill.location = (bx, by, bz)
+P.append(fill)
+HA = 0.4                                                                    # дужка: «ушки» на бортике
+for sgn in (-1, 1):
+    ex, ey = bx + sgn * math.cos(HA) * 0.142, by + sgn * math.sin(HA) * 0.142
+    P.append(cyl(0.018, 0.04, (ex, ey, bz + 0.19), TOY_RED, verts=10,
+                 rot=(math.pi / 2, 0, HA + math.pi / 2)))
+pts = []
+for k in range(15):                                                         # дужка — дуга над ведром
+    t = math.pi * k / 14
+    r = 0.15
+    pts.append((bx + math.cos(HA) * math.cos(t) * r, by + math.sin(HA) * math.cos(t) * r,
+                bz + 0.19 + math.sin(t) * 0.17))
+for a_, b_ in zip(pts, pts[1:]):
+    P.append(rod(a_, b_, 0.006, TOY_YELLOW, verts=6))
+# Лопатка: лежит НА песке — каждая точка поднята над самой высокой точкой песка под ней.
+
+
+def above_sand(x, y, r):
+    return max(sand_h(x + dx, y + dy) for dx in (-r, 0, r) for dy in (-r, 0, r)) + 0.014
+
+
 sx, sy = -0.4, -0.2
-sz = sand_h(sx, sy) + 0.015
-P.append(rod((sx - 0.18, sy - 0.14, sz), (sx + 0.06, sy + 0.05, sz), 0.012, TOY_BLUE, verts=8))
-P.append(rod((sx - 0.22, sy - 0.1, sz), (sx - 0.14, sy - 0.18, sz), 0.014, TOY_BLUE, verts=8))
+p0, p1 = (sx - 0.18, sy - 0.14), (sx + 0.06, sy + 0.05)
+P.append(rod((*p0, above_sand(*p0, 0.02)), (*p1, above_sand(*p1, 0.02)), 0.012, TOY_BLUE, verts=8))
+g0, g1 = (sx - 0.22, sy - 0.1), (sx - 0.14, sy - 0.18)
+P.append(rod((*g0, above_sand(*g0, 0.02)), (*g1, above_sand(*g1, 0.02)), 0.014, TOY_BLUE, verts=8))
 scoop = lathe_mesh([(0.0, 0.0), (0.06, 0.006), (0.075, 0.025)], TOY_BLUE, n=14)
 scoop.scale = (1.0, 1.3, 1.0)
 scoop.rotation_euler = (0, 0, math.atan2(0.19, 0.24) - math.pi / 2)
-scoop.location = (sx + 0.13, sy + 0.1, sz - 0.012)
+c = (sx + 0.13, sy + 0.1)
+scoop.location = (*c, above_sand(*c, 0.09) - 0.012)
 P.append(scoop)
-# Формочки и куличики: формочка-«звезда» вверх дном и два ребристых куличика.
-fx, fy = 0.1, 0.6
-P.append(lathe_mesh([(0.0, 0.0), (0.09, 0.0), (0.075, 0.07), (0.0, 0.07)], TOY_YELLOW, n=10))
-P[-1].location = (fx, fy, sand_h(fx, fy))
-for cx, cy, h in ((0.35, 0.5, 0.06), (0.32, 0.75, 0.05)):
-    cake = lathe_mesh([(0.0, 0.0), (0.075, 0.0), (0.06, h), (0.0, h)], WET_SAND, n=16)
-    cake.location = (cx, cy, sand_h(cx, cy))
-    P.append(cake)
+# Формочка-«башенка» (жёлтая, вверх дном) и песочный замок: стена с зубцами и две башенки.
+fx, fy = 0.05, 0.62
+P.append(lathe_mesh([(0.0, 0.0), (0.09, 0.0), (0.075, 0.07), (0.0, 0.07)], TOY_YELLOW, n=12))
+P[-1].location = (fx, fy, sand_h(fx, fy) - 0.005)
+
+
+def battlements(cx, cy, z, r, n, m):
+    P.append(cyl(r + 0.008, 0.012, (cx, cy, z + 0.006), m, verts=12))       # венец башенки
+    for k in range(n):
+        a = k * math.tau / n
+        P.append(box((0.02, 0.026, 0.026), (cx + math.cos(a) * r, cy + math.sin(a) * r, z + 0.025), m,
+                     rot=(0, 0, a)))
+
+
+kx, ky = 0.38, 0.6                                                          # замок
+kz = sand_h(kx, ky) - 0.01
+P.append(box((0.26, 0.08, 0.08), (kx, ky, kz + 0.04), WET_SAND))             # стена
+for k in range(5):
+    P.append(box((0.03, 0.08, 0.03), (kx - 0.1 + k * 0.05, ky, kz + 0.095), WET_SAND))
+for tx, h in ((kx - 0.14, 0.16), (kx + 0.14, 0.13)):                        # башенки
+    P.append(lathe_mesh([(0.0, 0.0), (0.06, 0.0), (0.05, h), (0.0, h)], WET_SAND, n=12))
+    P[-1].location = (tx, ky, kz)
+    battlements(tx, ky, kz + h, 0.042, 8, WET_SAND)
+P.append(box((0.04, 0.012, 0.05), (kx, ky - 0.041, kz + 0.025), mat("SandDoor", (0.5, 0.4, 0.26), 1.0)))
 bpy.context.view_layer.update()
 export("sandbox", [join("Sandbox", P)])
 
