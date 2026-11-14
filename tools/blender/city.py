@@ -555,13 +555,77 @@ B.cyl(5.4, 1.2, (0, 0, 28.3), ROOF, n=16, r2=0.5)
 export("water_tower", B)
 
 
+# ---------------- 8. Башенный кран, как на стройках 80–90-х (горизонт) ----------------
+# Решётчатая мачта и стрела выцветшей жёлто-оранжевой краской, красно-белые полосы на оголовке и
+# конце стрелы, бетонные плиты-противовесы, кабина крановщика, тележка с крюком, тяги к стреле.
+CRANE = mat("CCraneSoviet", (0.88, 0.6, 0.14), 0.7, 0.15)
+CRANE_RED = mat("CCraneRed", (0.72, 0.12, 0.08), 0.6)
+CAB = mat("CCraneCab", (0.82, 0.84, 0.86), 0.6)
+
+
+def beam(B, a, b, r, m):
+    """Балка (квадратного сечения 2r) от точки a до точки b."""
+    a, b = Vector(a), Vector(b)
+    d = b - a
+    B.box((r * 2, r * 2, d.length), tuple((a + b) / 2), m, rot=tuple(d.to_track_quat("Z", "Y").to_euler()))
+
+
+B = Builder()
+MH, M = 46.0, 1.0                                                         # высота мачты, полуширина
+B.box((7, 7, 1.4), (0, 0, 0.7), CONCRETE)                                  # балластная база
+for x in (-3.0, 3.0):
+    B.box((0.3, 9, 0.25), (x, 0, 0.12), RAIL)                              # рельсы
+corners = [(-M, -M), (M, -M), (M, M), (-M, M)]
+for cx, cy in corners:
+    beam(B, (cx, cy, 1.4), (cx, cy, MH), 0.09, CRANE)
+z = 1.4
+step = 2.6
+while z + step <= MH:                                                     # раскосы зигзагом по граням
+    for k in range(4):
+        (x0, y0), (x1, y1) = corners[k], corners[(k + 1) % 4]
+        beam(B, (x0, y0, z), (x1, y1, z + step), 0.05, CRANE)
+        beam(B, (x0, y0, z), (x1, y1, z), 0.04, CRANE)
+    z += step
+B.box((3.2, 3.2, 0.6), (0, 0, MH + 0.3), CRANE)                          # поворотная платформа
+B.box((2.2, 2.0, 2.2), (2.2, -1.6, MH - 0.6), CAB)                         # кабина
+B.box((2.0, 0.05, 1.0), (2.2, -2.62, MH - 0.3), DARK)
+HEAD = MH + 8.0                                                           # оголовок (А-рама)
+for cy in (-0.8, 0.8):
+    beam(B, (-0.8, cy, MH + 0.6), (0, 0, HEAD), 0.08, CRANE)
+    beam(B, (0.8, cy, MH + 0.6), (0, 0, HEAD), 0.08, CRANE)
+for k in range(4):                                                        # полосы на оголовке
+    B.box((0.5, 0.5, 0.6), (0, 0, HEAD - 0.3 - k * 0.6), CRANE_RED if k % 2 == 0 else WHITE)
+JL, JZ = 38.0, MH + 0.9                                                   # стрела
+x = 1.6
+while x < JL:
+    nx = min(JL, x + 2.4)
+    for cy in (-0.7, 0.7):
+        beam(B, (x, cy, JZ), (nx, cy, JZ), 0.07, CRANE)
+        beam(B, (x, cy, JZ), ((x + nx) / 2, 0, JZ + 1.4), 0.04, CRANE)
+        beam(B, ((x + nx) / 2, 0, JZ + 1.4), (nx, cy, JZ), 0.04, CRANE)
+    beam(B, ((x + nx) / 2, 0, JZ + 1.4), (min(JL, nx + 1.2), 0, JZ + 1.4), 0.06, CRANE)
+    x = nx
+for k in range(3):                                                        # красно-белый конец стрелы
+    B.box((0.8, 1.6, 0.3), (JL - 0.4 - k * 0.8, 0, JZ), CRANE_RED if k % 2 == 0 else WHITE)
+for cy in (-0.7, 0.7):                                                    # противовесная консоль
+    beam(B, (-1.6, cy, JZ), (-13, cy, JZ), 0.08, CRANE)
+for k in range(4):
+    B.box((1.0, 2.2, 2.0), (-10.5 - k * 0.8, 0, JZ - 1.0), CONCRETE)       # плиты-противовесы
+for end in ((JL * 0.7, 0, JZ + 1.4), (-12.5, 0, JZ)):                     # тяги от оголовка
+    beam(B, (0, 0, HEAD), end, 0.035, DARK)
+TX = 22.0                                                                 # тележка и крюк
+B.box((1.6, 1.6, 0.5), (TX, 0, JZ - 0.3), DARK)
+beam(B, (TX, 0, JZ - 0.5), (TX, 0, JZ - 14), 0.03, DARK)
+B.box((0.8, 0.5, 1.0), (TX, 0, JZ - 14.5), CRANE_RED)
+export("tower_crane", B)
+
 if not RENDER:
     sys.exit(0)
 
 # ---------------- Превью ----------------
 spots = {"brick_khrushchevka": (-30, 0), "panel_ninestory": (0, 4), "stalinka": (31, 0),
          "tower_block": (-48, 22), "garage_row": (-22, -18), "transformer_box": (-8, -16),
-         "tec_chimney": (55, 60), "water_tower": (20, 40)}
+         "tec_chimney": (55, 60), "water_tower": (20, 40), "tower_crane": (-10, 50)}
 for o in MADE:
     o.location = (*spots[o.name], 0)
 bpy.ops.mesh.primitive_plane_add(size=400)

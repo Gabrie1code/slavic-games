@@ -33,6 +33,7 @@ func start(world_env: WorldEnvironment, sun: DirectionalLight3D, yard: FreezeYar
 	_sun.light_color = Color(0.78, 0.82, 0.92)
 	_sun_energy = _sun.light_energy
 	yard.tint_clouds(CLOUD_RAIN)
+	yard.smoke.tint = Color(0.55, 0.56, 0.6)
 	_build_drops()
 	_build_puddles()
 	_next_flash = randf_range(LIGHTNING_GAP.x * 0.5, LIGHTNING_GAP.y * 0.5)

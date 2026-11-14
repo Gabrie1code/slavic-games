@@ -1,7 +1,7 @@
 class_name FreezeYard
 extends Node3D
 ## Двор 90-х для «Морожки»: разные дома вокруг на все 360° (хрущёвки, девятиэтажка, сталинка,
-## башни, гаражи; вдали труба ТЭЦ, водокачка), забор, лавочки, открытая песочница
+## башни, гаражи; вдали труба ТЭЦ с дымом, водокачка, краны), забор, лавочки, открытая песочница
 ## с «грибком», деревья, фонари и площадка — горка, качели, карусель (см. их скрипты),
 ## у краёв — шведская стенка, «глобус» и дуга-лесенка (препятствия); облака разных видов;
 ## тропинки и тротуары вокруг (YardPaths).
@@ -17,7 +17,8 @@ const S := 1.5
 const SANDBOX := Vector3(-5.0, 0, -2.5) * S
 
 ## Дома вокруг двора на все 360° (разные, tools/blender/city.py) и дальний горизонт: башни,
-## труба ТЭЦ, водонапорная башня. Только декорации (без столкновений, за забором).
+## труба ТЭЦ (с дымом — ChimneySmoke), водонапорная башня, башенные краны.
+## Только декорации (без столкновений, за забором).
 const SURROUNDINGS: Array = [
 	# Близкий круг: лицом к площадке.
 	["khrushchevka", Vector3(0, 0, -26.25), 0.0],
@@ -39,7 +40,10 @@ const SURROUNDINGS: Array = [
 	["panel_ninestory", Vector3(95, 0, 5), -PI / 2],
 	["stalinka", Vector3(60, 0, -75), -0.4],
 	["khrushchevka", Vector3(-55, 0, -80), 0.3],
-	["tec_chimney", Vector3(140, 0, -120), 0.6],
+	# Труба ТЭЦ и краны — в просветах между ближними домами (иначе их закрывают дома).
+	["tec_chimney", Vector3(-111, 0, 100), 0.6],
+	["tower_crane", Vector3(105, 0, 34), 2.4],
+	["tower_crane", Vector3(-104, 0, 62), -0.9],
 	["water_tower", Vector3(-120, 0, -10), 0.0],
 ]
 const EXTRA_TREES: Array[Vector3] = [
@@ -65,12 +69,17 @@ var benches: Array[Transform3D] = []
 var slide: PlaygroundSlide
 var swing: PlaygroundSwing
 var carousel: PlaygroundCarousel
+## Дым из трубы ТЭЦ (в дождь RainWeather делает его темнее).
+var smoke: ChimneySmoke
 var _clouds: Node3D
 
 
 func _ready() -> void:
 	_build_surroundings()
 	_build_clouds()
+	smoke = ChimneySmoke.new()
+	smoke.position = Vector3(-111, 61, 100) # верх трубы ТЭЦ (см. SURROUNDINGS)
+	add_child(smoke)
 	var paths := YardPaths.new()
 	add_child(paths)
 	paths.build(SURROUNDINGS)

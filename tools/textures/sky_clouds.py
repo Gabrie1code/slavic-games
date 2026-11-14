@@ -3,7 +3,8 @@
   cloud_cumulus_b.png — кучевое пониже и пошире, из нескольких шапок;
   cloud_cirrus.png    — перистые полосы-«хвосты» (высоко);
   cloud_stratus.png   — длинное слоистое облако-пелена;
-  cloud_tower.png     — высокое грозовое облако-«башня» с плоской вершиной.
+  cloud_tower.png     — высокое грозовое облако-«башня» с плоской вершиной;
+  smoke_puff.png      — клуб дыма из трубы ТЭЦ (серо-белый, мягкий; в игре растёт и тает).
 Запуск (Python с Pillow):
     python3 tools/textures/sky_clouds.py assets/textures/sky
 """
@@ -84,3 +85,14 @@ items += [(256 + k * 60 - 150, 85 + random.uniform(-8, 8), 70, 30) for k in rang
 for k in range(5):                                                                      # шапки у основания
     items.append((256 + (k - 2) * 55, 385 + random.uniform(-10, 5), 60, 40))
 save(blobs(512, 448, items, 7), "cloud_tower")
+
+random.seed(10)
+items = [(128 + random.uniform(-45, 45), 128 + random.uniform(-40, 40), random.uniform(38, 60),
+          random.uniform(34, 52)) for _ in range(9)]
+img = blobs(256, 256, items, 10)
+px = img.load()
+for y in range(256):                                                  # дым серее облаков
+    for x in range(256):
+        r, g, b, a = px[x, y]
+        px[x, y] = (int(r * 0.88), int(g * 0.88), int(b * 0.9), int(a * 0.9))
+save(img, "smoke_puff")
