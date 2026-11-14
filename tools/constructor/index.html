@@ -5,14 +5,14 @@
 <style>
 /* Мастерская игрушек: слева верстак с ползунками, справа подиум с фигуркой. */
 :root {
-  --bg: #e7e9ef;          /* стена мастерской */
-  --panel: #f6f7fa;       /* верстак */
+  --bg: #e7e9ef;
+  --panel: #f6f7fa;
   --ink: #23262f;
   --muted: #6a7080;
   --line: #d3d7e0;
-  --accent: #d6402f;      /* красный фигурки */
+  --accent: #d6402f;
   --accent-ink: #ffffff;
-  --stage: #cfd4de;       /* фон подиума */
+  --stage: #cfd4de;
   --ok: #2f8a57;
   --font-display: "Unbounded", "Manrope", system-ui, sans-serif;
   --font-body: "Manrope", system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -34,7 +34,7 @@ body {
   padding-right: max(16px, env(safe-area-inset-right, 0px));
   padding-block: 16px; box-sizing: border-box;
 }
-.app { display: grid; grid-template-columns: minmax(280px, 360px) 1fr; gap: 16px; height: 100%; min-height: 560px; }
+.app { display: grid; grid-template-columns: minmax(290px, 370px) 1fr; gap: 16px; height: 100%; min-height: 600px; }
 .side { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; display: flex; flex-direction: column; min-height: 0; min-width: 0; }
 .side header { padding: 16px 18px 10px; border-bottom: 1px solid var(--line); }
 h1 { font-family: var(--font-display); font-size: 18px; font-weight: 700; margin: 0 0 4px; letter-spacing: 0.01em; text-wrap: balance; }
@@ -42,20 +42,24 @@ h1 { font-family: var(--font-display); font-size: 18px; font-weight: 700; margin
 .controls { overflow-y: auto; padding: 6px 18px 18px; flex: 1; min-height: 0; }
 details { border-bottom: 1px solid var(--line); padding: 10px 0; }
 summary { cursor: pointer; font-weight: 700; font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); list-style: none; display: flex; justify-content: space-between; }
+summary::-webkit-details-marker { display: none; }
 summary::after { content: "+"; font-weight: 600; }
 details[open] summary::after { content: "−"; }
+details.featured summary { color: var(--accent); }
 summary:focus-visible, button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .row { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; margin-top: 10px; align-items: center; }
 .row label { font-weight: 600; }
 .row output { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 12px; min-width: 4.5em; text-align: right; }
 .row input[type=range] { grid-column: 1 / -1; width: 100%; accent-color: var(--accent); }
-.swatches { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
-.swatch { width: 30px; height: 30px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; padding: 0; }
+.note { color: var(--muted); font-size: 12px; line-height: 1.4; margin: 8px 0 0; }
+.swlabel { font-weight: 600; margin-top: 12px; }
+.swatches { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.swatch { width: 30px; height: 30px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; padding: 0; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.12); }
 .swatch[aria-pressed="true"] { border-color: var(--ink); }
 .stagewrap { display: flex; flex-direction: column; gap: 12px; min-height: 0; min-width: 0; }
-.stage { position: relative; flex: 1; min-height: 360px; background: var(--stage); border-radius: 14px; overflow: hidden; border: 1px solid var(--line); }
+.stage { position: relative; flex: 1; min-height: 380px; background: var(--stage); border-radius: 14px; overflow: hidden; border: 1px solid var(--line); }
 .stage canvas { display: block; width: 100%; height: 100%; touch-action: none; }
-.hint { position: absolute; left: 12px; bottom: 10px; color: var(--muted); font-size: 12px; pointer-events: none; }
+.hint { position: absolute; left: 12px; bottom: 10px; right: 12px; color: var(--muted); font-size: 12px; pointer-events: none; display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
 .poses { position: absolute; top: 10px; left: 10px; right: 10px; display: flex; flex-wrap: wrap; gap: 6px; }
 .chip { font: 600 13px var(--font-body); border: 1px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 999px; padding: 6px 12px; cursor: pointer; }
 .chip[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
@@ -73,11 +77,9 @@ summary:focus-visible, button:focus-visible, input:focus-visible { outline: 2px 
 .empty { color: var(--muted); font-size: 13px; }
 @media (max-width: 760px) {
   .app { grid-template-columns: 1fr; height: auto; }
-  .stage { min-height: 420px; }
+  .stage { min-height: 440px; }
   .side { order: 2; }
-  .controls { max-height: none; }
 }
-@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto; } }
 </style>
 
 <div class="app">
@@ -91,7 +93,7 @@ summary:focus-visible, button:focus-visible, input:focus-visible { outline: 2px 
   <section class="stagewrap">
     <div class="stage" id="stage">
       <div class="poses" id="poses" role="group" aria-label="Поза"></div>
-      <div class="hint">Размеры — в сантиметрах игры</div>
+      <div class="hint"><span>Размеры — в сантиметрах игры</span><span id="modeNote"></span></div>
     </div>
     <div class="bar">
       <input type="text" id="name" maxlength="40" placeholder="Название варианта, например «Коренастый»" aria-label="Название варианта">
@@ -108,58 +110,87 @@ summary:focus-visible, button:focus-visible, input:focus-visible { outline: 2px 
 <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/geometries/RoundedBoxGeometry.js"></script>
 <script>
-// ---------- Параметры (единицы — метры игры; на экране — сантиметры) ----------
+// ======================= Параметры =======================
+// [ключ, подпись, мин, макс, по умолчанию, единица]: "" — сантиметры, "%" — доля, "x" — множитель, "°" — градусы.
 const GROUPS = [
+  ["Соединения", [
+    ["blend", "Гладкость соединений", 0, 1, 0.0, "%"],
+    ["quality", "Подробность цельной сетки", 0, 1, 0.5, "%"],
+  ], "featured", "0% — фигурка из отдельных деталей. Чем больше, тем сильнее детали сливаются; 100% — цельная, как отлитая из пластилина."],
   ["Голова", [
     ["headW", "Ширина", 0.30, 0.60, 0.46], ["headH", "Высота", 0.30, 0.60, 0.45],
     ["headD", "Глубина", 0.28, 0.55, 0.42], ["headRound", "Скругление углов", 0.05, 0.5, 0.32, "%"],
+    ["headTaper", "Сужение к подбородку", 0.6, 1.0, 0.9, "%"], ["headScale", "Общий размер", 0.75, 1.3, 1.0, "x"],
+    ["headForward", "Сдвиг вперёд", -0.06, 0.08, 0.0], ["headTilt", "Наклон вперёд", -20, 25, 0, "°"],
+    ["headLift", "Посадка (выше / ниже)", -0.05, 0.08, 0.0],
   ]],
   ["Глаза", [
     ["eyeSize", "Размер", 0.5, 1.8, 1.0, "x"], ["eyeGap", "Расстояние между", 0.04, 0.16, 0.085],
     ["eyeY", "Высота на лице", 0.10, 0.36, 0.25], ["pupil", "Зрачок", 0.3, 0.9, 0.55, "%"],
+    ["eyeTall", "Вытянутость вверх", 0.7, 1.8, 1.2, "x"], ["eyeTilt", "Наклон (грустные / злые)", -30, 30, 0, "°"],
+    ["eyeBulge", "Выпуклость", 0.2, 1.0, 0.42, "%"], ["lookX", "Взгляд влево / вправо", -1, 1, 0, "%"],
+    ["lookY", "Взгляд вверх / вниз", -1, 1, -0.15, "%"],
   ]],
   ["Шея и плечи", [
     ["neckLen", "Длина шеи", 0.0, 0.14, 0.05], ["neckR", "Толщина шеи", 0.04, 0.11, 0.062],
     ["shoulderW", "Ширина плеч", 0.15, 0.30, 0.205], ["shoulderDrop", "Опущенность плеч", 0.0, 0.10, 0.03],
+    ["neckTilt", "Наклон шеи вперёд", -10, 30, 4, "°"], ["neckBase", "Ширина основания шеи", 1.0, 2.2, 1.4, "x"],
+    ["shoulderBall", "Округлость плеча", 0.8, 1.6, 1.05, "x"], ["shoulderFwd", "Плечи вперёд / назад", -0.05, 0.05, 0.0],
   ]],
   ["Корпус", [
     ["torsoLen", "Длина", 0.32, 0.62, 0.47], ["chestW", "Ширина груди", 0.13, 0.28, 0.20],
     ["waistW", "Ширина талии", 0.12, 0.28, 0.176], ["hipW", "Ширина таза", 0.12, 0.28, 0.18],
     ["torsoDepth", "Толщина (спереди назад)", 0.45, 0.95, 0.68, "%"],
+    ["belly", "Живот", 0, 1, 0.0, "%"], ["chestOut", "Грудь вперёд", 0, 1, 0.0, "%"],
+    ["bottom", "Попа", 0, 1, 0.25, "%"], ["slouch", "Сутулость", -10, 25, 0, "°"],
+    ["waistPos", "Высота талии", 0.2, 0.55, 0.35, "%"],
   ]],
   ["Руки", [
     ["upperArm", "Плечо (до локтя)", 0.12, 0.32, 0.20], ["forearm", "Предплечье", 0.12, 0.32, 0.20],
     ["armR", "Толщина", 0.035, 0.09, 0.062], ["handSize", "Кисть", 0.6, 1.6, 1.0, "x"],
+    ["armTaper", "Сужение к кисти", 0.6, 1.1, 0.85, "%"], ["armSpread", "Отвести в стороны", -5, 30, 4, "°"],
+    ["elbowRest", "Сгиб локтя в покое", 0, 45, 12, "°"], ["thumb", "Большой палец", 0.5, 1.6, 1.0, "x"],
+    ["handFlat", "Ладонь плоская / круглая", 0.55, 1.1, 0.78, "%"],
   ]],
   ["Ноги", [
     ["thigh", "Бедро", 0.14, 0.38, 0.26], ["shin", "Голень", 0.12, 0.36, 0.23],
     ["legR", "Толщина", 0.045, 0.12, 0.08], ["legGap", "Расстояние между ногами", 0.06, 0.16, 0.092],
+    ["legTaper", "Сужение к стопе", 0.6, 1.1, 0.85, "%"], ["knee", "Колени", 0.8, 1.4, 0.95, "x"],
+    ["stance", "Стойка шире", -5, 15, 0, "°"], ["kneeRest", "Присогнутые колени", 0, 30, 0, "°"],
+    ["thighTop", "Толщина верха бедра", 0.9, 1.5, 1.1, "x"],
   ]],
   ["Ботинки", [
     ["bootL", "Длина", 0.16, 0.38, 0.27], ["bootW", "Ширина", 0.10, 0.24, 0.16],
-    ["bootH", "Высота", 0.07, 0.18, 0.13],
+    ["bootH", "Высота", 0.07, 0.18, 0.13], ["bootFwd", "Носок вперёд", 0.0, 0.35, 0.18, "%"],
+    ["bootToe", "Нос кверху", 0, 25, 6, "°"], ["sole", "Подошва", 0, 0.04, 0.015],
+    ["bootRound", "Скруглённость", 0.4, 1.0, 1.0, "%"],
   ]],
 ];
 const COLORS = ["#d6402f", "#2f6fd6", "#3b9a5a", "#e2b23a", "#8a55c9", "#e07a2e", "#2fa8b3", "#d4528f", "#5b6270"];
-const DEFAULTS = { color: COLORS[0] };
+const BOOT_COLORS = ["same", "#3a2a22", "#20232a", "#e9e6df", "#7a4a2a", "#b23a2c", "#2b4d8c"];
+const DEFAULTS = { color: COLORS[0], bootColor: "same", soleColor: "#2a2a2a" };
 GROUPS.forEach(([, items]) => items.forEach(([k, , , , d]) => { DEFAULTS[k] = d; }));
 let P = Object.assign({}, DEFAULTS);
 try { const saved = JSON.parse(localStorage.getItem("figure-draft") || "null"); if (saved) P = Object.assign({}, DEFAULTS, saved); } catch (e) {}
+const RAD = Math.PI / 180;
 
-function fmt(k, v, unit) {
+function fmt(v, unit) {
   if (unit === "%") return Math.round(v * 100) + "%";
   if (unit === "x") return "×" + v.toFixed(2);
+  if (unit === "°") return Math.round(v) + "°";
   return (v * 100).toFixed(1) + " см";
 }
 
-// ---------- Панель ----------
+// ======================= Панель =======================
 const controls = document.getElementById("controls");
-GROUPS.forEach(([title, items], gi) => {
+GROUPS.forEach(([title, items, cls, note], gi) => {
   const det = document.createElement("details");
-  if (gi < 3) det.open = true;
+  if (gi < 2) det.open = true;
+  if (cls) det.className = cls;
   const sum = document.createElement("summary");
   sum.textContent = title;
   det.appendChild(sum);
+  if (note) { const n = document.createElement("p"); n.className = "note"; n.textContent = note; det.appendChild(n); }
   items.forEach(([k, label, min, max, , unit]) => {
     const row = document.createElement("div");
     row.className = "row";
@@ -170,8 +201,8 @@ GROUPS.forEach(([title, items], gi) => {
     const inp = document.createElement("input");
     inp.type = "range"; inp.id = "p-" + k; inp.min = min; inp.max = max;
     inp.step = (max - min) / 200; inp.value = P[k];
-    inp.addEventListener("input", () => { P[k] = parseFloat(inp.value); out.textContent = fmt(k, P[k], unit); rebuild(); draft(); });
-    out.textContent = fmt(k, P[k], unit);
+    inp.addEventListener("input", () => { P[k] = parseFloat(inp.value); out.textContent = fmt(P[k], unit); rebuild(); draft(); });
+    out.textContent = fmt(P[k], unit);
     row.append(lab, out, inp);
     det.appendChild(row);
   });
@@ -180,32 +211,43 @@ GROUPS.forEach(([title, items], gi) => {
 const colDet = document.createElement("details");
 colDet.open = true;
 colDet.innerHTML = "<summary>Цвет</summary>";
-const sw = document.createElement("div");
-sw.className = "swatches"; sw.setAttribute("role", "group"); sw.setAttribute("aria-label", "Цвет фигурки");
-COLORS.forEach((c) => {
-  const b = document.createElement("button");
-  b.className = "swatch"; b.style.background = c; b.setAttribute("aria-label", "Цвет " + c);
-  b.setAttribute("aria-pressed", String(P.color === c));
-  b.addEventListener("click", () => { P.color = c; syncUI(); rebuild(); draft(); });
-  sw.appendChild(b);
-});
-colDet.appendChild(sw);
+function swatchRow(label, list, key) {
+  const l = document.createElement("div"); l.className = "swlabel"; l.textContent = label;
+  const box = document.createElement("div");
+  box.className = "swatches"; box.setAttribute("role", "group"); box.setAttribute("aria-label", label);
+  list.forEach((c) => {
+    const b = document.createElement("button");
+    b.className = "swatch";
+    b.dataset.value = c;
+    if (c === "same") { b.style.background = "linear-gradient(135deg, var(--accent) 50%, var(--panel) 50%)"; b.setAttribute("aria-label", "Как тело"); b.title = "Как тело"; }
+    else { b.style.background = c; b.setAttribute("aria-label", "Цвет " + c); }
+    b.addEventListener("click", () => { P[key] = c; syncUI(); rebuild(); draft(); });
+    box.appendChild(b);
+  });
+  colDet.append(l, box);
+  return box;
+}
+const swBody = swatchRow("Тело", COLORS, "color");
+const swBoot = swatchRow("Ботинки", BOOT_COLORS, "bootColor");
+const swSole = swatchRow("Подошва", ["#2a2a2a", "#e9e6df", "#6b4a32", "#b23a2c"], "soleColor");
 controls.appendChild(colDet);
 
 function syncUI() {
   GROUPS.forEach(([, items]) => items.forEach(([k, , , , , unit]) => {
     document.getElementById("p-" + k).value = P[k];
-    document.getElementById("o-" + k).textContent = fmt(k, P[k], unit);
+    document.getElementById("o-" + k).textContent = fmt(P[k], unit);
   }));
-  [...sw.children].forEach((b, i) => b.setAttribute("aria-pressed", String(COLORS[i] === P.color)));
+  [[swBody, "color"], [swBoot, "bootColor"], [swSole, "soleColor"]].forEach(([box, key]) =>
+    [...box.children].forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.value === P[key]))));
 }
+syncUI();
 let draftTimer = 0;
 function draft() {
   clearTimeout(draftTimer);
   draftTimer = setTimeout(() => { try { localStorage.setItem("figure-draft", JSON.stringify(P)); } catch (e) {} }, 300);
 }
 
-// ---------- Сцена ----------
+// ======================= Сцена =======================
 const stage = document.getElementById("stage");
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
 renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
@@ -217,13 +259,13 @@ const camera = new THREE.PerspectiveCamera(32, 1, 0.05, 50);
 camera.position.set(1.6, 1.25, 3.6);
 const orbit = new THREE.OrbitControls(camera, renderer.domElement);
 orbit.target.set(0, 0.8, 0);
-orbit.enableDamping = true; orbit.minDistance = 1.2; orbit.maxDistance = 7; orbit.enablePan = false;
+orbit.enableDamping = true; orbit.minDistance = 1.0; orbit.maxDistance = 7; orbit.enablePan = false;
 scene.add(new THREE.HemisphereLight(0xffffff, 0x8890a0, 0.75));
 const sun = new THREE.DirectionalLight(0xffffff, 0.85);
 sun.position.set(2.5, 4, 3);
 sun.castShadow = true;
 sun.shadow.mapSize.set(1024, 1024);
-Object.assign(sun.shadow.camera, { left: -2, right: 2, top: 2, bottom: -2, near: 0.5, far: 12 });
+Object.assign(sun.shadow.camera, { left: -2, right: 2, top: 2.5, bottom: -1, near: 0.5, far: 12 });
 scene.add(sun);
 const floor = new THREE.Mesh(new THREE.CircleGeometry(1.6, 48), new THREE.ShadowMaterial({ opacity: 0.22 }));
 floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true;
@@ -233,199 +275,411 @@ const ring = new THREE.Mesh(new THREE.RingGeometry(0.62, 0.66, 64),
 ring.rotation.x = -Math.PI / 2; ring.position.y = 0.001;
 scene.add(ring);
 
-let figure = null, J = {};
-const body = new THREE.MeshStandardMaterial({ color: P.color, roughness: 0.55 });
-const white = new THREE.MeshStandardMaterial({ color: 0xf4f4f4, roughness: 0.35 });
-const black = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.3 });
+const MAT = {
+  body: new THREE.MeshStandardMaterial({ color: P.color, roughness: 0.55 }),
+  boot: new THREE.MeshStandardMaterial({ color: P.color, roughness: 0.6 }),
+  sole: new THREE.MeshStandardMaterial({ color: P.soleColor, roughness: 0.8 }),
+  white: new THREE.MeshStandardMaterial({ color: 0xf4f4f4, roughness: 0.35 }),
+  black: new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.3 }),
+  blended: new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.55 }),
+};
 
-function mesh(geo, mat) { const m = new THREE.Mesh(geo, mat || body); m.castShadow = true; return m; }
-function capsule(r, len) { // вниз от точки крепления
-  const m = mesh(new THREE.CapsuleGeometry(r, Math.max(0.001, len), 8, 20));
-  m.position.y = -len / 2; return m;
-}
-function ball(r) { return mesh(new THREE.SphereGeometry(r, 24, 16)); }
+// ======================= Детали =======================
+// Каждая деталь тела — «описание» (тип, сустав, положение в нём, размеры, материал). Из него
+// строится и отдельная сетка, и формула расстояния для цельной (слитой) фигурки.
+let figure = null, J = {}, PARTS = [], blendedMesh = null, dirty = true;
+
 function group(parent, x, y, z) { const g = new THREE.Group(); g.position.set(x, y, z); parent.add(g); return g; }
-
-function torsoGeometry() {
-  // Профиль корпуса снизу вверх: таз → талия → грудь → покатое плечо → шея (тело вращения, сплющено).
-  const L = P.torsoLen, top = L;
-  const pts = [
-    [0.0, -0.06], [P.hipW * 0.62, -0.05], [P.hipW * 0.92, -0.01], [P.hipW, 0.05],
-    [P.waistW, L * 0.35], [P.chestW * 0.97, L * 0.68], [P.chestW, L * 0.8],
-    [Math.max(P.chestW * 0.9, P.shoulderW * 0.95), L * 0.86 - P.shoulderDrop * 0.6], [Math.max(P.neckR + 0.03, P.chestW * 0.55), top - 0.01],
-    [P.neckR + 0.012, top + 0.005], [0.0, top + 0.012],
-  ].map(([x, y]) => new THREE.Vector2(Math.max(0.0001, x), y));
-  const g = new THREE.LatheGeometry(pts, 48);
-  g.scale(1, 1, P.torsoDepth);
-  g.computeVertexNormals();
-  return g;
+function local(pos, rot) {
+  const m = new THREE.Matrix4();
+  m.compose(new THREE.Vector3(...(pos || [0, 0, 0])), new THREE.Quaternion().setFromEuler(new THREE.Euler(...(rot || [0, 0, 0]))), new THREE.Vector3(1, 1, 1));
+  return m;
 }
+function part(joint, m, def) { const p = Object.assign({ joint, m, mat: "body" }, def); PARTS.push(p); return p; }
 
-function headGeometry() {
-  const r = Math.min(P.headW, P.headH, P.headD) * P.headRound;
-  return new THREE.RoundedBoxGeometry(P.headW, P.headH, P.headD, 6, r);
+// Конус со скруглёнными концами вниз от начала: верх радиуса r0, низ (на глубине len) — r1.
+function coneGeometry(len, r0, r1) {
+  const pts = [];
+  for (let i = 0; i <= 8; i++) { const a = -Math.PI / 2 + (i / 8) * (Math.PI / 2); pts.push(new THREE.Vector2(Math.cos(a) * r1, -len + Math.sin(a) * r1)); }
+  for (let i = 0; i <= 8; i++) { const a = (i / 8) * (Math.PI / 2); pts.push(new THREE.Vector2(Math.cos(a) * r0, Math.sin(a) * r0)); }
+  pts[0].x = 0.0001; pts[pts.length - 1].x = 0.0001;
+  return new THREE.LatheGeometry(pts, 28);
+}
+function torsoProfile() {
+  const L = P.torsoLen, W = P.waistPos;
+  return [
+    [0.0, -0.06], [P.hipW * 0.62, -0.05], [P.hipW * 0.92, -0.01], [P.hipW, 0.05],
+    [P.waistW, L * W], [P.chestW * 0.97, L * 0.68], [P.chestW, L * 0.78],
+    [Math.max(P.chestW * 0.9, P.shoulderW * 0.95), L * 0.86 - P.shoulderDrop * 0.6],
+    [Math.max(P.neckR * P.neckBase, P.chestW * 0.55), L - 0.01], [P.neckR + 0.012, L + 0.005], [0.0, L + 0.012],
+  ];
+}
+function headTaperAt(y, hy) { const t = Math.min(1, Math.max(0, (y + hy) / (2 * hy) * 1.6)); return P.headTaper + (1 - P.headTaper) * t; }
+
+function makeMesh(p) {
+  let g;
+  if (p.type === "cone") g = coneGeometry(p.len, p.r0, p.r1);
+  else if (p.type === "ell") { g = new THREE.SphereGeometry(1, 28, 18); g.scale(p.r[0], p.r[1], p.r[2]); }
+  else if (p.type === "lathe") {
+    g = new THREE.LatheGeometry(p.profile.map(([r, y]) => new THREE.Vector2(Math.max(0.0001, r), y)), 48);
+    g.scale(1, 1, p.depth);
+  } else if (p.type === "rbox") {
+    const rr = Math.min(p.h[0], p.h[1], p.h[2]) * 2 * p.round;
+    g = new THREE.RoundedBoxGeometry(p.h[0] * 2, p.h[1] * 2, p.h[2] * 2, 6, rr);
+    const pos = g.attributes.position;
+    for (let i = 0; i < pos.count; i++) {
+      const f = headTaperAt(pos.getY(i), p.h[1]);
+      pos.setX(i, pos.getX(i) * f); pos.setZ(i, pos.getZ(i) * f);
+    }
+  }
+  g.computeVertexNormals();
+  const mesh = new THREE.Mesh(g, MAT[p.mat]);
+  mesh.castShadow = true;
+  mesh.applyMatrix4(p.m);
+  p.joint.add(mesh);
+  p.mesh = mesh;
 }
 
 function rebuild() {
   if (figure) scene.remove(figure);
-  body.color.set(P.color);
+  MAT.body.color.set(P.color);
+  MAT.boot.color.set(P.bootColor === "same" ? P.color : P.bootColor);
+  MAT.sole.color.set(P.soleColor);
   figure = new THREE.Group();
-  J = {};
-  const ankleY = P.bootH * 0.55;
+  J = {}; PARTS = [];
+  const ankleY = P.bootH * 0.55 + P.sole;
   const kneeY = ankleY + P.shin, hipY = kneeY + P.thigh;
   const root = J.root = group(figure, 0, hipY, 0);
-  // Корпус и всё выше — на «спине» (наклоняется).
   const spine = J.spine = group(root, 0, 0, 0);
-  spine.add(mesh(torsoGeometry()));
-  const neckBase = P.torsoLen;
-  const neck = J.neck = group(spine, 0, neckBase - 0.01, 0);
-  const neckMesh = mesh(new THREE.CylinderGeometry(P.neckR, P.neckR * 1.05, P.neckLen + 0.06, 24));
-  neckMesh.position.y = (P.neckLen + 0.06) / 2 - 0.03;
-  neck.add(neckMesh);
-  const head = J.head = group(neck, 0, P.neckLen + 0.01, 0);
-  const hm = mesh(headGeometry());
-  hm.position.y = P.headH / 2;
-  head.add(hm);
-  // Глаза на лицевой стороне (+Z).
-  const er = 0.06 * P.eyeSize;
+  const L = P.torsoLen;
+  part(spine, local(), { type: "lathe", profile: torsoProfile(), depth: P.torsoDepth });
+  const front = (y) => P.torsoDepth * (P.waistW + (P.chestW - P.waistW) * Math.min(1, Math.max(0, (y / L - P.waistPos) / (0.78 - P.waistPos))));
+  // Живот, грудь и попа — округлые объёмы, утопленные в корпус: торчит только «выпуклость».
+  if (P.belly > 0.01) part(spine, local([0, L * P.waistPos, front(L * P.waistPos) * (0.15 + P.belly * 0.35)]),
+    { type: "ell", r: [P.waistW * 0.85, L * 0.22, front(L * P.waistPos) * 0.9] });
+  if (P.chestOut > 0.01) part(spine, local([0, L * 0.68, front(L * 0.68) * (0.1 + P.chestOut * 0.3)]),
+    { type: "ell", r: [P.chestW * 0.85, L * 0.17, front(L * 0.68) * 0.9] });
+  if (P.bottom > 0.01) part(spine, local([0, 0.03, -P.hipW * P.torsoDepth * (0.12 + P.bottom * 0.35)]),
+    { type: "ell", r: [P.hipW * 0.9, 0.11, P.hipW * P.torsoDepth * 0.9] });
+  // Шея и голова.
+  const neck = J.neck = group(spine, 0, L - 0.01, 0);
+  part(neck, local([0, P.neckLen + 0.05, 0]), { type: "cone", len: P.neckLen + 0.08, r0: P.neckR, r1: P.neckR * P.neckBase });
+  const head = J.head = group(neck, 0, P.neckLen + 0.01 + P.headLift, P.headForward);
+  const hs = P.headScale, hy = P.headH * hs / 2;
+  const hd = { type: "rbox", h: [P.headW * hs / 2, hy, P.headD * hs / 2], round: P.headRound };
+  part(head, local([0, hy, 0]), hd);
+  // Глаза — отдельные сетки на голове (не сливаются).
+  const er = 0.06 * P.eyeSize * hs;
+  const faceAt = (y) => P.headD * hs / 2 * headTaperAt(y - hy, hy);
   [-1, 1].forEach((s) => {
-    const w = mesh(new THREE.SphereGeometry(er, 24, 16), white);
-    w.scale.set(0.85, 1.05, 0.42);
-    w.position.set(s * P.eyeGap, P.eyeY, P.headD / 2 - er * 0.12);
-    head.add(w);
-    const b = mesh(new THREE.SphereGeometry(er * P.pupil, 20, 14), black);
-    b.scale.set(0.85, 1.05, 0.4);
-    b.position.set(s * P.eyeGap * 0.97, P.eyeY - er * 0.08, P.headD / 2 + er * 0.12);
-    head.add(b);
+    const ey = P.eyeY * hs, fz = faceAt(ey);
+    const holder = group(head, s * P.eyeGap * hs, ey, fz - er * 0.1);
+    holder.rotation.z = -s * P.eyeTilt * RAD;
+    const w = new THREE.Mesh(new THREE.SphereGeometry(er, 24, 16), MAT.white);
+    w.scale.set(0.85, 0.85 * P.eyeTall, P.eyeBulge);
+    holder.add(w);
+    const pr = er * P.pupil;
+    const b = new THREE.Mesh(new THREE.SphereGeometry(pr, 20, 14), MAT.black);
+    b.scale.set(0.85, 0.85 * P.eyeTall, 0.45);
+    b.position.set(P.lookX * (er * 0.85 - pr * 0.85) * 0.9, P.lookY * (er * 0.85 * P.eyeTall - pr * 0.85 * P.eyeTall) * 0.9, er * P.eyeBulge * 0.92);
+    holder.add(b);
   });
-  // Руки: плечо → локоть → кисть; в суставах шары толщиной с руку (без щелей).
-  const shY = neckBase * 0.82 - P.shoulderDrop;
+  // Руки: шар плеча, плечо, локоть, предплечье, варежка с большим пальцем.
+  const shY = L * 0.82 - P.shoulderDrop;
   [["R", -1], ["L", 1]].forEach(([side, s]) => {
-    const sh = J["sh" + side] = group(spine, s * P.shoulderW, shY, 0);
-    sh.add(ball(P.armR * 1.04));
-    sh.add(capsule(P.armR, P.upperArm));
+    const r = P.armR, rw = r * P.armTaper;
+    const sh = J["sh" + side] = group(spine, s * P.shoulderW, shY, P.shoulderFwd);
+    part(sh, local(), { type: "ell", r: [r * P.shoulderBall, r * P.shoulderBall, r * P.shoulderBall] });
+    part(sh, local(), { type: "cone", len: P.upperArm, r0: r, r1: (r + rw) / 2 });
     const el = J["el" + side] = group(sh, 0, -P.upperArm, 0);
-    el.add(ball(P.armR * 0.96));
-    el.add(capsule(P.armR * 0.9, P.forearm));
+    part(el, local(), { type: "cone", len: P.forearm, r0: (r + rw) / 2 * 0.97, r1: rw });
     const hand = J["hand" + side] = group(el, 0, -P.forearm, 0);
-    const hs = P.handSize;
-    const palm = ball(0.07 * hs);
-    palm.scale.set(0.78, 1.05, 0.95);
-    palm.position.y = -0.05 * hs;
-    hand.add(palm);
-    const thumb = mesh(new THREE.CapsuleGeometry(0.022 * hs, 0.035 * hs, 6, 12));
-    thumb.position.set(-s * 0.03 * hs, -0.035 * hs, 0.04 * hs);
-    thumb.rotation.set(0.6, 0, -s * 0.35);
-    hand.add(thumb);
+    const k = P.handSize;
+    part(hand, local([0, -0.05 * k, 0]), { type: "ell", r: [0.07 * k * P.handFlat, 0.07 * k * 1.05, 0.07 * k * 0.95] });
+    part(hand, local([-s * 0.032 * k, -0.02 * k, 0.04 * k], [0.6, 0, -s * 0.35]),
+      { type: "cone", len: 0.045 * k * P.thumb, r0: 0.023 * k * P.thumb, r1: 0.02 * k * P.thumb });
   });
-  // Ноги: бедро → колено → голень → ботинок.
+  // Ноги и ботинки.
   [["R", -1], ["L", 1]].forEach(([side, s]) => {
+    const r = P.legR, rb = r * P.legTaper;
     const hip = J["hip" + side] = group(root, s * P.legGap, 0.02, 0);
-    hip.add(ball(P.legR));
-    hip.add(capsule(P.legR, P.thigh));
+    part(hip, local([0, 0.01, 0]), { type: "cone", len: P.thigh + 0.01, r0: r * P.thighTop, r1: (r + rb) / 2 * P.knee });
     const kn = J["kn" + side] = group(hip, 0, -P.thigh, 0);
-    kn.add(ball(P.legR * 0.92));
-    kn.add(capsule(P.legR * 0.86, P.shin - ankleY * 0.2));
+    part(kn, local(), { type: "cone", len: P.shin - ankleY * 0.2, r0: (r + rb) / 2 * P.knee * 0.97, r1: rb });
     const an = J["an" + side] = group(kn, 0, -P.shin, 0);
-    const boot = mesh(new THREE.SphereGeometry(0.5, 28, 18));
-    boot.scale.set(P.bootW, P.bootH, P.bootL);
-    boot.position.set(0, -ankleY + P.bootH / 2, P.bootL * 0.18);
-    an.add(boot);
+    const toe = J["toe" + side] = group(an, 0, -ankleY + P.sole, P.bootL * P.bootFwd);
+    toe.rotation.x = -P.bootToe * RAD * 0.5;
+    const bh = P.bootH / 2;
+    part(toe, local([0, bh, 0]), { type: "ell", r: [P.bootW / 2, bh, P.bootL / 2], mat: "boot", round: P.bootRound });
+    if (P.sole > 0.002) part(toe, local([0, P.sole / 2 - 0.002, 0]),
+      { type: "ell", r: [P.bootW / 2 * 1.04, P.sole, P.bootL / 2 * 1.03], mat: "sole" });
   });
+  PARTS.forEach((p) => { if (p.type === "ell" && p.round && p.round < 1) p.r = [p.r[0], p.r[1] * (0.6 + 0.4 * p.round), p.r[2]]; makeMesh(p); });
   scene.add(figure);
-  orbit.target.y = (hipY + P.torsoLen + P.neckLen + P.headH) / 2;
+  orbit.target.y = (hipY + L + P.neckLen + P.headH * hs) / 2;
+  if (blendedMesh) { scene.remove(blendedMesh); blendedMesh.geometry.dispose(); blendedMesh = null; }
+  dirty = true;
 }
 
-// ---------- Позы ----------
-// Повороты в радианах [x, y, z]. Фигурка смотрит на +Z; −X у рук и ног — вперёд, +X у колена — сгиб назад.
+// ======================= Цельная фигурка (слияние деталей) =======================
+// Каждая деталь даёт «расстояние до поверхности»; детали объединяются плавным минимумом (smin) —
+// чем больше k, тем шире и мягче перемычки. Поверхность строится методом Surface Nets.
+const TMP = new THREE.Matrix4();
+function prepare() {
+  figure.updateMatrixWorld(true);
+  return PARTS.map((p) => {
+    const wm = new THREE.Matrix4().multiplyMatrices(p.joint.matrixWorld, p.m);
+    const inv = TMP.copy(wm).invert().elements.slice();
+    let rad, c = new THREE.Vector3();
+    if (p.type === "cone") { c.set(0, -p.len / 2, 0); rad = p.len / 2 + Math.max(p.r0, p.r1); }
+    else if (p.type === "ell") rad = Math.max(...p.r);
+    else if (p.type === "rbox") rad = Math.hypot(...p.h);
+    else { c.set(0, P.torsoLen / 2, 0); rad = Math.hypot(Math.max(P.hipW, P.chestW, P.shoulderW), P.torsoLen / 2 + 0.08); }
+    c.applyMatrix4(wm);
+    return { p, e: inv, c, rad };
+  });
+}
+function sdf(q, x, y, z) {
+  const e = q.e, p = q.p;
+  const lx = e[0] * x + e[4] * y + e[8] * z + e[12];
+  const ly = e[1] * x + e[5] * y + e[9] * z + e[13];
+  const lz = e[2] * x + e[6] * y + e[10] * z + e[14];
+  if (p.type === "cone") {
+    const t = Math.min(1, Math.max(0, -ly / p.len));
+    return Math.hypot(lx, ly + t * p.len, lz) - (p.r0 + (p.r1 - p.r0) * t);
+  }
+  if (p.type === "ell") {
+    const a = p.r[0], b = p.r[1], c = p.r[2];
+    const k0 = Math.hypot(lx / a, ly / b, lz / c), k1 = Math.hypot(lx / (a * a), ly / (b * b), lz / (c * c));
+    return k1 > 1e-9 ? k0 * (k0 - 1) / k1 : -Math.min(a, b, c);
+  }
+  if (p.type === "rbox") {
+    const f = headTaperAt(ly, p.h[1]);
+    const rr = Math.min(p.h[0], p.h[1], p.h[2]) * p.round;
+    const qx = Math.abs(lx / f) - p.h[0] + rr, qy = Math.abs(ly) - p.h[1] + rr, qz = Math.abs(lz / f) - p.h[2] + rr;
+    return (Math.hypot(Math.max(qx, 0), Math.max(qy, 0), Math.max(qz, 0)) + Math.min(Math.max(qx, qy, qz), 0) - rr) * Math.min(1, f);
+  }
+  // Корпус: радиус по профилю на высоте ly, сплющен по Z.
+  const pr = p.profile, y0 = pr[0][1], y1 = pr[pr.length - 1][1];
+  let r = 0;
+  if (ly > y0 && ly < y1) {
+    for (let i = 1; i < pr.length; i++) if (ly <= pr[i][1]) { const t = (ly - pr[i - 1][1]) / (pr[i][1] - pr[i - 1][1]); r = pr[i - 1][0] + (pr[i][0] - pr[i - 1][0]) * t; break; }
+  }
+  const rho = Math.hypot(lx, lz / p.depth);
+  return Math.max((rho - r) * Math.sqrt(p.depth), y0 - ly, ly - y1);
+}
+function smin(a, b, k) {
+  if (k <= 1e-6) return Math.min(a, b);
+  const h = Math.max(k - Math.abs(a - b), 0) / k;
+  return Math.min(a, b) - h * h * k * 0.25;
+}
+const tmpColor = new THREE.Color();
+function buildBlended(fast) {
+  const Q = prepare();
+  const k = 0.12 * Math.pow(P.blend, 1.8);
+  const h = fast ? 0.026 - P.quality * 0.008 : 0.02 - P.quality * 0.009;
+  const box = new THREE.Box3();
+  Q.forEach((q) => { box.expandByPoint(q.c.clone().addScalar(q.rad)); box.expandByPoint(q.c.clone().addScalar(-q.rad)); });
+  box.expandByScalar(k + 2 * h);
+  const nx = Math.ceil((box.max.x - box.min.x) / h) + 1, ny = Math.ceil((box.max.y - box.min.y) / h) + 1, nz = Math.ceil((box.max.z - box.min.z) / h) + 1;
+  const N = nx * ny * nz, F = new Float32Array(N).fill(1);
+  const ox = box.min.x, oy = box.min.y, oz = box.min.z;
+  // Каждая деталь заполняет только свой кусок сетки (её шар + запас на слияние).
+  Q.forEach((q) => {
+    const R = q.rad + k + 2 * h;
+    const i0 = Math.max(0, Math.floor((q.c.x - R - ox) / h)), i1 = Math.min(nx - 1, Math.ceil((q.c.x + R - ox) / h));
+    const j0 = Math.max(0, Math.floor((q.c.y - R - oy) / h)), j1 = Math.min(ny - 1, Math.ceil((q.c.y + R - oy) / h));
+    const k0 = Math.max(0, Math.floor((q.c.z - R - oz) / h)), k1i = Math.min(nz - 1, Math.ceil((q.c.z + R - oz) / h));
+    for (let kk = k0; kk <= k1i; kk++) {
+      const z = oz + kk * h;
+      for (let j = j0; j <= j1; j++) {
+        const y = oy + j * h, base = (kk * ny + j) * nx;
+        for (let i = i0; i <= i1; i++) {
+          const d = sdf(q, ox + i * h, y, z), idx = base + i;
+          F[idx] = F[idx] === 1 ? d : smin(F[idx], d, k);
+        }
+      }
+    }
+  });
+  // Surface Nets: по вершине в каждой клетке, через которую проходит поверхность.
+  const cell = new Int32Array(N).fill(-1);
+  const pos = [], nrm = [], col = [], idxs = [];
+  const v = new Float32Array(8);
+  const EDGES = [[0, 1], [2, 3], [4, 5], [6, 7], [0, 2], [1, 3], [4, 6], [5, 7], [0, 4], [1, 5], [2, 6], [3, 7]];
+  const OFF = [[0, 0, 0], [1, 0, 0], [0, 1, 0], [1, 1, 0], [0, 0, 1], [1, 0, 1], [0, 1, 1], [1, 1, 1]];
+  for (let kk = 0; kk < nz - 1; kk++) for (let j = 0; j < ny - 1; j++) for (let i = 0; i < nx - 1; i++) {
+    let mask = 0;
+    for (let c = 0; c < 8; c++) {
+      const o = OFF[c];
+      v[c] = F[((kk + o[2]) * ny + j + o[1]) * nx + i + o[0]];
+      if (v[c] < 0) mask |= 1 << c;
+    }
+    if (mask === 0 || mask === 255) continue;
+    let sx = 0, sy = 0, sz = 0, n = 0;
+    for (const [a, b] of EDGES) {
+      if ((v[a] < 0) === (v[b] < 0)) continue;
+      const t = v[a] / (v[a] - v[b]), A = OFF[a], B = OFF[b];
+      sx += A[0] + (B[0] - A[0]) * t; sy += A[1] + (B[1] - A[1]) * t; sz += A[2] + (B[2] - A[2]) * t; n++;
+    }
+    const px = ox + (i + sx / n) * h, py = oy + (j + sy / n) * h, pz = oz + (kk + sz / n) * h;
+    cell[(kk * ny + j) * nx + i] = pos.length / 3;
+    pos.push(px, py, pz);
+    const gx = (v[1] - v[0]) + (v[3] - v[2]) + (v[5] - v[4]) + (v[7] - v[6]);
+    const gy = (v[2] - v[0]) + (v[3] - v[1]) + (v[6] - v[4]) + (v[7] - v[5]);
+    const gz = (v[4] - v[0]) + (v[5] - v[1]) + (v[6] - v[2]) + (v[7] - v[3]);
+    const gl = Math.hypot(gx, gy, gz) || 1;
+    nrm.push(gx / gl, gy / gl, gz / gl);
+    // Цвет — по ближайшей детали (ботинки и подошва — свои цвета).
+    let best = 1e9, mat = "body";
+    for (const q of Q) {
+      if (Math.hypot(px - q.c.x, py - q.c.y, pz - q.c.z) > q.rad + 0.05) continue;
+      const d = sdf(q, px, py, pz) + (q.p.mat === "sole" ? 0.006 : 0);
+      if (d < best) { best = d; mat = q.p.mat; }
+    }
+    tmpColor.copy(MAT[mat].color);
+    col.push(tmpColor.r, tmpColor.g, tmpColor.b);
+  }
+  // Грани: на каждом ребре сетки со сменой знака — четырёхугольник из 4 соседних клеток.
+  const at = (i, j, kk) => cell[(kk * ny + j) * nx + i];
+  const quad = (a, b, c, d, flip) => {
+    if (a < 0 || b < 0 || c < 0 || d < 0) return;
+    if (flip) idxs.push(a, b, c, a, c, d); else idxs.push(a, c, b, a, d, c);
+  };
+  for (let kk = 1; kk < nz - 1; kk++) for (let j = 1; j < ny - 1; j++) for (let i = 1; i < nx - 1; i++) {
+    const v0 = F[(kk * ny + j) * nx + i] < 0;
+    if (v0 !== (F[(kk * ny + j) * nx + i + 1] < 0)) quad(at(i, j, kk), at(i, j - 1, kk), at(i, j - 1, kk - 1), at(i, j, kk - 1), v0);
+    if (v0 !== (F[(kk * ny + j + 1) * nx + i] < 0)) quad(at(i, j, kk), at(i, j, kk - 1), at(i - 1, j, kk - 1), at(i - 1, j, kk), v0);
+    if (v0 !== (F[((kk + 1) * ny + j) * nx + i] < 0)) quad(at(i, j, kk), at(i - 1, j, kk), at(i - 1, j - 1, kk), at(i, j - 1, kk), v0);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute("normal", new THREE.Float32BufferAttribute(nrm, 3));
+  g.setAttribute("color", new THREE.Float32BufferAttribute(col, 3));
+  g.setIndex(idxs);
+  if (!blendedMesh) {
+    blendedMesh = new THREE.Mesh(g, MAT.blended);
+    blendedMesh.castShadow = true;
+    scene.add(blendedMesh);
+  } else { blendedMesh.geometry.dispose(); blendedMesh.geometry = g; }
+  return idxs.length / 3;
+}
+
+// ======================= Позы =======================
+// Повороты [x, y, z] в радианах. Фигурка смотрит на +Z: −X у рук и ног — вперёд,
+// +X у колена — сгиб назад, −X у предплечья — сгиб локтя.
 const POSES = {
-  "Стоит": () => ({ elR: [-0.2, 0, 0], elL: [-0.2, 0, 0], shR: [0, 0, -0.06], shL: [0, 0, 0.06] }),
+  "Стоит": () => ({}),
   "Ходьба": (t) => {
     const a = Math.sin(t * 5.2);
-    return { root: { y: Math.abs(Math.cos(t * 5.2)) * 0.02 },
-      shR: [a * 0.55, 0, -0.06], shL: [-a * 0.55, 0, 0.06],
-      elR: [-0.25 - Math.max(0, -a) * 0.6, 0, 0], elL: [-0.25 - Math.max(0, a) * 0.6, 0, 0],
+    return { root: { y: Math.abs(Math.cos(t * 5.2)) * 0.02 }, anim: true,
+      shR: [a * 0.55, 0, 0], shL: [-a * 0.55, 0, 0],
+      elR: [-0.1 - Math.max(0, -a) * 0.6, 0, 0], elL: [-0.1 - Math.max(0, a) * 0.6, 0, 0],
       hipR: [-a * 0.45, 0, 0], hipL: [a * 0.45, 0, 0],
       knR: [Math.max(0, a) * 0.7, 0, 0], knL: [Math.max(0, -a) * 0.7, 0, 0],
       spine: [0.05, Math.sin(t * 5.2) * 0.06, 0] };
   },
   "Бег": (t) => {
     const a = Math.sin(t * 8.5);
-    return { root: { y: Math.abs(Math.cos(t * 8.5)) * 0.05 },
-      shR: [a * 0.9, 0, -0.1], shL: [-a * 0.9, 0, 0.1], elR: [-1.3, 0, 0], elL: [-1.3, 0, 0],
+    return { root: { y: Math.abs(Math.cos(t * 8.5)) * 0.05 }, anim: true,
+      shR: [a * 0.9, 0, -0.1], shL: [-a * 0.9, 0, 0.1], elR: [-1.2, 0, 0], elL: [-1.2, 0, 0],
       hipR: [-a * 0.85, 0, 0], hipL: [a * 0.85, 0, 0],
       knR: [0.4 + Math.max(0, a) * 1.1, 0, 0], knL: [0.4 + Math.max(0, -a) * 1.1, 0, 0],
       spine: [0.18, 0, 0], head: [-0.1, 0, 0] };
   },
-  "Прыжок": (t) => ({ root: { y: 0.18 + Math.sin(t * 3) * 0.04 },
-    shR: [-0.2, 0, -2.6], elR: [-0.4, 0, 0], shL: [-0.2, 0, 1.0], elL: [-1.0, 0, 0],
+  "Прыжок": () => ({ root: { y: 0.18 },
+    shR: [-0.2, 0, -2.6], elR: [-0.3, 0, 0], shL: [-0.2, 0, 1.0], elL: [-0.9, 0, 0],
     hipR: [-1.1, 0, -0.1], knR: [1.7, 0, 0], hipL: [-0.3, 0, 0.12], knL: [1.5, 0, 0], head: [-0.12, 0, 0] }),
   "Присел": () => ({ root: { y: -0.2, z: -0.04 }, spine: [0.38, 0, 0],
-    shR: [-0.6, 0, -0.25], elR: [-0.9, 0, 0], shL: [-0.6, 0, 0.25], elL: [-0.9, 0, 0],
+    shR: [-0.6, 0, -0.25], elR: [-0.8, 0, 0], shL: [-0.6, 0, 0.25], elL: [-0.8, 0, 0],
     hipR: [-1.2, 0, -0.08], knR: [1.8, 0, 0], hipL: [-1.2, 0, 0.08], knL: [1.8, 0, 0], head: [-0.3, 0, 0] }),
-  "Думает": () => ({ shR: [-0.55, 0, 0.45], elR: [-2.2, 0, 0], handR: [0.3, 0, 0],
-    shL: [-0.15, 0, -0.15], elL: [-0.7, 0, 0], hipL: [0, 0, 0.1], head: [0.12, 0.2, 0] }),
-  "Машет": (t) => ({ shR: [-0.1, 0, -2.5], elR: [0, 0, -0.5 + Math.sin(t * 7) * 0.45],
-    elL: [-0.2, 0, 0], shL: [0, 0, 0.06], head: [0, -0.15, 0.08] }),
+  "Думает": () => ({ shR: [-0.55, 0, 0.45], elR: [-2.0, 0, 0], handR: [0.3, 0, 0],
+    shL: [-0.15, 0, -0.15], elL: [-0.5, 0, 0], hipL: [0, 0, 0.1], head: [0.12, 0.2, 0] }),
+  "Машет": (t) => ({ anim: true, shR: [-0.1, 0, -2.5], elR: [0, 0, -0.5 + Math.sin(t * 7) * 0.45], head: [0, -0.15, 0.08] }),
 };
-let pose = "Ходьба";
+let pose = "Стоит";
 const posesEl = document.getElementById("poses");
 Object.keys(POSES).forEach((name) => {
   const b = document.createElement("button");
   b.className = "chip"; b.textContent = name; b.setAttribute("aria-pressed", String(name === pose));
-  b.addEventListener("click", () => { pose = name; [...posesEl.children].forEach((c) => c.setAttribute("aria-pressed", String(c === b))); });
+  b.addEventListener("click", () => { pose = name; dirty = true; [...posesEl.children].forEach((c) => c.setAttribute("aria-pressed", String(c === b))); });
   posesEl.appendChild(b);
 });
 
+const JOINTS = ["spine", "neck", "head", "shR", "shL", "elR", "elL", "handR", "handL", "hipR", "hipL", "knR", "knL", "anR", "anL"];
 function applyPose(t) {
-  const keys = ["spine", "neck", "head", "shR", "shL", "elR", "elL", "handR", "handL", "hipR", "hipL", "knR", "knL", "anR", "anL"];
-  keys.forEach((k) => J[k] && J[k].rotation.set(0, 0, 0));
-  const ankleY = P.bootH * 0.55;
+  JOINTS.forEach((k) => J[k] && J[k].rotation.set(0, 0, 0));
+  const ankleY = P.bootH * 0.55 + P.sole;
   const baseY = ankleY + P.shin + P.thigh;
-  J.root.position.set(0, baseY, 0);
+  // Поза покоя из ползунков: сутулость, наклоны, руки в стороны, сгиб локтя, стойка, колени.
+  const kr = P.kneeRest * RAD;
+  const rest = {
+    spine: [P.slouch * RAD * 0.5, 0, 0], neck: [P.neckTilt * RAD, 0, 0], head: [P.headTilt * RAD - P.neckTilt * RAD * 0.6, 0, 0],
+    shR: [0, 0, -P.armSpread * RAD], shL: [0, 0, P.armSpread * RAD],
+    elR: [-P.elbowRest * RAD, 0, 0], elL: [-P.elbowRest * RAD, 0, 0],
+    hipR: [-kr * 0.5, 0, -P.stance * RAD], hipL: [-kr * 0.5, 0, P.stance * RAD], knR: [kr, 0, 0], knL: [kr, 0, 0],
+  };
   const p = POSES[pose](t);
-  Object.entries(p).forEach(([k, v]) => {
-    if (k === "root") { J.root.position.y = baseY + (v.y || 0); J.root.position.z = v.z || 0; return; }
-    if (J[k]) J[k].rotation.set(v[0], v[1], v[2]);
+  const drop = (1 - Math.cos(kr * 0.5)) * P.thigh + (1 - Math.cos(kr * 0.5)) * P.shin * 0.6;
+  J.root.position.set(0, baseY - drop + ((p.root && p.root.y) || 0), (p.root && p.root.z) || 0);
+  JOINTS.forEach((k) => {
+    if (!J[k]) return;
+    const a = rest[k] || [0, 0, 0], b = p[k] || [0, 0, 0];
+    J[k].rotation.set(a[0] + b[0], a[1] + b[1], a[2] + b[2]);
   });
   // Стопы ровно по земле, когда нога стоит.
-  ["R", "L"].forEach((s) => { if (J["an" + s]) J["an" + s].rotation.x = -(J["hip" + s].rotation.x + J["kn" + s].rotation.x) * 0.6; });
+  ["R", "L"].forEach((s) => { if (J["an" + s]) J["an" + s].rotation.set(-(J["hip" + s].rotation.x + J["kn" + s].rotation.x), 0, -J["hip" + s].rotation.z); });
+  return !!p.anim;
 }
 
 function resize() {
-  const w = stage.clientWidth, h = stage.clientHeight;
-  renderer.setSize(w, h, false);
-  camera.aspect = w / h; camera.updateProjectionMatrix();
+  const w = stage.clientWidth, hgt = stage.clientHeight;
+  renderer.setSize(w, hgt, false);
+  camera.aspect = w / hgt; camera.updateProjectionMatrix();
 }
 new ResizeObserver(resize).observe(stage);
 const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 const clock = new THREE.Clock();
+const modeNote = document.getElementById("modeNote");
+let lastBlend = 0;
 function tick() {
   const t = still ? 0.4 : clock.getElapsedTime();
-  applyPose(t);
+  const animated = applyPose(t);
+  const blended = P.blend > 0.001;
+  PARTS.forEach((p) => { p.mesh.visible = !blended; });
+  if (blended) {
+    const now = performance.now();
+    // В движении цельная сетка пересчитывается ~12 раз в секунду (покрупнее), в покое — подробно.
+    if (dirty || (animated && now - lastBlend > 80)) {
+      const tris = buildBlended(animated);
+      modeNote.textContent = "Цельная фигурка · " + tris.toLocaleString("ru-RU") + " треугольников";
+      lastBlend = now; dirty = false;
+    }
+    if (blendedMesh) blendedMesh.visible = true;
+  } else {
+    if (blendedMesh) blendedMesh.visible = false;
+    modeNote.textContent = "Отдельные детали";
+  }
   orbit.update();
   renderer.render(scene, camera);
   requestAnimationFrame(tick);
 }
 rebuild(); resize(); tick();
 
-// ---------- Сохранение ----------
+// ======================= Сохранение =======================
 const statusEl = document.getElementById("status");
 const savedEl = document.getElementById("saved");
 const nameEl = document.getElementById("name");
 const saveBtn = document.getElementById("save");
 function say(text, ok) { statusEl.textContent = text; statusEl.classList.toggle("ok", !!ok); }
 function exportParams() {
-  const out = { color: P.color };
-  Object.keys(DEFAULTS).forEach((k) => { if (k !== "color") out[k] = Math.round(P[k] * 1000) / 1000; });
+  const out = { color: P.color, bootColor: P.bootColor, soleColor: P.soleColor };
+  Object.keys(DEFAULTS).forEach((k) => { if (typeof P[k] === "number") out[k] = Math.round(P[k] * 1000) / 1000; });
   return out;
 }
 document.getElementById("copy").addEventListener("click", async () => {
   const text = JSON.stringify(exportParams(), null, 1);
   try { await navigator.clipboard.writeText(text); say("Настройки скопированы — можно вставить их в чат.", true); }
-  catch (e) {
-    nameEl.value = text; nameEl.select(); say("Копирование не сработало: настройки в поле названия, выдели и скопируй.");
-  }
+  catch (e) { nameEl.value = text; nameEl.select(); say("Копирование не сработало: настройки в поле названия, выдели и скопируй."); }
 });
 document.getElementById("reset").addEventListener("click", () => {
   P = Object.assign({}, DEFAULTS); syncUI(); rebuild(); draft(); say("Вернул исходные размеры.");
