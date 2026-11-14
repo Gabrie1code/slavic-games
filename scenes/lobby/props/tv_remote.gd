@@ -8,6 +8,10 @@ enum State { HOME, HELD, LOOSE }
 
 const BACK_TIME := 5.0
 const SIZE := Vector3(0.06, 0.025, 0.2)
+## В руке: на столько метров выше середины кулака (минус — выше) и вперёд — чтобы пульт не уходил
+## в кисть.
+const HOLD_GRIP := -0.045
+const HOLD_FORWARD := 0.03
 
 var state := State.HOME
 var holder: PlayerData
@@ -92,7 +96,8 @@ static func _box(size: Vector3, pos: Vector3, color: Color, rough: float) -> Mes
 
 func _process(_delta: float) -> void:
 	if state == State.HELD:
-		HandHold.follow(self, 0.01) # ровно в кулаке, кнопками вверх
+		# Ровно, кнопками вверх, лежит на кулаке (а не утоплен в нём) и чуть впереди кисти.
+		HandHold.follow(self, HOLD_GRIP, 0.0, HOLD_FORWARD)
 
 
 func _physics_process(delta: float) -> void:
@@ -141,7 +146,7 @@ func hold(p: PlayerData, character: PlayerCharacter) -> void:
 	_set_loose_physics(false)
 	_move_to(null)
 	character.attach_to_part("ArmR", self)
-	HandHold.place(self, 0.01) # кнопками вверх, глазком вперёд
+	HandHold.place(self, HOLD_GRIP) # кнопками вверх, глазком вперёд
 	character.set_arm_pose(0.15, 0.9, 0.2)
 
 
