@@ -322,7 +322,7 @@ func _build_buildings() -> void:
 		var bush := _place("bush_round" if round_bush else "bush_wide",
 			spot + Vector3(0, GROUND_Y, 0), rng.randf() * TAU)
 		bush.scale = Vector3.ONE * rng.randf_range(0.8, 1.3)
-		var shape := _cylinder_shape(0.6, 0.75) if round_bush \
+		var shape: Shape3D = _cylinder_shape(0.6, 0.75) if round_bush \
 			else _box_shape(Vector3(1.6, 0.7, 0.95))
 		_blocker(bush, shape, Vector3(0, 0.36, 0))
 	for x in [-10.5, 10.5]:
