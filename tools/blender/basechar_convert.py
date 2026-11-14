@@ -88,8 +88,34 @@ if True:
         h, t, z = plan[b.name]
         b.head, b.tail = h, t
         b.align_roll(z)
+    # Кости стоп были «ручками» IK от корня — делаем их дочерними голеням: ступни (ниже) висят
+    # на них и двигаются с ногой; размер стопы можно менять отдельно.
+    for side in ("R", "L"):
+        eb["Foot." + side].parent = eb["LowerLeg." + side]
     bpy.ops.object.mode_set(mode="OBJECT")
 me.transform(G)
+# --- 4. Ступни: у модели ноги сужались в точку — добавляем скруглённые ступни носком вперёд (+Y),
+# на кость голени (двигаются вместе с ней), цвет тела.
+FOOT = (0.07, 0.12, 0.045)            # полуразмеры: ширина, длина, высота
+bm = bmesh.new()
+bm.from_mesh(me)
+dl = bm.verts.layers.deform.verify()
+prim_i = [i for i, m in enumerate(me.materials) if m and m.name == "Skin"][0]
+for side, sx in (("R", 1), ("L", -1)):
+    vg = body.vertex_groups["Foot." + side].index
+    tail = rig.data.bones["LowerLeg." + side].tail_local
+    res = bmesh.ops.create_uvsphere(bm, u_segments=16, v_segments=10, radius=1.0)
+    for v in res["verts"]:
+        c = v.co
+        v.co = Vector((tail.x + sx * 0.004 + c.x * FOOT[0], tail.y + 0.035 + c.y * FOOT[1],
+                       FOOT[2] + max(c.z, -0.75) * FOOT[2]))     # подошва плоская, на земле
+        for k in list(v[dl].keys()):
+            del v[dl][k]
+        v[dl][vg] = 1.0
+    for f in {f for v in res["verts"] for f in v.link_faces}:
+        f.material_index = prim_i
+        f.smooth = True
+bm.to_mesh(me); bm.free(); me.update()
 mod = body.modifiers.new("Armature", "ARMATURE")
 mod.object = rig
 for m in me.materials:
