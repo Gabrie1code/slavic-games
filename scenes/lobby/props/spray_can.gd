@@ -303,7 +303,7 @@ func _splat_parent(point: Vector3, collider: Object) -> Node:
 		var best: Node3D = character
 		var best_dist := INF
 		for part_name in ["Torso", "Head", "ArmL", "ArmR", "LegL", "LegR"]:
-			var part := character.part(part_name)
+			var part := character.part(part_name, true)
 			var d := part.global_position.distance_to(point)
 			if d < best_dist:
 				best_dist = d

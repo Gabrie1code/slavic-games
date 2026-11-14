@@ -159,6 +159,7 @@ class Pose extends Node:
 
 	func _ready() -> void:
 		process_priority = 100
+		character.manual_pose = true # руки и ноги — по этой позе, без анимации модели
 		_time = randf() * 2.0
 
 	func _process(delta: float) -> void:

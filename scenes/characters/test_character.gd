@@ -58,6 +58,18 @@ const ARM_UP := 2.75
 const ARM_SIDE := 1.45
 ## Ходьба: частота шага и размах рук/ног.
 const STEP_FREQUENCY := 2.4
+## Анимации модели: шагом до RUN_ANIM_FROM м/с, дальше бегом; скорость, при которой анимация
+## идёт с обычной скоростью (быстрее — проигрывается быстрее, в пределах ANIM_SPEED_MIN..MAX).
+const RUN_ANIM_FROM := 2.5
+const WALK_ANIM_SPEED := 1.4
+const RUN_ANIM_SPEED := 2.8
+const ANIM_SPEED_MIN := 0.5
+const ANIM_SPEED_MAX := 2.2
+## Поза прыжка — кадр анимации Jump по скорости: взлёт (ноги поджимаются) … падение (тянутся вниз).
+const JUMP_RISE_TIME := 7.0 / 24.0
+const JUMP_FALL_TIME := 13.0 / 24.0
+## Смерть: анимация Death чуть быстрее (успевает упасть до исчезновения).
+const DEATH_ANIM_SPEED := 1.5
 const SWING := 0.65
 
 var player: PlayerData
@@ -79,6 +91,8 @@ var fall_limit := -10.0
 var arm_pose_x := 0.0
 ## Сидит ли персонаж (на диване в лобби).
 var sitting := false
+## Позу рук и ног целиком задаёт внешний код через part() (пьедестал итогов) — без анимации.
+var manual_pose := false
 ## Вид от первого лица: движение относительно взгляда.
 var first_person := false
 ## Насколько персонаж присел: 0 — стоит, 1 — сидит на корточках (плавно).
@@ -136,6 +150,7 @@ var _render_layer := 1
 ## Часть тела -> узел (см. CharacterRig); у цельной модели ещё и «гнёзда» для предметов.
 var _parts: Dictionary = {}
 var _rig: CharacterRig = null
+var _dying := false
 
 @onready var visual: Node3D = $Visual
 @onready var right_hand: Node3D = Node3D.new()
@@ -263,7 +278,9 @@ func _process(delta: float) -> void:
 	_part("Torso").rotation.x = -CROUCH_LEAN * crouch_amount - lean
 	_update_drunk(delta)
 	# Подпрыгивание при шаге и лёгкое «дыхание» в стойке.
-	_model.position.y = SIT_DROP if sitting else absf(sin(_walk_phase)) * 0.06 * amount
+	# У модели с анимациями тело качается само (в анимации ходьбы), подпрыгивание от кода не нужно.
+	var bob := 0.0 if _rig and _rig.animated() else 0.06
+	_model.position.y = SIT_DROP if sitting else absf(sin(_walk_phase)) * bob * amount
 	if crouch_amount > 0.0 and not sitting:
 		var legs := minf(absf(_part("LegL").rotation.x), absf(_part("LegR").rotation.x))
 		var rise := LEG_LENGTH * (1.0 - cos(legs)) - HEEL * sin(legs)
@@ -276,14 +293,44 @@ func _process(delta: float) -> void:
 	# Свободный взгляд: голова поворачивается за камерой (не до конца — шея не ломается).
 	_part("Head").rotation.y = clampf(head_yaw, -1.3, 1.3)
 	_animate_jump(delta)
-	_drive_rig()
+	_drive_rig(delta, walk_speed)
 
 
-## Цельная модель: кости — по частям тела; локти чуть согнуты (сильнее, когда рука впереди),
-## колено гнётся, когда нога уходит назад, сидя — голень вниз.
-func _drive_rig() -> void:
+## Цельная модель: анимация по состоянию (стоит, идёт, бежит, в воздухе), поверх — позы от кода.
+## Локти от кода чуть согнуты (сильнее, когда рука впереди), колено гнётся, когда нога уходит
+## назад, сидя — голень вниз.
+func _drive_rig(delta: float, walk_speed: float) -> void:
 	if _rig == null:
 		return
+	var airborne := _air > 0.3
+	if _rig.animated() and not _dying:
+		if sitting:
+			_rig.play("Idle")
+		elif airborne:
+			var rise := clampf(0.5 + 0.5 * velocity.y / JUMP_VELOCITY, 0.0, 1.0)
+			_rig.hold("Jump", lerpf(JUMP_FALL_TIME, JUMP_RISE_TIME, rise))
+		elif walk_speed > 0.3 and walk_speed < RUN_ANIM_FROM:
+			_rig.play("Walk", clampf(walk_speed / WALK_ANIM_SPEED, ANIM_SPEED_MIN, ANIM_SPEED_MAX))
+		elif walk_speed >= RUN_ANIM_FROM:
+			_rig.play("Run", clampf(walk_speed / RUN_ANIM_SPEED, ANIM_SPEED_MIN, ANIM_SPEED_MAX))
+		else:
+			_rig.play("Idle")
+	_rig.lock_root = airborne and not _dying
+	# Вес позы от кода: правая рука — держит предмет или замахивается; ноги — сидя и присев.
+	# Без анимаций в модели всё тело — от кода.
+	var arm_r := _right_arm_busy or (_arm_tween != null and _arm_tween.is_running()) or manual_pose
+	var w_arm_r := 1.0 if arm_r else move_toward(float(_rig.weights["ArmR"]), 0.0, delta * 6.0)
+	var w_arm_l := move_toward(float(_rig.weights["ArmL"]), 1.0 if manual_pose else 0.0, delta * 6.0)
+	var w_legs := move_toward(float(_rig.weights["LegL"]),
+		1.0 if sitting or manual_pose else crouch_amount, delta * 8.0)
+	if not _rig.animated():
+		w_arm_r = 1.0
+		w_arm_l = 1.0
+		w_legs = 1.0
+	_rig.weights["ArmR"] = w_arm_r
+	_rig.weights["ArmL"] = w_arm_l
+	_rig.weights["LegL"] = w_legs
+	_rig.weights["LegR"] = w_legs
 	var elbows := {}
 	for arm in ["ArmL", "ArmR"]:
 		elbows[arm] = 0.18 + maxf(0.0, _part(arm).rotation.x) * 0.7
@@ -293,7 +340,7 @@ func _drive_rig() -> void:
 	for leg in ["LegL", "LegR"]:
 		var swing_x := _part(leg).rotation.x
 		knees[leg] = -swing_x if sitting else -maxf(0.0, -swing_x) * 0.9
-	_rig.drive(elbows, knees)
+	_rig.update(delta, elbows, knees)
 
 
 ## Части тела: у цельной модели — узлы CharacterRig, у старой модели из частей — её узлы.
@@ -308,6 +355,13 @@ func _setup_parts() -> void:
 	# Голова и руки — внутри туловища: при наклоне (приседание) они наклоняются вместе с ним.
 	for limb in ["Head", "ArmL", "ArmR"]:
 		_part(limb).reparent(_part("Torso"), true)
+
+
+## Куда крепить одежду на части тела: у цельной модели — рамка, повторяющая кость (с анимацией).
+func _frame(part_name: String) -> Node3D:
+	if _rig and _rig.frames.has(part_name):
+		return _rig.frames[part_name] as Node3D
+	return _part(part_name)
 
 
 ## Куда крепить предметы на части тела (у цельной модели — гнездо с поправкой на размеры).
@@ -539,7 +593,7 @@ func wear(slot: int, item_id: String) -> void:
 			continue
 		var piece_3d := piece as Node3D
 		item.remove_child(piece_3d)
-		_part(String(piece.name)).add_child(piece_3d)
+		_frame(String(piece.name)).add_child(piece_3d)
 		# Слои одежды: шапка шире головы (голова не торчит на бегу), верх поверх штанов,
 		# обувь поверх штанин — внешний слой чуть шире по X/Z вокруг оси части тела.
 		# У цельной модели одежда прежнего тела подгоняется под новое (CharacterRig.fit).
@@ -574,7 +628,7 @@ func _shirt_number() -> Label3D:
 	number.pixel_size = 0.0022
 	# Спина туловища: в координатах части Torso (сустав — таз).
 	number.position = Vector3(0, 0.3, 0.12 if _rig else 0.215)
-	_part("Torso").add_child(number)
+	_frame("Torso").add_child(number)
 	_apply_layer(number)
 	return number
 
@@ -626,10 +680,16 @@ func play_death(fade_delay: float = 0.9, fade_time: float = 1.0) -> void:
 			bar.rotation.z = angle
 			attach_to_part("Head", bar)
 			meshes.append(bar)
-	create_tween().tween_property(visual, "rotation:x", PI / 2, 0.45) \
-		.set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
-	# Лёжа тело приподнято на половину толщины — не уходит наполовину в землю.
-	create_tween().tween_property(visual, "position:y", visual.position.y + 0.2, 0.45)
+	_dying = true
+	if _rig and _rig.animated():
+		# Падает по анимации Death модели.
+		_right_arm_busy = false
+		_rig.play("Death", DEATH_ANIM_SPEED, 0.1)
+	else:
+		create_tween().tween_property(visual, "rotation:x", PI / 2, 0.45) \
+			.set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
+		# Лёжа тело приподнято на половину толщины — не уходит наполовину в землю.
+		create_tween().tween_property(visual, "position:y", visual.position.y + 0.2, 0.45)
 	# Исчезновение — все части сразу, после падения и паузы.
 	var fade := create_tween().set_parallel(true)
 	var start := 0.45 + fade_delay
@@ -678,8 +738,9 @@ func _apply_layer(node: Node) -> void:
 
 
 ## Часть тела по имени (Torso/Head/ArmL/ArmR/LegL/LegR) — для поз вне игры (пьедестал итогов).
-func part(part_name: String) -> Node3D:
-	return _part(part_name)
+## visible_frame — видимая часть (повторяет анимацию): к ней прилипают следы краски и т.п.
+func part(part_name: String, visible_frame: bool = false) -> Node3D:
+	return _frame(part_name) if visible_frame else _part(part_name)
 
 
 func _part(part_name: String) -> Node3D:
