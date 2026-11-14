@@ -183,7 +183,7 @@ func tint_clouds(color: Color) -> void:
 
 
 ## Облака разных видов по кругу (seed постоянный — каждый раз одинаково): плоские картинки,
-## всегда повёрнутые к игроку, в 260–420 м, на разной высоте над горизонтом.
+## повёрнутые к центру двора, в 260–420 м, на разной высоте над горизонтом.
 func _build_clouds() -> void:
 	_clouds = Node3D.new()
 	add_child(_clouds)
@@ -196,12 +196,14 @@ func _build_clouds() -> void:
 		var elevation := deg_to_rad(rng.randf_range(float(kind[1]), float(kind[2])))
 		var cloud := Sprite3D.new()
 		cloud.texture = load(SKY + String(kind[0]) + ".png") as Texture2D
-		cloud.billboard = BaseMaterial3D.BILLBOARD_FIXED_Y
 		cloud.shaded = false
 		cloud.pixel_size = dist * rng.randf_range(0.0008, 0.0014)
 		cloud.flip_h = rng.randf() < 0.5
 		cloud.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		cloud.position = Vector3(cos(angle) * dist, tan(elevation) * dist, sin(angle) * dist)
+		# Повёрнуто к центру двора один раз (не «billboard»): billboard поворачивался вслед за
+		# камерой вокруг своей середины, и широкие облака заметно ездили по небу при повороте мыши.
+		cloud.rotation.y = atan2(cloud.position.x, cloud.position.z) + PI
 		_clouds.add_child(cloud)
 
 
