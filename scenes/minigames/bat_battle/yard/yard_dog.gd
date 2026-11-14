@@ -1,18 +1,28 @@
 class_name YardDog
 extends Node3D
 ## Бездомная собака бродит перед гаражами туда-сюда: идёт, останавливается понюхать землю,
-## иногда садится почесаться. Просто декорация — ни с кем не сталкивается.
+## иногда садится почесаться. Просто декорация — ни с кем не сталкивается, но препятствие
+## (открытую створку гаража) обходит дугой: у avoid_x отходит от гаражей на avoid_depth.
 
 const SCENE := preload("res://assets/models/courtyard/dog.glb")
 const SPEED := 1.3
 const MIN_X := -9.0
 const MAX_X := 9.0
+## Обход: ровный участок ±AVOID_HALF вокруг avoid_x, плавный заход длиной AVOID_RAMP.
+const AVOID_HALF := 0.8
+const AVOID_RAMP := 0.6
+
+## Где по X препятствие у стены (INF — обходить нечего).
+var avoid_x := INF
+## На сколько отойти от стены у препятствия.
+var avoid_depth := 1.0
 
 var _parts: Dictionary = {}
 var _target_x := 0.0
 var _wait := 0.0
 var _sniff := false
 var _time := 0.0
+var _base_z := 0.0
 
 
 func _ready() -> void:
@@ -20,6 +30,7 @@ func _ready() -> void:
 	add_child(model)
 	for part in ["DogBody", "DogHead", "DogTail", "LegFL", "LegFR", "LegBL", "LegBR"]:
 		_parts[part] = model.find_child(part, true, false)
+	_base_z = position.z
 	_pick_target()
 
 
@@ -37,10 +48,21 @@ func _process(delta: float) -> void:
 			_sniff = randf() < 0.6
 		else:
 			walking = true
+			var before := position
 			position.x += signf(dx) * minf(SPEED * delta, absf(dx))
-			# Собака смотрит по -Z: вправо (+X) — поворот −90°.
-			rotation.y = lerp_angle(rotation.y, -PI / 2 * signf(dx), minf(1.0, delta * 6.0))
+			position.z = _base_z + _detour(position.x)
+			# Собака смотрит по -Z: поворот по направлению шага.
+			var step := position - before
+			rotation.y = lerp_angle(rotation.y, atan2(-step.x, -step.z), minf(1.0, delta * 6.0))
 	_animate(walking, delta)
+
+
+## Насколько отойти от стены в точке x, чтобы обойти препятствие (0 — идти прямо).
+func _detour(x: float) -> float:
+	if avoid_x == INF:
+		return 0.0
+	var k := clampf(1.0 - (absf(x - avoid_x) - AVOID_HALF) / AVOID_RAMP, 0.0, 1.0)
+	return avoid_depth * smoothstep(0.0, 1.0, k)
 
 
 func _pick_target() -> void:

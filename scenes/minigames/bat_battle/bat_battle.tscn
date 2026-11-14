@@ -108,10 +108,6 @@ mesh = SubResource("BoxMesh_roof_edge")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6.375, -1.9, 0)
 mesh = SubResource("BoxMesh_garage_a")
 
-[node name="Garage2" type="MeshInstance3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.125, -1.9, 0)
-mesh = SubResource("BoxMesh_garage_b")
-
 [node name="Garage3" type="MeshInstance3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.125, -1.9, 0)
 mesh = SubResource("BoxMesh_garage_a")

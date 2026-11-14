@@ -6,7 +6,7 @@ extends Node3D
 ##   спереди — разбитый асфальт и лужи, чёрный «гелик» (без эмблем), «копейка» на кирпичах,
 ##   мусорные баки, бочки, ящики, лестница к крыше; на воротах — номера, замки и надписи.
 ## Баки стоят наискосок; правый приоткрыт и полон мусора, на его углу сидит «местный» голубь.
-## Второй гараж («№18») приоткрыт — внутри картинка-заглушка (garage_inside.png) и лампочка.
+## Второй гараж («№18») приоткрыт и объёмный (OpenGarage) — внутри мастерская с лампочкой.
 ## Асфальт: площадка перед гаражами, тротуар вдоль дома сзади (подъезды выходят прямо на него),
 ## тротуары у боковых домов и проезды по бокам от гаражей — всё одним цветом и на одной высоте.
 ## Голуби сидят по краям крыши и на мусорных баках и улетают (сами или если рядом боец);
@@ -59,6 +59,9 @@ func _ready() -> void:
 	_build_garage_details()
 	var dog := YardDog.new()
 	dog.position = Vector3(0, GROUND_Y, 4.95)
+	# Обходит открытую створку (левая: от петли x−1.65 уходит вправо-вперёд).
+	dog.avoid_x = DOOR_X[OPEN_GARAGE] - 1.65 + 0.45
+	dog.avoid_depth = 1.45
 	add_child(dog)
 	for i in PIGEON_COUNT:
 		_spawn_pigeon(false)
@@ -190,43 +193,14 @@ func _build_trash_bags() -> void:
 	pigeon.rotation.y = BIN_YAW + 0.4
 
 
-## Гараж OPEN_GARAGE приоткрыт: левая створка закрыта, правая открыта наружу; за ней —
-## картинка внутренности (свет лампочки, полки, шины, велосипед) и тёплый свет.
+## Гараж OPEN_GARAGE приоткрыт и объёмный (OpenGarage): настоящий проём, внутри верстак,
+## инструменты, полка, шины, велосипед и лампочка. Его коробку Garage2 из сцены заменяет он.
 func _build_open_garage() -> void:
-	var x := DOOR_X[OPEN_GARAGE]
-	var inside := MeshInstance3D.new()
-	var quad := QuadMesh.new()
-	quad.size = Vector2(3.24, 2.26)
-	inside.mesh = quad
-	var inside_mat := StandardMaterial3D.new()
-	inside_mat.albedo_texture = load("res://assets/textures/garage/garage_inside.png")
-	inside_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED # полумрак уже нарисован
-	inside.material_override = inside_mat
-	inside.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	inside.position = Vector3(x, -2.25, 4.505)
-	add_child(inside)
-	var leaf_mat := _mat(Color(0.5, 0.23, 0.12), 0.8)
-	for side: float in [-1.0, 1.0]:
-		var hinge := Node3D.new()
-		hinge.position = Vector3(x + side * 1.65, -2.25, 4.53)
-		hinge.rotation.y = OPEN_LEAF_ANGLE if side > 0.0 else 0.0
-		add_child(hinge)
-		var leaf := MeshInstance3D.new()
-		var mesh := BoxMesh.new()
-		mesh.size = Vector3(1.64, 2.3, 0.06)
-		leaf.mesh = mesh
-		leaf.material_override = leaf_mat
-		leaf.position = Vector3(-side * 0.82, 0, 0)
-		hinge.add_child(leaf)
-		if side > 0.0: # номер — на открытой створке
-			_decal("plate_%d" % GARAGE_NUMBERS[OPEN_GARAGE], Vector2(0.56, 0.28),
-				Vector3(-0.45, 0.83, 0.035), hinge)
-	var lamp := OmniLight3D.new()
-	lamp.light_color = Color(1.0, 0.78, 0.5)
-	lamp.light_energy = 0.8
-	lamp.omni_range = 3.0
-	lamp.position = Vector3(x, -1.4, 4.9)
-	add_child(lamp)
+	var garage := OpenGarage.new()
+	var plate := "res://assets/textures/garage/plate_%d.png" % GARAGE_NUMBERS[OPEN_GARAGE]
+	garage.plate_texture = load(plate)
+	garage.position = Vector3(DOOR_X[OPEN_GARAGE], GROUND_Y, 0)
+	add_child(garage)
 
 
 # ---------------- Земля ----------------
@@ -248,6 +222,7 @@ func _build_ground() -> void:
 		var walk := _box(Vector3(28.0, 0.04, 2.0), Vector3.ZERO, asphalt)
 		walk.rotation.y = yaw
 		walk.position = house + Vector3(0, 0, 6.5).rotated(Vector3.UP, yaw) + Vector3(0, 0.02, 0)
+		_wedge(side, asphalt)
 	# Разбитый асфальт: несколько заплаток на площадке перед гаражами, не касаются друг
 	# друга, луж и люков.
 	var rng := RandomNumberGenerator.new()
@@ -299,15 +274,34 @@ func _build_ground() -> void:
 		_place("manhole", spot + Vector3(0, GROUND_Y + 0.05, 0), rng.randf() * TAU)
 
 
+## Треугольник асфальта в развилке: где тротуар бокового дома отходит от тротуара у дома
+## сзади, оставался зелёный клин — заливаем его (верх на той же высоте, что весь асфальт).
+func _wedge(side: float, material: Material) -> void:
+	var a := Vector2(side * 20.39, -8.0) # край заднего тротуара × край бокового
+	var b := Vector2(side * 16.0, -8.0)
+	var c := a + Vector2(-side, -1.0).normalized() * 5.5 # вверх вдоль бокового тротуара
+	var tool := SurfaceTool.new()
+	tool.begin(Mesh.PRIMITIVE_TRIANGLES)
+	tool.set_normal(Vector3.UP)
+	for p: Vector2 in [a, b, c]:
+		tool.add_vertex(Vector3(p.x, GROUND_Y + 0.04, p.y))
+	var mesh_instance := MeshInstance3D.new()
+	mesh_instance.mesh = tool.commit()
+	var mat := (material as StandardMaterial3D).duplicate() as StandardMaterial3D
+	mat.cull_mode = BaseMaterial3D.CULL_DISABLED # порядок вершин не важен
+	mesh_instance.material_override = mat
+	add_child(mesh_instance)
+
+
 # ---------------- Дома, деревья, фонари ----------------
 
 func _build_buildings() -> void:
 	_place("khrushchevka", Vector3(0, GROUND_Y, -13.5))
 	_place("khrushchevka", Vector3(-31, GROUND_Y, -8.0), PI / 4)
 	_place("khrushchevka", Vector3(31, GROUND_Y, -8.0), -PI / 4)
-	# Деревья за гаражами — между подъездами, а не у дверей (подъезды: x −8.1, 1.2, 10.5).
-	for spot: Vector3 in [Vector3(-12.5, 0, -2.0), Vector3(13.0, 0, 1.0), Vector3(-3.6, 0, -5.6),
-			Vector3(5.8, 0, -5.6)]:
+	# Деревья — только по бокам от гаражей: сзади их кроны закрывали крышу (поле битвы),
+	# а у дома — двери подъездов.
+	for spot: Vector3 in [Vector3(-12.5, 0, -2.0), Vector3(13.0, 0, 1.0)]:
 		var model := "tree_poplar" if int(spot.x) % 2 == 0 else "tree_birch"
 		_place(model, spot + Vector3(0, GROUND_Y, 0), randf() * TAU)
 	_place("tree_birch", Vector3(-18.6, GROUND_Y, 9.0)) # на траве за краем асфальта
@@ -353,7 +347,7 @@ func _build_front() -> void:
 			blink_gelik())
 	gelik.add_child(sensor)
 
-	_solid("kopeyka", Vector3(4.1, 1.7, 1.65), Vector3(-4.4, GROUND_Y, 6.6), PI)
+	_solid("kopeyka", Vector3(4.1, 1.7, 1.65), Vector3(-6.0, GROUND_Y, 7.7), PI) # не под створкой
 	_solid("trash_bin_open", Vector3(1.5, 1.2, 1.0), BINS[0], BIN_YAW)
 	_solid("trash_bin", Vector3(1.5, 1.2, 1.0), BINS[1], BIN_YAW)
 	_solid("barrel", Vector3(0.65, 0.9, 0.65), Vector3(9.4, GROUND_Y, 3.3))
