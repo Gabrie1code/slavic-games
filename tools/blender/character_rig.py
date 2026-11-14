@@ -28,7 +28,7 @@ WRIST = Vector((0.29, 0.0, 0.6))
 HIP = Vector((0.092, 0.0, 0.6))
 KNEE = Vector((0.094, 0.005, 0.34))
 ANKLE = Vector((0.094, 0.0, 0.11))
-HEAD_SIZE = Vector((0.43, 0.39, 0.42))
+HEAD_SIZE = Vector((0.46, 0.42, 0.45))
 
 
 def mat(name, color, rough=0.55):
@@ -118,8 +118,8 @@ def mirror_x(v):
 def build_body():
     pieces = []
     # Корпус: от паха до шеи, плечи покатые, спина чуть выпуклая.
-    pieces.append(lathe([(0.0, 0.0, 0.53), (0.1, 0.08, 0.545), (0.155, 0.11, 0.585),
-                         (0.168, 0.12, 0.65), (0.165, 0.118, 0.74), (0.172, 0.122, 0.83),
+    pieces.append(lathe([(0.0, 0.0, 0.53), (0.11, 0.085, 0.545), (0.165, 0.118, 0.585),
+                         (0.18, 0.128, 0.65), (0.176, 0.125, 0.74), (0.178, 0.126, 0.83),
                          (0.185, 0.128, 0.91), (0.2, 0.13, 0.96), (0.205, 0.125, 0.995),
                          (0.185, 0.11, 1.03), (0.13, 0.09, 1.06), (0.075, 0.068, 1.08),
                          (0.062, 0.06, 1.1), (0.06, 0.058, 1.16), (0.0, 0.0, 1.17)], 40, "Torso"))
@@ -279,18 +279,37 @@ POSES = {
             "ForearmL": (1.3, 0, 0), "ThighR": (0.95, 0, 0), "ShinR": (-1.2, 0, 0),
             "ThighL": (-0.55, 0, 0), "ShinL": (-1.0, 0, 0), "Spine": (-0.18, 0, 0), "Head": (0.1, 0, 0)},
     "jump": {"UpperArmR": (0.2, 0, -2.5), "ForearmR": (0.4, 0, 0), "UpperArmL": (0.2, 0, 1.0),
-             "ForearmL": (1.0, 0, 0), "ThighR": (1.0, 0, -0.18), "ShinR": (-1.5, 0, 0),
-             "ThighL": (-0.2, 0, 0.15), "ShinL": (-1.1, 0, 0), "Head": (0.15, 0, 0)},
+             "ForearmL": (1.0, 0, 0), "ThighR": (1.2, 0, -0.12), "ShinR": (-1.8, 0, 0),
+             "ThighL": (0.35, 0, 0.14), "ShinL": (-1.7, 0, 0), "Head": (0.15, 0, 0)},
     "crouch": {"Spine": (-0.35, 0, 0), "Chest": (-0.1, 0, 0),
                "UpperArmR": (0.6, 0, -0.25), "ForearmR": (0.9, 0, 0), "UpperArmL": (0.6, 0, 0.25),
                "ForearmL": (0.9, 0, 0), "ThighR": (1.15, 0, -0.08), "ShinR": (-1.7, 0, 0),
                "ThighL": (1.15, 0, 0.08), "ShinL": (-1.7, 0, 0), "Head": (0.3, 0, 0)},
-    "think": {"UpperArmR": (0.55, 0, 0.5), "ForearmR": (2.1, 0, 0), "HandR": (0.3, 0, 0), "UpperArmL": (0.15, 0, 0.15),
+    "think": { "UpperArmL": (0.15, 0, 0.15),
               "ForearmL": (0.7, 0, 0), "ThighL": (0.0, 0, 0.12), "Head": (-0.12, 0.2, 0)},
 }
 
 
+CHIN = Vector((0.04, 0.24, HEAD_Z + 0.04))   # куда тянется кисть в позе «думает»
+
+
 def set_pose(name):
+    ik = rig.pose.bones["ForearmR"].constraints.get("IK")
+    if name == "think" and ik is None:
+        target = bpy.data.objects.new("ChinTarget", None)
+        SCN.collection.objects.link(target)
+        target.location = CHIN
+        pole = bpy.data.objects.new("ElbowPole", None)
+        SCN.collection.objects.link(pole)
+        pole.location = Vector((0.45, 0.1, 0.75))                 # локоть — вниз и в сторону
+        ik = rig.pose.bones["ForearmR"].constraints.new("IK")
+        ik.name = "IK"
+        ik.target = target
+        ik.pole_target = pole
+        ik.pole_angle = 0.0
+        ik.chain_count = 2
+    elif name != "think" and ik is not None:
+        rig.pose.bones["ForearmR"].constraints.remove(ik)
     for pb in rig.pose.bones:
         pb.rotation_mode = "XYZ"
         pb.rotation_euler = (0, 0, 0)
