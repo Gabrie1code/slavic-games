@@ -107,6 +107,14 @@ class Builder:
         self.faces.append((base, base + 1, base + 2, base + 3))
         self.mats.append(self._mi(m))
 
+    def tri_uv(self, pts, uvs, m):
+        """Треугольник с картинкой: pts — 3 точки, uvs — их UV."""
+        base = len(self.verts)
+        self.verts += [tuple(p) for p in pts]
+        self.uvs[len(self.faces)] = list(uvs)
+        self.faces.append((base, base + 1, base + 2))
+        self.mats.append(self._mi(m))
+
     def poly(self, pts, faces, m):
         base = len(self.verts)
         self.verts += [tuple(p) for p in pts]
@@ -153,6 +161,60 @@ FRAME_WOOD = mat("CFrameWood", (0.42, 0.27, 0.14))
 GLASS = mat("CGlass", (0.16, 0.22, 0.28), 0.15)
 GLASS_SKY = mat("CGlassSky", (0.4, 0.52, 0.6), 0.1)
 DISH = mat("CDish", (0.82, 0.83, 0.84), 0.5, 0.2)
+# Лицо тарелки: пародийный логотип «ДВУКОЛОР» (tools/textures/dish_logo.py).
+DISH_FACE = mat("CDishFace", (1, 1, 1), 0.45, image="assets/textures/city/dish_logo.png")
+
+
+def dish(B, center, out, ax=0.34, az=0.38, depth=0.07, tilt=0.25):
+    """Спутниковая тарелка как настоящая офсетная: овальная вогнутая чаша (лицо с картинкой,
+    изнанка серая, ободок), снизу изогнутая штанга с конвертером в фокусе, сзади кронштейн.
+    center — центр чаши, out — ±1: куда смотрит (по Y), tilt — наклон вверх (рад)."""
+    c = Vector(center)
+    n, rings = 20, 4
+    ct, st = math.cos(tilt), math.sin(tilt)
+
+    def pt(u, v, back=False):
+        x, z = u * ax, v * az
+        y = -out * depth * (1 - (u * u + v * v)) - (out * 0.012 if back else 0.0)
+        # Наклон вверх: поворот вокруг X (лицо смотрит наружу и чуть вверх).
+        yy = y * ct - z * st * out
+        zz = z * ct + y * st * out
+        return c + Vector((x, yy, zz))
+
+    grid = [[(0.0, 0.0)] * (n) for _ in range(rings + 1)]
+    for r in range(rings + 1):
+        rad = r / rings
+        for k in range(n):
+            a = k * math.tau / n
+            grid[r][k] = (math.cos(a) * rad, math.sin(a) * rad)
+    for r in range(rings):
+        for k in range(n):
+            k2 = (k + 1) % n
+            quad = [grid[r][k], grid[r][k2], grid[r + 1][k2], grid[r + 1][k]]
+            tris = [(quad[0], quad[1], quad[2]), (quad[0], quad[2], quad[3])]
+            for t in tris:
+                if out > 0:
+                    t = (t[0], t[2], t[1])
+                uvs = [(0.5 + u * 0.5, 0.5 + v * 0.5) for u, v in t]
+                B.tri_uv([pt(u, v) for u, v in t], uvs, DISH_FACE)                 # лицо
+                B.tri_uv([pt(u, v, True) for u, v in reversed(t)], [(0, 0)] * 3, DISH)  # изнанка
+    for k in range(n):                                                             # ободок
+        a0, a1 = k * math.tau / n, (k + 1) * math.tau / n
+        p0, p1 = pt(math.cos(a0), math.sin(a0)), pt(math.cos(a1), math.sin(a1))
+        q0, q1 = pt(math.cos(a0), math.sin(a0), True), pt(math.cos(a1), math.sin(a1), True)
+        B.poly([p0, p1, q1, q0], [(0, 1, 2, 3) if out < 0 else (3, 2, 1, 0)], DISH)
+    # Штанга: от низа чаши вперёд-вверх к фокусу, на конце — конвертер.
+    bottom = pt(0.0, -0.95)
+    focus = c + Vector((0.12, out * 0.42, -0.02))
+    knee = c + Vector((0.08, out * 0.3, -az * 0.9))
+    for a, b in ((bottom, knee), (knee, focus)):
+        d = b - a
+        B.box((0.025, 0.025, d.length), tuple((a + b) / 2), DISH, rot=tuple(d.to_track_quat("Z", "Y").to_euler()))
+    B.box((0.06, 0.08, 0.06), tuple(focus + Vector((0, -out * 0.02, 0))), WHITE)
+    B.box((0.05, 0.05, 0.04), tuple(focus + Vector((0, out * 0.03, 0))), DARK)
+    return pt(0.0, 0.0, True)                                                      # центр изнанки
+
+
 # Стекло застеклённых балконов: картинка «что за стеклом» (tools/textures/balcony_glass.py, 8 вариантов).
 BALCONY_GLASS = mat("CBalconyGlass", (1, 1, 1), 0.15, image="assets/textures/city/balcony_glass.png")
 
@@ -290,8 +352,12 @@ def balcony(B, rng, x, y, z_floor, w=2.4, depth=1.1, style=None, out=-1):
             B.box((0.03, 0.04, H), (x - w / 2 + k * w / n, yf + f * 0.03, z_floor + H / 2), c)
         for s in (-1, 1):
             B.box((0.05, depth, H), (x + s * w / 2, yc, z_floor + H / 2), c)
-    # Вещи на открытом балконе.
+    # Вещи на открытом балконе. Тарелка — редко (у каждого ~10-го), и тогда на перилах ничего не
+    # висит (ковёр, ящики с цветами закрыли бы её или вошли в неё).
+    has_dish = rng.random() < 0.09
     r = rng.random()
+    if has_dish and 0.3 <= r < 0.55:
+        r = 0.9                                                                     # без ковра и ящиков
     if r < 0.3:                                                                     # бельё
         B.box((w - 0.2, 0.015, 0.015), (x, yc, z_floor + 1.85), WHITE)
         for k in range(rng.randint(2, 4)):
@@ -317,18 +383,15 @@ def balcony(B, rng, x, y, z_floor, w=2.4, depth=1.1, style=None, out=-1):
         B.box((0.14, 0.14, 0.14), (cx + 0.2, yf, z_floor + H + 0.27), CAT)              # голова
     elif r < 0.82:                                                                  # санки
         B.box((0.9, 0.35, 0.05), (x, yc, z_floor + 0.75), mat("CSled", (0.55, 0.35, 0.18)), rot=(0, 1.3, 0))
-    if rng.random() < 0.25:                                                         # спутниковая тарелка
-        # Чаша смотрит НАРУЖУ и чуть вверх (раньше — в стену: была видна тёмная изнанка),
-        # светло-серая, на кронштейне от перил, с конвертером на штанге.
-        dx, dz = x + w / 2 - 0.25, z_floor + 1.55
-        dy = yf + f * 0.35
-        tilt = math.radians(-70 * f)                                                 # ось: наружу и вверх
-        B.box((0.04, 0.35, 0.04), (dx, yf + f * 0.17, dz - 0.15), METAL)              # кронштейн
-        B.cyl(0.3, 0.07, (dx, dy, dz), DISH, n=16, r2=0.12, rot=(tilt, 0, 0))
-        axis = Vector((0, -math.sin(tilt), math.cos(tilt)))
-        tip = Vector((dx, dy, dz)) + axis * 0.32
-        B.box((0.03, 0.03, 0.34), tuple(Vector((dx, dy, dz)) + axis * 0.16), METAL, rot=(tilt, 0, 0))
-        B.box((0.07, 0.07, 0.09), tuple(tip), DARK, rot=(tilt, 0, 0))                 # конвертер
+    if has_dish:                                                                    # спутниковая тарелка
+        # Висит снаружи перил (ни во что не входит): чаша смотрит наружу и чуть вверх,
+        # от изнанки к перилам — кронштейн.
+        dx = x + w / 2 - 0.5
+        center = (dx, yf + f * 0.42, z_floor + H + 0.42)
+        back = dish(B, center, f)
+        rail = Vector((dx, yf + f * 0.04, z_floor + H - 0.1))
+        d = rail - back
+        B.box((0.04, 0.04, d.length), tuple((back + rail) / 2), METAL, rot=tuple(d.to_track_quat("Z", "Y").to_euler()))
 
 
 def entrance(B, x, y, ground=0.0, w=1.4, canopy=CONCRETE, door=DOOR, out=-1):
