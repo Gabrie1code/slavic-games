@@ -21,8 +21,8 @@ const SANDBOX := Vector3(-5.0, 0, -2.5) * S
 ## Только декорации (без столкновений, за забором).
 const SURROUNDINGS: Array = [
 	# Близкий круг: лицом к площадке.
-	["khrushchevka", Vector3(0, 0, -26.25), 0.0],
-	["khrushchevka", Vector3(-36, 0, -4.5), PI / 2],
+	["khrushchevka_yard", Vector3(0, 0, -26.25), 0.0],
+	["khrushchevka_yard", Vector3(-36, 0, -4.5), PI / 2],
 	["brick_khrushchevka", Vector3(35, 0, -4.5), -PI / 2],
 	["panel_ninestory", Vector3(-6, 0, 31), PI],
 	["garage_row", Vector3(22, 0, 20), PI],
@@ -39,7 +39,7 @@ const SURROUNDINGS: Array = [
 	["panel_ninestory", Vector3(-85, 0, 35), PI / 2],
 	["panel_ninestory", Vector3(95, 0, 5), -PI / 2],
 	["stalinka", Vector3(60, 0, -75), -0.4],
-	["khrushchevka", Vector3(-55, 0, -80), 0.3],
+	["khrushchevka_yard", Vector3(-55, 0, -80), 0.3],
 	# Труба ТЭЦ и краны — в просветах между ближними домами (иначе их закрывают дома).
 	["tec_chimney", Vector3(-111, 0, 100), 0.6],
 	["tower_crane", Vector3(105, 0, 34), 2.4],
@@ -52,6 +52,10 @@ const EXTRA_TREES: Array[Vector3] = [
 	Vector3(-18, 0, -22), Vector3(30, 0, 13), Vector3(-30, 0, 24), Vector3(44, 0, -12),
 ]
 
+const YARD_BUSHES: Array[Vector3] = [
+	Vector3(-21.5, 0, 6), Vector3(-21.5, 0, -9), Vector3(21.5, 0, 7), Vector3(21.5, 0, -10),
+	Vector3(-9, 0, -15.2), Vector3(10, 0, -15.2), Vector3(-13, 0, 15.2), Vector3(3, 0, 15.2),
+]
 ## Облака вокруг на 360° (tools/textures/sky_clouds.py): вид — [картинка, высота над горизонтом
 ## от и до (градусы)]; перистые выше всех, слоистые ниже. Ниже ~20° облака закрыты домами.
 const SKY := "res://assets/textures/sky/"
@@ -122,6 +126,13 @@ func _build_surroundings() -> void:
 			i * 1.7)
 	for x in [-12.5, 12.5]:
 		_place(COURTYARD + "lamp_post", Vector3(x, 0, 8.4) * S, PI)
+	# Немного кустов вокруг площадки (за асфальтовым кольцом, не на дорожках).
+	for i in YARD_BUSHES.size():
+		var bush := _place(COURTYARD + ("bush_round" if i % 2 == 0 else "bush_wide"), YARD_BUSHES[i],
+			i * 1.3)
+		bush.scale = Vector3.ONE * (0.8 + 0.1 * (i % 3))
+	# У гаражей: «жигуль» носом к гаражу (ворота четвёртого гаража приоткрыты — в модели).
+	_place(COURTYARD + "zhiguli", Vector3(27.1, 0, 16.8), -PI / 2)
 
 
 ## Земля до горизонта: основной газон сцены — 90 × 90 м, дальше — большая плоскость чуть ниже

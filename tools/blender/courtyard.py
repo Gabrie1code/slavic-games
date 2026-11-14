@@ -132,6 +132,7 @@ for f in range(1, FLOORS + 1):                                                  
 LAUNDRY = [mat("L%d" % i, c, 0.9) for i, c in enumerate(
     [(0.9, 0.2, 0.2), (0.95, 0.95, 0.9), (0.25, 0.45, 0.85), (0.95, 0.8, 0.2), (0.4, 0.75, 0.4)])]
 cols = 12
+dishes_old, dish_spots = [], []
 for f in range(FLOORS):
     z = 0.6 + f * FLOOR + 1.45
     for c in range(cols):
@@ -156,8 +157,9 @@ for f in range(FLOORS):
                     P.append(box((0.3, 0.02, random.uniform(0.3, 0.6)),
                                  (x - 0.4 + k * 0.45, y - 0.45, z + 0.35), random.choice(LAUNDRY)))
             if random.random() < 0.3:                                              # тарелка
-                P.append(cyl(0.32, 0.12, (x + 1.1, y - 0.6, z + 0.1), METAL, verts=12, r2=0.05,
-                             rot=(math.radians(-70), 0, math.radians(20))))
+                dishes_old.append(cyl(0.32, 0.12, (x + 1.1, y - 0.6, z + 0.1), METAL, verts=12, r2=0.05,
+                                      rot=(math.radians(-70), 0, math.radians(20))))
+                dish_spots.append((x + 1.1, y - 0.6, z + 0.1))
 for c in (2, 6, 10):                                                               # подъезды
     x = -W / 2 + 1.2 + c * (W - 2.4) / (cols - 1)
     P.append(box((1.3, 0.1, 2.2), (x, -D / 2 - 0.02, 1.1), mat("DoorBrown", (0.35, 0.2, 0.1), 0.7)))
@@ -168,6 +170,24 @@ for x in (-9, -2, 5, 11):                                                       
     for k in range(3):
         P.append(rod((x - 0.6 + k * 0.1, 0, H + 1.8 + k * 0.3), (x + 0.6 - k * 0.1, 0, H + 1.8 + k * 0.3),
                      0.02, METAL, verts=4))
+# Вариант для дворов мини-игр (khrushchevka_yard): тарелки светлые, НЕ металл (металл в игре
+# чёрный — были «чёрные круги»), чашей наружу и вверх, на кронштейне; их вдвое меньше.
+# Сама khrushchevka (видна из окон квартиры) не меняется.
+DISH_LIGHT = mat("DishLight", (0.84, 0.85, 0.86), 0.5, 0.1)
+P_yard = []
+for o in P:
+    c = o.copy()
+    c.data = o.data.copy()
+    bpy.context.scene.collection.objects.link(c)
+    P_yard.append(c)
+for i, (dx, dy, dz) in enumerate(dish_spots):
+    if i % 2:
+        continue
+    P_yard.append(cyl(0.3, 0.08, (dx, dy - 0.1, dz + 0.1), DISH_LIGHT, verts=16, r2=0.1,
+                      rot=(math.radians(-110), 0, math.radians(15))))
+    P_yard.append(box((0.04, 0.4, 0.04), (dx, dy + 0.15, dz - 0.05), METAL))
+export("khrushchevka_yard", [join("KhrushchevkaYard", P_yard)])
+P += dishes_old
 export("khrushchevka", [join("Khrushchevka", P)])
 
 # ---------------- Деревья: тополь и берёза ----------------
@@ -274,6 +294,32 @@ for y in (-0.55, 0.55):
     P.append(box((0.04, 0.3, 0.12), (-2.03, y, LIFT + 0.45), mat("TailOff", (0.4, 0.05, 0.05), 0.3)))
 P.append(box((0.03, 0.6, 0.1), (2.03, 0, LIFT + 0.42), CHROME))                  # решётка без эмблем
 export("kopeyka", [join("Kopeyka", P)])
+
+# ---------------- «Жигуль» на колёсах (вдоль X, перед — +X): вишнёвый, у гаражей ----------------
+CHERRY = mat("ZhiguliCherry", (0.42, 0.06, 0.08), 0.5)
+TYRE = mat("Tyre", (0.06, 0.06, 0.06), 0.9)
+HUB = mat("Hubcap", (0.75, 0.76, 0.78), 0.35, 0.2)
+LIFT = 0.3
+P = [box((4.05, 1.6, 0.62), (0, 0, LIFT + 0.31), CHERRY)]
+P.append(box((2.0, 1.45, 0.58), (-0.2, 0, LIFT + 0.9), CHERRY))
+P.append(box((1.6, 1.25, 0.04), (-0.2, 0, LIFT + 1.19), CHERRY))
+for y in (-0.73, 0.73):
+    P.append(box((1.8, 0.02, 0.42), (-0.2, y, LIFT + 0.92), GLASS))
+    P.append(box((3.9, 0.02, 0.04), (0, y * 1.1, LIFT + 0.5), CHROME))          # молдинг
+P.append(box((0.02, 1.3, 0.42), (0.81, 0, LIFT + 0.9), GLASS))
+P.append(box((0.02, 1.3, 0.4), (-1.21, 0, LIFT + 0.9), GLASS))
+for x in (-1.3, 1.3):
+    for y in (-0.74, 0.74):
+        P.append(cyl(0.3, 0.2, (x, y, 0.3), TYRE, verts=16, rot=(math.pi / 2, 0, 0)))
+        P.append(cyl(0.17, 0.21, (x, y, 0.3), HUB, verts=12, rot=(math.pi / 2, 0, 0)))
+for x in (2.05, -2.05):
+    P.append(box((0.08, 1.65, 0.14), (x, 0, LIFT + 0.18), CHROME))
+for y in (-0.55, 0.55):
+    P.append(cyl(0.09, 0.04, (2.03, y, LIFT + 0.45), LAMP_OFF, verts=10, rot=(0, math.pi / 2, 0)))
+    P.append(box((0.04, 0.3, 0.12), (-2.03, y, LIFT + 0.45), mat("TailOff", (0.4, 0.05, 0.05), 0.3)))
+P.append(box((0.03, 0.6, 0.1), (2.03, 0, LIFT + 0.42), CHROME))                  # решётка без эмблем
+P.append(box((0.03, 0.42, 0.11), (-2.06, 0, LIFT + 0.2), WHITE))               # номер
+export("zhiguli", [join("Zhiguli", P)])
 
 # ---------------- Бочка, ящик, лестница, бак, замок ----------------
 P = [cyl(0.32, 0.9, (0, 0, 0.45), RUST, verts=12)]
