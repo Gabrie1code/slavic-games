@@ -86,8 +86,9 @@ rig.rotation_euler = (0.0, 0.0, math.pi)
 # чтобы смотрел вперёд. У ходьбы шаг короче: присевший не дотянется ногой так далеко.
 # Оси костей: у Body/Hips/Head локальная Y — вверх, Z — вперёд; у ступней Y — вперёд, Z — вверх.
 CROUCH_DROP = 0.2 / SCALE    # насколько опускается таз (0.2 м в игре)
-CROUCH_LEAN = 0.45           # наклон корпуса вперёд, рад
-HEAD_BACK = 0.35             # голова поднимается обратно, рад
+CROUCH_LEAN = 0.38           # наклон корпуса вперёд, рад
+HEAD_BACK = 0.3              # голова поднимается обратно, рад
+ELBOW_BEND = 0.55            # локти сильнее согнуты (иначе кажется, что руки прямые), рад
 
 
 def _curves(act, bone, prop):
@@ -104,7 +105,7 @@ def offset_loc(act, bone, idx, d, scale=1.0):
                     pt[1] = pt[1] * scale + d
 
 
-def turn(act, bone, angle):
+def turn(act, bone, angle, axis=(1.0, 0.0, 0.0)):
     fcs = _curves(act, bone, "rotation_quaternion")
     if len(fcs) != 4:
         fcs = [act.fcurves.new('pose.bones["%s"].rotation_quaternion' % bone, index=i, action_group=bone)
@@ -113,7 +114,7 @@ def turn(act, bone, angle):
             fc.keyframe_points.insert(act.frame_range[0], 1.0 if i == 0 else 0.0)
     frames = sorted({round(kp.co[0], 3) for fc in fcs for kp in fc.keyframe_points})
     vals = [[fc.evaluate(f) for fc in fcs] for f in frames]
-    add = Quaternion((1.0, 0.0, 0.0), angle)
+    add = Quaternion(axis, angle)
     for fc in fcs:
         fc.keyframe_points.clear()
     for f, v in zip(frames, vals):
@@ -130,6 +131,9 @@ for src, name, drop, bob, stride in (("Idle", "Crouch", CROUCH_DROP, 1.0, 1.0),
     offset_loc(act, "Body", 1, -drop, bob)
     turn(act, "Hips", CROUCH_LEAN)
     turn(act, "Head", -HEAD_BACK)
+    # Локоть: ось сгиба — локальная Z кости предплечья (у правой руки «+» — вперёд, у левой «−»).
+    turn(act, "LowerArm.R", ELBOW_BEND, (0.0, 0.0, 1.0))
+    turn(act, "LowerArm.L", -ELBOW_BEND, (0.0, 0.0, 1.0))
     for side in ("L", "R"):
         offset_loc(act, "Foot." + side, 1, 0.0, stride)
         # Полюса коленей — вперёд и ниже, чтобы колени шли вперёд, а не вбок.
