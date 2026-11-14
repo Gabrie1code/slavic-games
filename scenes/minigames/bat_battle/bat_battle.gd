@@ -536,7 +536,7 @@ func _build_ui() -> void:
 	_timer_label = _label("%d" % int(ROUND_TIME), 52, Color.WHITE)
 	top.add_child(_timer_label)
 
-	var rules := "Атака (вращение): Пробел / Enter / A.  Скинь всех с крыши!"
+	var rules := "Атака (вращение): Пробел или ЛКМ / Enter / A.  Скинь всех с крыши!"
 	column.add_child(_label(rules, 20, Color.WHITE))
 
 	_message_label = _label("", 54, Color.WHITE)
