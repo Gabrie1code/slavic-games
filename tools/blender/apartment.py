@@ -19,7 +19,10 @@ bpy.ops.wm.read_factory_settings(use_empty=True)
 _mats = {}
 
 
-def mat(name, color, rough=0.6, metal=0.0, alpha=1.0):
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+
+def mat(name, color, rough=0.6, metal=0.0, alpha=1.0, image=None):
     if name in _mats:
         return _mats[name]
     m = bpy.data.materials.new(name)
@@ -28,6 +31,10 @@ def mat(name, color, rough=0.6, metal=0.0, alpha=1.0):
     b.inputs["Base Color"].default_value = (*color, 1)
     b.inputs["Roughness"].default_value = rough
     b.inputs["Metallic"].default_value = metal
+    if image:
+        tex = m.node_tree.nodes.new("ShaderNodeTexImage")
+        tex.image = bpy.data.images.load(os.path.join(ROOT, image))
+        m.node_tree.links.new(tex.outputs["Color"], b.inputs["Base Color"])
     if alpha < 1.0:
         b.inputs["Alpha"].default_value = alpha
         m.blend_method = "BLEND"
@@ -100,7 +107,9 @@ FABRIC = mat("SofaFabric", (0.42, 0.25, 0.08), 0.9)
 FABRIC2 = mat("SofaFabric2", (0.35, 0.2, 0.06), 0.9)
 GLASS = mat("Crystal", (0.75, 0.9, 1.0), 0.05, 0.0, 0.45)
 JAR_GLASS = mat("JarGlass", (0.8, 0.95, 0.9), 0.05, 0.0, 0.35)
-LID = mat("Lid", (0.7, 0.7, 0.72), 0.3, 1.0)
+# Крышки — не «металл» (в игре металл без отражений выглядел чёрным): лакированная жесть.
+LID = mat("Lid", (0.85, 0.66, 0.25), 0.35, 0.2)
+LID_RED = mat("LidRed", (0.7, 0.1, 0.08), 0.4, 0.15)
 CLAY = mat("Clay", (0.65, 0.3, 0.15), 0.8)
 GREEN = mat("Plant", (0.15, 0.45, 0.15), 0.7)
 METAL = mat("Brass", (0.75, 0.6, 0.3), 0.3, 1.0)
@@ -221,11 +230,34 @@ P = [cyl(0.04, 0.01, (0, 0, 0.005), GLASS, verts=8), cyl(0.008, 0.08, (0, 0, 0.0
 made.append(export("wine_glass", P))
 
 # ---------------- Банки ----------------
-def jar(name, fill, extra):
+def label_band(r, z0, z1, m, n=24):
+    """Этикетка вокруг банки: кольцо с UV (картинка оборачивается по кругу)."""
+    verts, faces = [], []
+    for k in range(n + 1):
+        a = k / n * math.tau
+        verts += [(math.cos(a) * r, math.sin(a) * r, z0), (math.cos(a) * r, math.sin(a) * r, z1)]
+    for k in range(n):
+        i = 2 * k
+        faces.append((i, i + 2, i + 3, i + 1))
+    me = bpy.data.meshes.new("Label")
+    me.from_pydata(verts, [], faces)
+    uv = me.uv_layers.new(name="UVMap")
+    for poly in me.polygons:
+        for li in poly.loop_indices:
+            vi = me.loops[li].vertex_index
+            uv.data[li].uv = ((vi // 2) / n, vi % 2)
+    o = bpy.data.objects.new("Label", me)
+    bpy.context.scene.collection.objects.link(o)
+    return flat(o, m)
+
+
+def jar(name, fill, extra, lid=LID, label=None):
     P = [cyl(0.1, 0.27, (0, 0, 0.135), JAR_GLASS, verts=12),
          cyl(0.085, 0.03, (0, 0, 0.285), JAR_GLASS, verts=12),
-         cyl(0.088, 0.025, (0, 0, 0.31), LID, verts=12),
+         cyl(0.088, 0.025, (0, 0, 0.31), lid, verts=12),
          cyl(0.092, 0.2, (0, 0, 0.11), fill, verts=12)]
+    if label:
+        P.append(label_band(0.103, 0.07, 0.19, mat("Label_" + name, (1, 1, 1), 0.8, image=label), n=12))
     P += extra
     made.append(export(name, P))
 
@@ -235,8 +267,10 @@ PICKLE = mat("Pickle", (0.25, 0.4, 0.1), 0.6)
 # (Godot путает порядок прозрачных слоёв). Огурцы выступают из рассола — видны сквозь стекло.
 jar("jar_pickles", mat("Brine", (0.55, 0.62, 0.32), 0.3),
     [sphere(0.024, (0.074 * math.cos(a), 0.074 * math.sin(a), z), PICKLE, scale=(1, 1, 2.6))
-     for a, z in ((0.3, 0.08), (1.4, 0.14), (2.5, 0.09), (3.6, 0.15), (4.6, 0.08), (5.6, 0.13))])
-jar("jar_jam", mat("Jam", (0.5, 0.04, 0.06), 0.3), [])
+     for a, z in ((0.3, 0.08), (1.4, 0.14), (2.5, 0.09), (3.6, 0.15), (4.6, 0.08), (5.6, 0.13))],
+    label="assets/textures/apartment/jar_label_pickles.png")
+jar("jar_jam", mat("Jam", (0.5, 0.04, 0.06), 0.3), [], lid=LID_RED,
+    label="assets/textures/apartment/jar_label_jam.png")
 
 # ---------------- Растения ----------------
 SOIL = mat("PotSoil", (0.06, 0.035, 0.02), 1.0)
