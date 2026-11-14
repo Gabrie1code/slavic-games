@@ -249,6 +249,15 @@ LAUNDRY = [mat("CL%d" % i, c, 0.9) for i, c in enumerate(
         (226, 132, 128), (240, 170, 160), (232, 196, 120), (150, 196, 150), (120, 176, 196),
         (160, 150, 210), (214, 150, 196), (120, 160, 220), (238, 168, 104), (176, 214, 120),
         (110, 190, 176), (200, 120, 150))])]
+
+# Семейства похожих оттенков (индексы в LAUNDRY): на одной верёвке вещи из РАЗНЫХ семейств,
+# чтобы не висели подряд два бирюзовых или три голубых.
+LAUNDRY_FAMILIES = [(0, 11), (1, 6), (2, 8), (3, 9), (4, 7, 10), (5,)]
+
+
+def laundry_set(n, rnd):
+    """n разных по цвету вещей для одной верёвки (n <= 6)."""
+    return [LAUNDRY[rnd.choice(fam)] for fam in rnd.sample(LAUNDRY_FAMILIES, n)]
 CARPETS = [mat("CCarpet%d" % i, c, 0.95) for i, c in enumerate(
     [(0.55, 0.08, 0.1), (0.2, 0.15, 0.4), (0.6, 0.35, 0.1)])]
 CAT = mat("CCat", (0.85, 0.48, 0.15), 0.8)
@@ -363,9 +372,9 @@ def balcony(B, rng, x, y, z_floor, w=2.4, depth=1.1, style=None, out=-1):
         r = 0.9                                                                     # без ковра и ящиков
     if r < 0.3:                                                                     # бельё
         B.box((w - 0.2, 0.015, 0.015), (x, yc, z_floor + 1.85), WHITE)
-        for k in range(rng.randint(2, 4)):
+        for k, cloth in enumerate(laundry_set(rng.randint(2, 4), rng)):
             B.box((0.32, 0.02, rng.uniform(0.3, 0.6)), (x - w / 2 + 0.4 + k * 0.5, yc, z_floor + 1.6),
-                  rng.choice(LAUNDRY))
+                  cloth)
     elif r < 0.42:                                                                  # ковёр на перилах
         B.box((min(1.6, w - 0.3), 0.03, 1.1), (x, yf + f * 0.04, z_floor + H - 0.45), rng.choice(CARPETS))
     elif r < 0.55:                                                                  # ящики с цветами

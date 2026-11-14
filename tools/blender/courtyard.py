@@ -141,6 +141,15 @@ LAUNDRY = [mat("L%d" % i, c, 0.9) for i, c in enumerate(
         (226, 132, 128), (240, 170, 160), (232, 196, 120), (150, 196, 150), (120, 176, 196),
         (160, 150, 210), (214, 150, 196), (120, 160, 220), (238, 168, 104), (176, 214, 120),
         (110, 190, 176), (200, 120, 150))])]
+
+# Семейства похожих оттенков (индексы в LAUNDRY): на одной верёвке вещи из РАЗНЫХ семейств,
+# чтобы не висели подряд два бирюзовых или три голубых.
+LAUNDRY_FAMILIES = [(0, 11), (1, 6), (2, 8), (3, 9), (4, 7, 10), (5,)]
+
+
+def laundry_set(n, rnd):
+    """n разных по цвету вещей для одной верёвки (n <= 6)."""
+    return [LAUNDRY[rnd.choice(fam)] for fam in rnd.sample(LAUNDRY_FAMILIES, n)]
 cols = 12
 dish_spots = []
 for f in range(FLOORS):
@@ -161,12 +170,13 @@ for f in range(FLOORS):
             P.append(box((2.0, 0.05, 0.95), (x + 0.3, y - 0.53, z - 0.5), PANEL))
             for s in (-1, 1):
                 P.append(box((0.05, 1.1, 0.95), (x + 0.3 + s * 0.98, y, z - 0.5), PANEL))
-            if random.random() < 0.5:                                              # бельё на верёвке
+            hangs = random.random() < 0.5
+            if hangs:                                                              # бельё на верёвке
                 P.append(rod((x - 0.6, y - 0.45, z + 0.6), (x + 1.2, y - 0.45, z + 0.6), 0.01, WHITE, verts=4))
-                for k in range(random.randint(2, 4)):
+                for k, cloth in enumerate(laundry_set(random.randint(2, 4), random)):
                     P.append(box((0.3, 0.02, random.uniform(0.3, 0.6)),
-                                 (x - 0.4 + k * 0.45, y - 0.45, z + 0.35), random.choice(LAUNDRY)))
-            if random.random() < 0.3:                                              # тарелка
+                                 (x - 0.4 + k * 0.45, y - 0.45, z + 0.35), cloth))
+            if random.random() < 0.3 and not hangs:                                # тарелка (не на бельё)
                 dish_spots.append((x + 1.1, y - 0.6, z + 0.1))
 for c in (2, 6, 10):                                                               # подъезды
     x = -W / 2 + 1.2 + c * (W - 2.4) / (cols - 1)
