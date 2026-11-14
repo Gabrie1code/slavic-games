@@ -196,6 +196,9 @@ func update(delta: float, knee_bend: Dictionary) -> void:
 		else:
 			proc_xf = skel_inv * part.global_transform * offset
 			final_xf = anim_xf.interpolate_with(proc_xf, w) if w > 0.0 else anim_xf
+			if hands.has(part_name):
+				# Плечо остаётся там, где оно в анимации (присел, наклонился), — рука не отрывается.
+				final_xf.origin = anim_xf.origin
 		_skeleton.set_bone_global_pose(bone, final_xf)
 		(frames[part_name] as Node3D).transform = _to_model * final_xf * offset.affine_inverse()
 		var lower := int(link.get("lower", -1))
@@ -233,12 +236,16 @@ func _reach_arm(part_name: String, link: Dictionary, part: Node3D, w: float,
 	var side := 1.0 if part_name == "ArmR" else -1.0
 	var reach := float(arm_reach.get(part_name, DEFAULT_REACH))
 	var aim: Vector3 = arm_target.get(part_name, Vector3.INF)
-	var target := skel_inv * (part.global_transform * Vector3(0, -reach, 0))
+	# Цель кулака — от настоящего плеча (в анимации тело могло присесть и наклониться), а не от
+	# плеча стоящего персонажа: сдвиг «плечо → цель» тот же, что у стоящего.
+	var rest_shoulder := skel_inv * part.global_position
+	var goal := skel_inv * (part.global_transform * Vector3(0, -reach, 0))
 	if aim.is_finite():
-		target = skel_inv * (_model_node.global_transform * aim)
+		goal = skel_inv * (_model_node.global_transform * aim)
 	var pole := skel_inv.basis * (_model_basis() * Vector3(side, -0.7, 0.45))
 	var upper_xf := _skeleton.get_bone_global_pose(bone)
 	var shoulder := upper_xf.origin
+	var target := shoulder + (goal - rest_shoulder)
 	var a := float(link["upper_skel"])
 	var b := float(link["fore_skel"])
 	var to_t := target - shoulder
