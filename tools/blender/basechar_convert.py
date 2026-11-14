@@ -2,7 +2,10 @@
 глаза вплавлены в сетку на кость Head, руки опущены (новая исходная поза), масштаб 0.52 (рост ~1.6 м),
 лицом в +Y Blender (в Godot — в −Z), материал тела «Primary» (цвет игрока), анимации убраны
 (анимация — кодом, через CharacterRig). Печатает замеры для подгонки одежды.
-Запуск: python -I tools/blender/basechar_convert.py <BaseCharacter_eyes.blend> <выход.glb>
+Запуск: python -I tools/blender/basechar_convert.py tools/blender/source/character_eyes.blend \
+    assets/models/character/character_rigged.glb
+Исходник с нашими глазами — tools/blender/source/character_eyes.blend (из BaseCharacter.blend через
+basechar_eyes.py); готовая модель сохраняется в tools/blender/source/character_final.blend.
 """
 import bpy, bmesh, sys, math, os
 from mathutils import Vector, Matrix, Quaternion
@@ -149,3 +152,7 @@ with bpy.context.temp_override(selected_objects=[rig, body], active_object=rig):
                               export_animations=False, export_skins=True,
                               export_draco_mesh_compression_enable=False)
 print("EXPORTED", out_glb, len(me.polygons), "faces")
+# Готовая модель (глаза, ступни, руки вниз, наш масштаб) — рядом с исходником, чтобы открыть в Blender.
+final_blend = os.path.join(os.path.dirname(os.path.abspath(__file__)), "source", "character_final.blend")
+bpy.ops.wm.save_as_mainfile(filepath=final_blend, copy=True, compress=True)
+print("SAVED", final_blend)
