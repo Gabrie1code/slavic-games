@@ -1,0 +1,492 @@
+<title>Конструктор фигурки</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700&family=Manrope:wght@400;600;700&display=swap">
+<style>
+/* Мастерская игрушек: слева верстак с ползунками, справа подиум с фигуркой. */
+:root {
+  --bg: #e7e9ef;          /* стена мастерской */
+  --panel: #f6f7fa;       /* верстак */
+  --ink: #23262f;
+  --muted: #6a7080;
+  --line: #d3d7e0;
+  --accent: #d6402f;      /* красный фигурки */
+  --accent-ink: #ffffff;
+  --stage: #cfd4de;       /* фон подиума */
+  --ok: #2f8a57;
+  --font-display: "Unbounded", "Manrope", system-ui, sans-serif;
+  --font-body: "Manrope", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #171a21; --panel: #1f232c; --ink: #e8eaf0; --muted: #9aa1b2; --line: #333946;
+    --accent: #f05a47; --accent-ink: #ffffff; --stage: #2a2f3a; --ok: #5cc28a; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #171a21; --panel: #1f232c; --ink: #e8eaf0; --muted: #9aa1b2; --line: #333946;
+  --accent: #f05a47; --accent-ink: #ffffff; --stage: #2a2f3a; --ok: #5cc28a; color-scheme: dark;
+}
+html, body { height: 100%; }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 14px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 16px; box-sizing: border-box;
+}
+.app { display: grid; grid-template-columns: minmax(280px, 360px) 1fr; gap: 16px; height: 100%; min-height: 560px; }
+.side { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+.side header { padding: 16px 18px 10px; border-bottom: 1px solid var(--line); }
+h1 { font-family: var(--font-display); font-size: 18px; font-weight: 700; margin: 0 0 4px; letter-spacing: 0.01em; text-wrap: balance; }
+.sub { color: var(--muted); margin: 0; line-height: 1.45; }
+.controls { overflow-y: auto; padding: 6px 18px 18px; flex: 1; min-height: 0; }
+details { border-bottom: 1px solid var(--line); padding: 10px 0; }
+summary { cursor: pointer; font-weight: 700; font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); list-style: none; display: flex; justify-content: space-between; }
+summary::after { content: "+"; font-weight: 600; }
+details[open] summary::after { content: "−"; }
+summary:focus-visible, button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.row { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; margin-top: 10px; align-items: center; }
+.row label { font-weight: 600; }
+.row output { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 12px; min-width: 4.5em; text-align: right; }
+.row input[type=range] { grid-column: 1 / -1; width: 100%; accent-color: var(--accent); }
+.swatches { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.swatch { width: 30px; height: 30px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; padding: 0; }
+.swatch[aria-pressed="true"] { border-color: var(--ink); }
+.stagewrap { display: flex; flex-direction: column; gap: 12px; min-height: 0; min-width: 0; }
+.stage { position: relative; flex: 1; min-height: 360px; background: var(--stage); border-radius: 14px; overflow: hidden; border: 1px solid var(--line); }
+.stage canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+.hint { position: absolute; left: 12px; bottom: 10px; color: var(--muted); font-size: 12px; pointer-events: none; }
+.poses { position: absolute; top: 10px; left: 10px; right: 10px; display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { font: 600 13px var(--font-body); border: 1px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 999px; padding: 6px 12px; cursor: pointer; }
+.chip[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.bar { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.bar input[type=text] { flex: 1 1 180px; min-width: 0; font: 600 14px var(--font-body); padding: 9px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); }
+.btn { font: 700 14px var(--font-body); padding: 9px 14px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); cursor: pointer; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.btn:disabled { opacity: 0.5; cursor: default; }
+.status { color: var(--muted); font-size: 13px; flex-basis: 100%; min-height: 1.2em; }
+.status.ok { color: var(--ok); }
+.saved { display: flex; flex-wrap: wrap; gap: 6px; flex-basis: 100%; }
+.saved .item { display: inline-flex; align-items: center; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; background: var(--bg); }
+.saved .item button { border: 0; background: transparent; color: var(--ink); font: 600 13px var(--font-body); padding: 6px 10px; cursor: pointer; }
+.saved .item button.del { color: var(--muted); padding: 6px 9px; border-left: 1px solid var(--line); }
+.empty { color: var(--muted); font-size: 13px; }
+@media (max-width: 760px) {
+  .app { grid-template-columns: 1fr; height: auto; }
+  .stage { min-height: 420px; }
+  .side { order: 2; }
+  .controls { max-height: none; }
+}
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto; } }
+</style>
+
+<div class="app">
+  <aside class="side">
+    <header>
+      <h1>Конструктор фигурки</h1>
+      <p class="sub">Двигай ползунки — фигурка меняется сразу. Крути её мышкой или пальцем, колесо — приблизить.</p>
+    </header>
+    <div class="controls" id="controls"></div>
+  </aside>
+  <section class="stagewrap">
+    <div class="stage" id="stage">
+      <div class="poses" id="poses" role="group" aria-label="Поза"></div>
+      <div class="hint">Размеры — в сантиметрах игры</div>
+    </div>
+    <div class="bar">
+      <input type="text" id="name" maxlength="40" placeholder="Название варианта, например «Коренастый»" aria-label="Название варианта">
+      <button class="btn primary" id="save">Сохранить</button>
+      <button class="btn" id="copy">Копировать настройки</button>
+      <button class="btn" id="reset">Сбросить</button>
+      <div class="status" id="status" role="status"></div>
+      <div class="saved" id="saved"></div>
+    </div>
+  </section>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/geometries/RoundedBoxGeometry.js"></script>
+<script>
+// ---------- Параметры (единицы — метры игры; на экране — сантиметры) ----------
+const GROUPS = [
+  ["Голова", [
+    ["headW", "Ширина", 0.30, 0.60, 0.46], ["headH", "Высота", 0.30, 0.60, 0.45],
+    ["headD", "Глубина", 0.28, 0.55, 0.42], ["headRound", "Скругление углов", 0.05, 0.5, 0.32, "%"],
+  ]],
+  ["Глаза", [
+    ["eyeSize", "Размер", 0.5, 1.8, 1.0, "x"], ["eyeGap", "Расстояние между", 0.04, 0.16, 0.085],
+    ["eyeY", "Высота на лице", 0.10, 0.36, 0.25], ["pupil", "Зрачок", 0.3, 0.9, 0.55, "%"],
+  ]],
+  ["Шея и плечи", [
+    ["neckLen", "Длина шеи", 0.0, 0.14, 0.05], ["neckR", "Толщина шеи", 0.04, 0.11, 0.062],
+    ["shoulderW", "Ширина плеч", 0.15, 0.30, 0.205], ["shoulderDrop", "Опущенность плеч", 0.0, 0.10, 0.03],
+  ]],
+  ["Корпус", [
+    ["torsoLen", "Длина", 0.32, 0.62, 0.47], ["chestW", "Ширина груди", 0.13, 0.28, 0.20],
+    ["waistW", "Ширина талии", 0.12, 0.28, 0.176], ["hipW", "Ширина таза", 0.12, 0.28, 0.18],
+    ["torsoDepth", "Толщина (спереди назад)", 0.45, 0.95, 0.68, "%"],
+  ]],
+  ["Руки", [
+    ["upperArm", "Плечо (до локтя)", 0.12, 0.32, 0.20], ["forearm", "Предплечье", 0.12, 0.32, 0.20],
+    ["armR", "Толщина", 0.035, 0.09, 0.062], ["handSize", "Кисть", 0.6, 1.6, 1.0, "x"],
+  ]],
+  ["Ноги", [
+    ["thigh", "Бедро", 0.14, 0.38, 0.26], ["shin", "Голень", 0.12, 0.36, 0.23],
+    ["legR", "Толщина", 0.045, 0.12, 0.08], ["legGap", "Расстояние между ногами", 0.06, 0.16, 0.092],
+  ]],
+  ["Ботинки", [
+    ["bootL", "Длина", 0.16, 0.38, 0.27], ["bootW", "Ширина", 0.10, 0.24, 0.16],
+    ["bootH", "Высота", 0.07, 0.18, 0.13],
+  ]],
+];
+const COLORS = ["#d6402f", "#2f6fd6", "#3b9a5a", "#e2b23a", "#8a55c9", "#e07a2e", "#2fa8b3", "#d4528f", "#5b6270"];
+const DEFAULTS = { color: COLORS[0] };
+GROUPS.forEach(([, items]) => items.forEach(([k, , , , d]) => { DEFAULTS[k] = d; }));
+let P = Object.assign({}, DEFAULTS);
+try { const saved = JSON.parse(localStorage.getItem("figure-draft") || "null"); if (saved) P = Object.assign({}, DEFAULTS, saved); } catch (e) {}
+
+function fmt(k, v, unit) {
+  if (unit === "%") return Math.round(v * 100) + "%";
+  if (unit === "x") return "×" + v.toFixed(2);
+  return (v * 100).toFixed(1) + " см";
+}
+
+// ---------- Панель ----------
+const controls = document.getElementById("controls");
+GROUPS.forEach(([title, items], gi) => {
+  const det = document.createElement("details");
+  if (gi < 3) det.open = true;
+  const sum = document.createElement("summary");
+  sum.textContent = title;
+  det.appendChild(sum);
+  items.forEach(([k, label, min, max, , unit]) => {
+    const row = document.createElement("div");
+    row.className = "row";
+    const lab = document.createElement("label");
+    lab.htmlFor = "p-" + k; lab.textContent = label;
+    const out = document.createElement("output");
+    out.id = "o-" + k;
+    const inp = document.createElement("input");
+    inp.type = "range"; inp.id = "p-" + k; inp.min = min; inp.max = max;
+    inp.step = (max - min) / 200; inp.value = P[k];
+    inp.addEventListener("input", () => { P[k] = parseFloat(inp.value); out.textContent = fmt(k, P[k], unit); rebuild(); draft(); });
+    out.textContent = fmt(k, P[k], unit);
+    row.append(lab, out, inp);
+    det.appendChild(row);
+  });
+  controls.appendChild(det);
+});
+const colDet = document.createElement("details");
+colDet.open = true;
+colDet.innerHTML = "<summary>Цвет</summary>";
+const sw = document.createElement("div");
+sw.className = "swatches"; sw.setAttribute("role", "group"); sw.setAttribute("aria-label", "Цвет фигурки");
+COLORS.forEach((c) => {
+  const b = document.createElement("button");
+  b.className = "swatch"; b.style.background = c; b.setAttribute("aria-label", "Цвет " + c);
+  b.setAttribute("aria-pressed", String(P.color === c));
+  b.addEventListener("click", () => { P.color = c; syncUI(); rebuild(); draft(); });
+  sw.appendChild(b);
+});
+colDet.appendChild(sw);
+controls.appendChild(colDet);
+
+function syncUI() {
+  GROUPS.forEach(([, items]) => items.forEach(([k, , , , , unit]) => {
+    document.getElementById("p-" + k).value = P[k];
+    document.getElementById("o-" + k).textContent = fmt(k, P[k], unit);
+  }));
+  [...sw.children].forEach((b, i) => b.setAttribute("aria-pressed", String(COLORS[i] === P.color)));
+}
+let draftTimer = 0;
+function draft() {
+  clearTimeout(draftTimer);
+  draftTimer = setTimeout(() => { try { localStorage.setItem("figure-draft", JSON.stringify(P)); } catch (e) {} }, 300);
+}
+
+// ---------- Сцена ----------
+const stage = document.getElementById("stage");
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+stage.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(32, 1, 0.05, 50);
+camera.position.set(1.6, 1.25, 3.6);
+const orbit = new THREE.OrbitControls(camera, renderer.domElement);
+orbit.target.set(0, 0.8, 0);
+orbit.enableDamping = true; orbit.minDistance = 1.2; orbit.maxDistance = 7; orbit.enablePan = false;
+scene.add(new THREE.HemisphereLight(0xffffff, 0x8890a0, 0.75));
+const sun = new THREE.DirectionalLight(0xffffff, 0.85);
+sun.position.set(2.5, 4, 3);
+sun.castShadow = true;
+sun.shadow.mapSize.set(1024, 1024);
+Object.assign(sun.shadow.camera, { left: -2, right: 2, top: 2, bottom: -2, near: 0.5, far: 12 });
+scene.add(sun);
+const floor = new THREE.Mesh(new THREE.CircleGeometry(1.6, 48), new THREE.ShadowMaterial({ opacity: 0.22 }));
+floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true;
+scene.add(floor);
+const ring = new THREE.Mesh(new THREE.RingGeometry(0.62, 0.66, 64),
+  new THREE.MeshBasicMaterial({ color: 0x8a92a6, transparent: true, opacity: 0.35 }));
+ring.rotation.x = -Math.PI / 2; ring.position.y = 0.001;
+scene.add(ring);
+
+let figure = null, J = {};
+const body = new THREE.MeshStandardMaterial({ color: P.color, roughness: 0.55 });
+const white = new THREE.MeshStandardMaterial({ color: 0xf4f4f4, roughness: 0.35 });
+const black = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.3 });
+
+function mesh(geo, mat) { const m = new THREE.Mesh(geo, mat || body); m.castShadow = true; return m; }
+function capsule(r, len) { // вниз от точки крепления
+  const m = mesh(new THREE.CapsuleGeometry(r, Math.max(0.001, len), 8, 20));
+  m.position.y = -len / 2; return m;
+}
+function ball(r) { return mesh(new THREE.SphereGeometry(r, 24, 16)); }
+function group(parent, x, y, z) { const g = new THREE.Group(); g.position.set(x, y, z); parent.add(g); return g; }
+
+function torsoGeometry() {
+  // Профиль корпуса снизу вверх: таз → талия → грудь → покатое плечо → шея (тело вращения, сплющено).
+  const L = P.torsoLen, top = L;
+  const pts = [
+    [0.0, -0.06], [P.hipW * 0.62, -0.05], [P.hipW * 0.92, -0.01], [P.hipW, 0.05],
+    [P.waistW, L * 0.35], [P.chestW * 0.97, L * 0.68], [P.chestW, L * 0.8],
+    [Math.max(P.chestW * 0.9, P.shoulderW * 0.95), L * 0.86 - P.shoulderDrop * 0.6], [Math.max(P.neckR + 0.03, P.chestW * 0.55), top - 0.01],
+    [P.neckR + 0.012, top + 0.005], [0.0, top + 0.012],
+  ].map(([x, y]) => new THREE.Vector2(Math.max(0.0001, x), y));
+  const g = new THREE.LatheGeometry(pts, 48);
+  g.scale(1, 1, P.torsoDepth);
+  g.computeVertexNormals();
+  return g;
+}
+
+function headGeometry() {
+  const r = Math.min(P.headW, P.headH, P.headD) * P.headRound;
+  return new THREE.RoundedBoxGeometry(P.headW, P.headH, P.headD, 6, r);
+}
+
+function rebuild() {
+  if (figure) scene.remove(figure);
+  body.color.set(P.color);
+  figure = new THREE.Group();
+  J = {};
+  const ankleY = P.bootH * 0.55;
+  const kneeY = ankleY + P.shin, hipY = kneeY + P.thigh;
+  const root = J.root = group(figure, 0, hipY, 0);
+  // Корпус и всё выше — на «спине» (наклоняется).
+  const spine = J.spine = group(root, 0, 0, 0);
+  spine.add(mesh(torsoGeometry()));
+  const neckBase = P.torsoLen;
+  const neck = J.neck = group(spine, 0, neckBase - 0.01, 0);
+  const neckMesh = mesh(new THREE.CylinderGeometry(P.neckR, P.neckR * 1.05, P.neckLen + 0.06, 24));
+  neckMesh.position.y = (P.neckLen + 0.06) / 2 - 0.03;
+  neck.add(neckMesh);
+  const head = J.head = group(neck, 0, P.neckLen + 0.01, 0);
+  const hm = mesh(headGeometry());
+  hm.position.y = P.headH / 2;
+  head.add(hm);
+  // Глаза на лицевой стороне (+Z).
+  const er = 0.06 * P.eyeSize;
+  [-1, 1].forEach((s) => {
+    const w = mesh(new THREE.SphereGeometry(er, 24, 16), white);
+    w.scale.set(0.85, 1.05, 0.42);
+    w.position.set(s * P.eyeGap, P.eyeY, P.headD / 2 - er * 0.12);
+    head.add(w);
+    const b = mesh(new THREE.SphereGeometry(er * P.pupil, 20, 14), black);
+    b.scale.set(0.85, 1.05, 0.4);
+    b.position.set(s * P.eyeGap * 0.97, P.eyeY - er * 0.08, P.headD / 2 + er * 0.12);
+    head.add(b);
+  });
+  // Руки: плечо → локоть → кисть; в суставах шары толщиной с руку (без щелей).
+  const shY = neckBase * 0.82 - P.shoulderDrop;
+  [["R", -1], ["L", 1]].forEach(([side, s]) => {
+    const sh = J["sh" + side] = group(spine, s * P.shoulderW, shY, 0);
+    sh.add(ball(P.armR * 1.04));
+    sh.add(capsule(P.armR, P.upperArm));
+    const el = J["el" + side] = group(sh, 0, -P.upperArm, 0);
+    el.add(ball(P.armR * 0.96));
+    el.add(capsule(P.armR * 0.9, P.forearm));
+    const hand = J["hand" + side] = group(el, 0, -P.forearm, 0);
+    const hs = P.handSize;
+    const palm = ball(0.07 * hs);
+    palm.scale.set(0.78, 1.05, 0.95);
+    palm.position.y = -0.05 * hs;
+    hand.add(palm);
+    const thumb = mesh(new THREE.CapsuleGeometry(0.022 * hs, 0.035 * hs, 6, 12));
+    thumb.position.set(-s * 0.03 * hs, -0.035 * hs, 0.04 * hs);
+    thumb.rotation.set(0.6, 0, -s * 0.35);
+    hand.add(thumb);
+  });
+  // Ноги: бедро → колено → голень → ботинок.
+  [["R", -1], ["L", 1]].forEach(([side, s]) => {
+    const hip = J["hip" + side] = group(root, s * P.legGap, 0.02, 0);
+    hip.add(ball(P.legR));
+    hip.add(capsule(P.legR, P.thigh));
+    const kn = J["kn" + side] = group(hip, 0, -P.thigh, 0);
+    kn.add(ball(P.legR * 0.92));
+    kn.add(capsule(P.legR * 0.86, P.shin - ankleY * 0.2));
+    const an = J["an" + side] = group(kn, 0, -P.shin, 0);
+    const boot = mesh(new THREE.SphereGeometry(0.5, 28, 18));
+    boot.scale.set(P.bootW, P.bootH, P.bootL);
+    boot.position.set(0, -ankleY + P.bootH / 2, P.bootL * 0.18);
+    an.add(boot);
+  });
+  scene.add(figure);
+  orbit.target.y = (hipY + P.torsoLen + P.neckLen + P.headH) / 2;
+}
+
+// ---------- Позы ----------
+// Повороты в радианах [x, y, z]. Фигурка смотрит на +Z; −X у рук и ног — вперёд, +X у колена — сгиб назад.
+const POSES = {
+  "Стоит": () => ({ elR: [-0.2, 0, 0], elL: [-0.2, 0, 0], shR: [0, 0, -0.06], shL: [0, 0, 0.06] }),
+  "Ходьба": (t) => {
+    const a = Math.sin(t * 5.2);
+    return { root: { y: Math.abs(Math.cos(t * 5.2)) * 0.02 },
+      shR: [a * 0.55, 0, -0.06], shL: [-a * 0.55, 0, 0.06],
+      elR: [-0.25 - Math.max(0, -a) * 0.6, 0, 0], elL: [-0.25 - Math.max(0, a) * 0.6, 0, 0],
+      hipR: [-a * 0.45, 0, 0], hipL: [a * 0.45, 0, 0],
+      knR: [Math.max(0, a) * 0.7, 0, 0], knL: [Math.max(0, -a) * 0.7, 0, 0],
+      spine: [0.05, Math.sin(t * 5.2) * 0.06, 0] };
+  },
+  "Бег": (t) => {
+    const a = Math.sin(t * 8.5);
+    return { root: { y: Math.abs(Math.cos(t * 8.5)) * 0.05 },
+      shR: [a * 0.9, 0, -0.1], shL: [-a * 0.9, 0, 0.1], elR: [-1.3, 0, 0], elL: [-1.3, 0, 0],
+      hipR: [-a * 0.85, 0, 0], hipL: [a * 0.85, 0, 0],
+      knR: [0.4 + Math.max(0, a) * 1.1, 0, 0], knL: [0.4 + Math.max(0, -a) * 1.1, 0, 0],
+      spine: [0.18, 0, 0], head: [-0.1, 0, 0] };
+  },
+  "Прыжок": (t) => ({ root: { y: 0.18 + Math.sin(t * 3) * 0.04 },
+    shR: [-0.2, 0, -2.6], elR: [-0.4, 0, 0], shL: [-0.2, 0, 1.0], elL: [-1.0, 0, 0],
+    hipR: [-1.1, 0, -0.1], knR: [1.7, 0, 0], hipL: [-0.3, 0, 0.12], knL: [1.5, 0, 0], head: [-0.12, 0, 0] }),
+  "Присел": () => ({ root: { y: -0.2, z: -0.04 }, spine: [0.38, 0, 0],
+    shR: [-0.6, 0, -0.25], elR: [-0.9, 0, 0], shL: [-0.6, 0, 0.25], elL: [-0.9, 0, 0],
+    hipR: [-1.2, 0, -0.08], knR: [1.8, 0, 0], hipL: [-1.2, 0, 0.08], knL: [1.8, 0, 0], head: [-0.3, 0, 0] }),
+  "Думает": () => ({ shR: [-0.55, 0, 0.45], elR: [-2.2, 0, 0], handR: [0.3, 0, 0],
+    shL: [-0.15, 0, -0.15], elL: [-0.7, 0, 0], hipL: [0, 0, 0.1], head: [0.12, 0.2, 0] }),
+  "Машет": (t) => ({ shR: [-0.1, 0, -2.5], elR: [0, 0, -0.5 + Math.sin(t * 7) * 0.45],
+    elL: [-0.2, 0, 0], shL: [0, 0, 0.06], head: [0, -0.15, 0.08] }),
+};
+let pose = "Ходьба";
+const posesEl = document.getElementById("poses");
+Object.keys(POSES).forEach((name) => {
+  const b = document.createElement("button");
+  b.className = "chip"; b.textContent = name; b.setAttribute("aria-pressed", String(name === pose));
+  b.addEventListener("click", () => { pose = name; [...posesEl.children].forEach((c) => c.setAttribute("aria-pressed", String(c === b))); });
+  posesEl.appendChild(b);
+});
+
+function applyPose(t) {
+  const keys = ["spine", "neck", "head", "shR", "shL", "elR", "elL", "handR", "handL", "hipR", "hipL", "knR", "knL", "anR", "anL"];
+  keys.forEach((k) => J[k] && J[k].rotation.set(0, 0, 0));
+  const ankleY = P.bootH * 0.55;
+  const baseY = ankleY + P.shin + P.thigh;
+  J.root.position.set(0, baseY, 0);
+  const p = POSES[pose](t);
+  Object.entries(p).forEach(([k, v]) => {
+    if (k === "root") { J.root.position.y = baseY + (v.y || 0); J.root.position.z = v.z || 0; return; }
+    if (J[k]) J[k].rotation.set(v[0], v[1], v[2]);
+  });
+  // Стопы ровно по земле, когда нога стоит.
+  ["R", "L"].forEach((s) => { if (J["an" + s]) J["an" + s].rotation.x = -(J["hip" + s].rotation.x + J["kn" + s].rotation.x) * 0.6; });
+}
+
+function resize() {
+  const w = stage.clientWidth, h = stage.clientHeight;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h; camera.updateProjectionMatrix();
+}
+new ResizeObserver(resize).observe(stage);
+const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+const clock = new THREE.Clock();
+function tick() {
+  const t = still ? 0.4 : clock.getElapsedTime();
+  applyPose(t);
+  orbit.update();
+  renderer.render(scene, camera);
+  requestAnimationFrame(tick);
+}
+rebuild(); resize(); tick();
+
+// ---------- Сохранение ----------
+const statusEl = document.getElementById("status");
+const savedEl = document.getElementById("saved");
+const nameEl = document.getElementById("name");
+const saveBtn = document.getElementById("save");
+function say(text, ok) { statusEl.textContent = text; statusEl.classList.toggle("ok", !!ok); }
+function exportParams() {
+  const out = { color: P.color };
+  Object.keys(DEFAULTS).forEach((k) => { if (k !== "color") out[k] = Math.round(P[k] * 1000) / 1000; });
+  return out;
+}
+document.getElementById("copy").addEventListener("click", async () => {
+  const text = JSON.stringify(exportParams(), null, 1);
+  try { await navigator.clipboard.writeText(text); say("Настройки скопированы — можно вставить их в чат.", true); }
+  catch (e) {
+    nameEl.value = text; nameEl.select(); say("Копирование не сработало: настройки в поле названия, выдели и скопируй.");
+  }
+});
+document.getElementById("reset").addEventListener("click", () => {
+  P = Object.assign({}, DEFAULTS); syncUI(); rebuild(); draft(); say("Вернул исходные размеры.");
+});
+
+let db = null, presets = [];
+function renderSaved() {
+  savedEl.textContent = "";
+  if (!presets.length) {
+    const e = document.createElement("span");
+    e.className = "empty";
+    e.textContent = db ? "Сохранённых вариантов пока нет — придумай название и нажми «Сохранить»." : "";
+    savedEl.appendChild(e);
+    return;
+  }
+  presets.forEach((doc) => {
+    const d = doc.data();
+    const item = document.createElement("span");
+    item.className = "item";
+    const load = document.createElement("button");
+    load.textContent = d.name || "Без названия";
+    load.title = "Загрузить вариант";
+    load.addEventListener("click", () => {
+      P = Object.assign({}, DEFAULTS, d.params || {}); syncUI(); rebuild(); draft();
+      nameEl.value = d.name || ""; say("Загружен вариант «" + (d.name || "Без названия") + "».", true);
+    });
+    const del = document.createElement("button");
+    del.className = "del"; del.textContent = "×"; del.setAttribute("aria-label", "Удалить «" + (d.name || "") + "»");
+    del.addEventListener("click", async () => {
+      if (del.dataset.armed !== "1") { del.dataset.armed = "1"; del.textContent = "удалить?"; return; }
+      try { await db.collection("presets").doc(doc.id).delete(); say("Удалено."); } catch (e) { say("Не получилось удалить: " + (e.code || e.message)); }
+    });
+    item.append(load, del);
+    savedEl.appendChild(item);
+  });
+}
+saveBtn.addEventListener("click", async () => {
+  const name = nameEl.value.trim() || "Вариант " + new Date().toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+  if (!db) { say("Сохранение здесь недоступно — нажми «Копировать настройки» и пришли их в чат."); return; }
+  saveBtn.disabled = true;
+  try {
+    const existing = presets.find((d) => (d.data().name || "") === name);
+    const ref = existing ? db.collection("presets").doc(existing.id) : db.collection("presets").doc();
+    await ref.set({ name, params: exportParams(), savedAt: new Date().toISOString() });
+    say("Сохранено: «" + name + "». Напиши в чат, какой вариант брать — я его прочитаю.", true);
+  } catch (e) {
+    say(e.code === "invalid_argument" ? "У тебя нет прав сохранять здесь — нажми «Копировать настройки»." : "Не сохранилось (" + (e.code || e.message) + "). Попробуй ещё раз.");
+  }
+  saveBtn.disabled = false;
+});
+
+(async () => {
+  try { db = window.claude && (await window.claude.use("db")); } catch (e) { db = null; }
+  if (!db) { renderSaved(); say("Сохранение доступно, когда страница открыта в Claude. Пока можно скопировать настройки."); return; }
+  let loaded = false;
+  const timer = setTimeout(() => { if (!loaded) say("Сохранённые варианты пока не загрузились — проверь соединение."); }, 10000);
+  db.collection("presets").orderBy("savedAt", "desc").onSnapshot((snap) => {
+    presets = snap.docs;
+    if (!snap.metadata.fromCache) { loaded = true; clearTimeout(timer); }
+    renderSaved();
+  }, (e) => { clearTimeout(timer); say("Список вариантов недоступен (" + e.code + ")."); });
+  renderSaved();
+})();
+</script>
