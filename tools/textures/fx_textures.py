@@ -104,3 +104,16 @@ alert()
 pixel_heart()
 pixel_note()
 print("DONE")
+
+
+# «Цензура» для шутки в ящике тумбочки: крупные пиксели розовых оттенков (12×8 — по 4×4 на
+# каждую грань BoxMesh в Godot; фильтр «ближайший» — квадраты остаются резкими).
+import random  # noqa: E402
+
+random.seed(3)
+img = Image.new("RGB", (12, 8))
+pal = [(214, 96, 150), (236, 140, 180), (190, 70, 120), (245, 180, 200), (170, 60, 110), (225, 120, 165)]
+for y in range(8):
+    for x in range(12):
+        img.putpixel((x, y), random.choice(pal))
+img.save(os.path.join(OUT, "censor_mosaic.png"))

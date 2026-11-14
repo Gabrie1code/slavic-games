@@ -4,7 +4,8 @@ extends StaticBody3D
 ## OPEN_TIME сек (кнопки открыть нет). В открытом ящике лежит баллончик — его можно взять.
 ## Когда ящик сам задвинется, в нём снова лежит баллончик (если прежний забрали — новый),
 ## так что баллончиков в квартире может быть несколько.
-## С шансом JOKE_CHANCE вместо баллончика в ящике шутка (розовый «предмет» и наручники) —
+## С шансом JOKE_CHANCE вместо баллончика в ящике шутка (розовый «предмет» с пиксельной
+## «цензурой» на кончике, наручники, пара презервативов) —
 ## взять нельзя; после следующего закрытия ящика — новая попытка.
 ## Модели — tools/blender/nightstand.py.
 
@@ -14,6 +15,9 @@ const OPEN_TIME := 25.0
 const JOKE := preload("res://assets/models/apartment/drawer_joke.glb")
 const JOKE_CHANCE := 0.1
 const JOKE_POS := Vector3(0.0, 0.345, 0.02)
+## «Цензура» на кончике предмета: кубик из крупных пикселей (как в передачах, где что-то скрыто).
+const CENSOR := preload("res://assets/textures/fx/censor_mosaic.png")
+const CENSOR_POS := Vector3(0.066, 0.024, 0.0)
 const SLIDE := 0.25
 ## Баллончик лежит на боку на дне ящика (в координатах ящика).
 ## Ровно посередине ящика, поперёк (баллончик длиной ~0.19 м: дно слева, сопло справа).
@@ -100,8 +104,26 @@ func _restock() -> void:
 		_joke = JOKE.instantiate() as Node3D
 		_joke.position = JOKE_POS
 		_joke.rotation.y = randf_range(-0.3, 0.3)
+		_joke.add_child(_make_censor())
 		_drawer.add_child(_joke)
 		return
 	can = SprayCan.new()
 	_drawer.add_child(can)
 	can.store_in(_drawer, CAN_POS, CAN_ROT)
+
+
+## Кубик «цензуры» вокруг кончика: пиксели остаются квадратными (фильтр «ближайший»), без теней,
+## светится ровно — сразу видно, что «там что-то запрещённое».
+static func _make_censor() -> MeshInstance3D:
+	var censor := MeshInstance3D.new()
+	var box := BoxMesh.new()
+	box.size = Vector3(0.07, 0.065, 0.065)
+	censor.mesh = box
+	var mat := StandardMaterial3D.new()
+	mat.albedo_texture = CENSOR
+	mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	censor.material_override = mat
+	censor.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	censor.position = CENSOR_POS
+	return censor

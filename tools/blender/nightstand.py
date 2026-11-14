@@ -4,7 +4,7 @@
   nightstand_drawer.glb — ящик: лицевая панель с ручкой + лоток (выдвигается вперёд, по −Y);
   spray_can.glb         — баллончик: тёмно-синий корпус, полоса CanStripe (в игре красится в цвет
                           краски), колпачок, распылитель;
-  drawer_joke.glb       — шутка на 10%: тёмно-розовый «предмет» и наручники (лежат в ящике).
+  drawer_joke.glb       — шутка на 10%: тёмно-розовый «предмет», наручники и пара презервативов.
 
 Запуск:
     python tools/blender/nightstand.py assets/models/apartment
@@ -132,6 +132,26 @@ for k in range(3):
                                      rotation=(math.radians(90 * (k % 2)), 0, 0))
     bpy.context.object.data.materials.append(STEEL)
     joke.append(bpy.context.object)
+# Пара презервативов в квадратных пакетиках из фольги (не металл — иначе в игре чёрные):
+# пакетик, выпуклое колечко внутри, зубчатый край по бокам.
+for k, (x, y, rz, color) in enumerate(((-0.02, -0.07, 0.3, (0.75, 0.15, 0.2)),
+                                        (0.04, -0.065, -0.4, (0.25, 0.45, 0.8)))):
+    FOIL = mat("Foil%d" % k, color, 0.3, 0.25)
+    pack = [box((0.05, 0.05, 0.004), (x, y, 0.002), FOIL)]
+    bpy.ops.mesh.primitive_torus_add(major_radius=0.014, minor_radius=0.003, major_segments=16,
+                                     minor_segments=4, location=(x, y, 0.004))
+    bpy.context.object.data.materials.append(FOIL)
+    pack.append(bpy.context.object)
+    for t in range(-4, 5):                                                  # зубчики края
+        pack.append(box((0.004, 0.004, 0.003), (x + t * 0.0055, y + 0.026, 0.002), FOIL))
+        pack.append(box((0.004, 0.004, 0.003), (x + t * 0.0055, y - 0.026, 0.002), FOIL))
+    for o in pack:
+        o.rotation_euler.z = rz
+        bpy.context.view_layer.update()
+        o.location = (x + (o.location.x - x) * math.cos(rz) - (o.location.y - y) * math.sin(rz),
+                      y + (o.location.x - x) * math.sin(rz) + (o.location.y - y) * math.cos(rz),
+                      o.location.z)
+    joke += pack
 joke_obj = export("drawer_joke", joke)
 
 if not RENDER:
