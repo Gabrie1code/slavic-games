@@ -114,6 +114,8 @@ var radio_music: RadioMusic
 ## Ночник на тумбочке в спальне; разбили — не светит, пока не восстановится.
 var night_lamp: Breakable
 var _night_bulb: MeshInstance3D
+## Коврики на полу: у них тонкая «толщина» для ходьбы; падающие вещи (торшер) их не замечают.
+var _rug_bodies: Array[StaticBody3D] = []
 ## Солнце в комнате (DirectionalLight лобби): вечером слабее, чтобы был виден свет ламп.
 ## Висящее под потолком (копии для вида сверху): {"node", "pos"} — прозрачнеют над персонажем.
 var _hanging_top: Array[Dictionary] = []
@@ -314,6 +316,9 @@ func _build_living_room() -> void:
 	floor_lamp = _tippable("floor_lamp", Vector3(0.42, 1.75, 0.42), 0.88, Vector3(-1.0, 0, 1.05), 6.0)
 	floor_lamp.add_box(Vector3(0.62, 0.36, 0.62), Vector3(0, 1.55, 0)) # абажур
 	floor_lamp.hammer_only = true # кулаком не сдвинуть, только молотком
+	# Подставка стоит на краю ковра: без этого край приподнимается и торшер кренится.
+	for rug_body in _rug_bodies:
+		floor_lamp.add_collision_exception_with(rug_body)
 	_build_lamp_light()
 	_chandelier(Vector3(-2.4, 0, -0.6), LIVING_SWITCH, -PI / 2)
 
@@ -859,6 +864,7 @@ func _solid(model: Node3D, size: Vector3, center_y: float, pos: Vector3,
 func _rug_floor(rug: Node3D) -> void:
 	var body := StaticBody3D.new()
 	rug.add_child(body)
+	_rug_bodies.append(body)
 	for node in rug.find_children("*", "MeshInstance3D", true, false):
 		var mesh_instance := node as MeshInstance3D
 		var shape := CollisionShape3D.new()
