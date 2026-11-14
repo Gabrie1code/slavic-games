@@ -18,8 +18,9 @@ const CAN_SCENE := preload("res://assets/models/props/energy_can.glb")
 ## Камера: куда смотрит и откуда (сдвиг от этой точки). Точка выбрана так, чтобы в кадре
 ## по центру была вся сцена битвы — крыша, ворота гаражей и машины с баками перед ними,
 ## а дома сзади видно меньше (раньше камера смотрела в центр крыши — низ сцены обрезался).
-const CAMERA_TARGET := Vector3(0, -1.0, 3.75)
-const CAMERA_OFFSET := Vector3(0, 11.34, 10.0)
+## Ракурс крутой — 60° сверху (было 48.6°), расстояние то же (15.1 м).
+const CAMERA_TARGET := Vector3(0, -1.0, 3.0)
+const CAMERA_OFFSET := Vector3(0, 13.09, 7.56)
 const MAX_HP := 250
 const ROUND_TIME := 75.0
 const SPAWN_POINTS: Array[Vector3] = [
