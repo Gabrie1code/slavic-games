@@ -1940,6 +1940,9 @@ Shoulder/UpperArm/LowerArm/Fist ×2, UpperLeg/LowerLeg/Foot ×2, IK-цели д�
 Idle, Walk, Walk_Carry, Run, Run_Carry, Jump, Punch, SwordSlash, Shoot_OneHanded, PickUp,
 RecieveHit, Roll, SitDown, StandUp, Victory, Defeat, Death. Стоп нет — ноги сужаются в точку,
 кисти — кулачки. Рендер: 4 ракурса + 8 кадров анимаций.
+Глаза заменены на наши (`tools/blender/basechar_eyes.py`): чёрточки были отдельными выпуклыми
+кусочками сетки (160 граней) — удалены; белок и зрачок в пропорциях character.py (голова r 0.49 →
+×1.64), на кости Head. Проверено рендером: крупно, 3 ракурса, 8 анимаций.
 
 ---
 
