@@ -95,7 +95,7 @@ func _build_door_wall() -> void:
 	plate_mat.roughness = 0.5
 	plate.material_override = plate_mat
 	plate.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	plate.position = Vector3(X0 - 0.082, DOOR_TOP + 0.15, door_mid)
+	plate.position = Vector3(X0 - 0.082, DOOR_TOP + 0.25, door_mid) # над наличником (DoorCasing)
 	plate.rotation.y = -PI / 2.0 # лицом в гостиную
 	add_child(plate)
 	# Изнутри над дверью — тоже побелка (было видно обои гостиной).
