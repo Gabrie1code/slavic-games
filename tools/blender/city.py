@@ -3,13 +3,12 @@
 
   brick_khrushchevka — кирпичная хрущёвка, 5 этажей, 3 подъезда;
   panel_ninestory    — панельная девятиэтажка с голубой плиткой, будки лифтов на крыше;
-  stalinka           — сталинка: высокие этажи, рустованный низ, карниз, скатная крыша, арка;
+  stalinka           — сталинка: высокие этажи, рустованный низ, карниз, скатная крыша;
   tower_block        — точечная башня, 14 этажей, окна на все стороны (ставится вдали);
   garage_row         — ряд гаражей с разными воротами;
   transformer_box    — кирпичная трансформаторная будка с жёлтым знаком;
   tec_chimney        — труба ТЭЦ в красно-белую полоску (горизонт);
   water_tower        — водонапорная башня (горизонт);
-  tower_crane        — башенный кран (горизонт).
 
 Окна: занавески разных цветов, тюль, фольга, газета, открытая форточка, кондиционер, цветок,
 окно заклеенное крестом. Балконы: бетонный, с металлическими прутьями, самодельно застеклённый,
@@ -450,7 +449,7 @@ front = []
 for fl in range(FL):
     z = 0.5 + fl * FH + 1.7
     for c, x in enumerate(xs):
-        if fl == 0 and c in (2, 5, 8):
+        if fl == 0 and c in (2, 8):
             continue
         window(B, rng, x, -D / 2 + REVEAL, z, 1.2, 1.8, frame=FRAME_WOOD, reveal=REVEAL)
         front.append((x, z, 1.36, 1.96))
@@ -464,10 +463,6 @@ for fl in range(FL):
 facade(B, W, H, -D / 2, -1, front, lambda z: RUST_BASE if z < FH + 0.5 else OCHRE)
 for c in (2, 8):
     entrance(B, xs[c], -D / 2, door=FRAME_WOOD, canopy=STUCCO)
-# Арка во двор посередине: тёмный проём с полукруглым верхом.
-B.box((3.4, 0.2, 2.8), (xs[5], -D / 2 - 0.02, 1.4), DARK)
-B.cyl(1.7, 0.2, (xs[5], -D / 2 - 0.02, 2.8), DARK, n=16, rot=(math.pi / 2, 0, 0))
-B.box((4.4, 0.3, 0.4), (xs[5], -D / 2 - 0.08, 4.6), STUCCO)
 export("stalinka", B)
 
 # ---------------- 4. Точечная башня (14 этажей, окна на все стороны) ----------------
@@ -543,7 +538,7 @@ B.poly([(0.6, -1.36, 1.9), (1.2, -1.36, 1.9), (0.9, -1.36, 2.45)], [(0, 1, 2)],
 B.box((0.06, 0.02, 0.3), (0.9, -1.37, 2.1), DARK, rot=(0, 0.4, 0))                 # молния
 export("transformer_box", B)
 
-# ---------------- 7. Горизонт: труба ТЭЦ, водонапорная башня, кран ----------------
+# ---------------- 7. Горизонт: труба ТЭЦ, водонапорная башня ----------------
 RED = mat("CChimneyRed", (0.7, 0.12, 0.1), 0.8)
 B = Builder()
 for k in range(10):                                                                 # полосы
@@ -559,17 +554,6 @@ B.cyl(5.0, 5.5, (0, 0, 25), mat("CTankGreen", (0.3, 0.42, 0.35), 0.7, 0.3), n=16
 B.cyl(5.4, 1.2, (0, 0, 28.3), ROOF, n=16, r2=0.5)
 export("water_tower", B)
 
-YELLOW = mat("CCraneYellow", (0.92, 0.72, 0.1), 0.6, 0.2)
-B = Builder()
-B.box((1.6, 1.6, 40), (0, 0, 20), YELLOW)
-for k in range(13):                                                                 # раскосы мачты
-    B.box((1.7, 1.7, 0.15), (0, 0, 2 + k * 3), DARK)
-B.box((36, 1.2, 1.2), (8, 0, 41), YELLOW)                                           # стрела
-B.box((3, 2.5, 2.5), (-8, 0, 41.8), CONCRETE)                                       # противовес
-B.box((2.4, 2.2, 2.2), (1.6, 0, 38.5), mat("CCab", (0.85, 0.85, 0.82)))           # кабина
-B.box((0.05, 0.05, 12), (20, 0, 34.5), DARK)                                        # трос
-B.box((1.2, 1.2, 0.8), (20, 0, 28.2), DARK)
-export("tower_crane", B)
 
 if not RENDER:
     sys.exit(0)
@@ -577,7 +561,7 @@ if not RENDER:
 # ---------------- Превью ----------------
 spots = {"brick_khrushchevka": (-30, 0), "panel_ninestory": (0, 4), "stalinka": (31, 0),
          "tower_block": (-48, 22), "garage_row": (-22, -18), "transformer_box": (-8, -16),
-         "tec_chimney": (55, 60), "water_tower": (20, 40), "tower_crane": (-10, 50)}
+         "tec_chimney": (55, 60), "water_tower": (20, 40)}
 for o in MADE:
     o.location = (*spots[o.name], 0)
 bpy.ops.mesh.primitive_plane_add(size=400)
