@@ -1,10 +1,12 @@
 class_name PlayerCharacter
 extends CharacterBody3D
-## Персонаж игрока: единая модель из частей, окрашенная в цвет игрока, плюс одежда.
+## Персонаж игрока: цельная гнущаяся модель со скелетом (character_rigged.glb), окрашенная в цвет
+## игрока, плюс одежда.
 ##
-## Части модели (из tools/blender/character.py): Torso, Head, ArmL, ArmR, LegL, LegR.
+## Код двигает 6 частей тела: Torso, Head, ArmL, ArmR, LegL, LegR — невидимые узлы на месте
+## суставов (CharacterRig); по ним каждый кадр ставятся кости, локти и колени гнутся сами.
 ## Анимация — кодом: ноги и руки качаются при ходьбе, правая рука поднимается
-## и держит предметы, всё тело крутится при атаке.
+## и держит предметы, всё тело крутится при атаке. (Старая модель из частей тоже работает.)
 
 const ACCELERATION := 40.0
 ## Прыжок: короткий и «тяжёлый» — гравитация персонажа сильнее стандартной.
@@ -131,19 +133,14 @@ var _worn: Dictionary = {}
 var _worn_ids: Dictionary = {}
 ## Слой видимости модели (свою модель камера от первого лица не показывает).
 var _render_layer := 1
+## Часть тела -> узел (см. CharacterRig); у цельной модели ещё и «гнёзда» для предметов.
+var _parts: Dictionary = {}
+var _rig: CharacterRig = null
 
 @onready var visual: Node3D = $Visual
 @onready var right_hand: Node3D = Node3D.new()
 @onready var _model: Node3D = $Visual/Model
 @onready var _name_label: Label3D = $NameLabel
-@onready var _parts := {
-	"Torso": $Visual/Model/Torso,
-	"Head": $Visual/Model/Head,
-	"ArmL": $Visual/Model/ArmL,
-	"ArmR": $Visual/Model/ArmR,
-	"LegL": $Visual/Model/LegL,
-	"LegR": $Visual/Model/LegR,
-}
 
 
 ## Вызывается сразу после создания персонажа, до добавления в сцену.
@@ -162,16 +159,14 @@ func _ready() -> void:
 	_primary_material.albedo_color = player.color
 	_primary_material.roughness = 0.6
 	_recolor(_model)
+	_setup_parts()
 
 	# Точка «в руке» — на конце правой руки.
 	right_hand.name = "Hand"
 	right_hand.position = Vector3(0, -0.42, 0)
-	_part("ArmR").add_child(right_hand)
+	_socket("ArmR").add_child(right_hand)
 	_part("ArmL").rotation.z = -ARM_DOWN
 	_part("ArmR").rotation.z = ARM_DOWN
-	# Голова и руки — внутри туловища: при наклоне (приседание) они наклоняются вместе с ним.
-	for limb in ["Head", "ArmL", "ArmR"]:
-		_part(limb).reparent(_part("Torso"), true)
 
 	apply_outfit(player.outfit)
 	_name_label.text = player.display_name
@@ -281,6 +276,45 @@ func _process(delta: float) -> void:
 	# Свободный взгляд: голова поворачивается за камерой (не до конца — шея не ломается).
 	_part("Head").rotation.y = clampf(head_yaw, -1.3, 1.3)
 	_animate_jump(delta)
+	_drive_rig()
+
+
+## Цельная модель: кости — по частям тела; локти чуть согнуты (сильнее, когда рука впереди),
+## колено гнётся, когда нога уходит назад, сидя — голень вниз.
+func _drive_rig() -> void:
+	if _rig == null:
+		return
+	var elbows := {}
+	for arm in ["ArmL", "ArmR"]:
+		elbows[arm] = 0.18 + maxf(0.0, _part(arm).rotation.x) * 0.7
+	if _right_arm_busy:
+		elbows["ArmR"] = 0.05 # держит предмет — рука почти прямая (предмет в кисти)
+	var knees := {}
+	for leg in ["LegL", "LegR"]:
+		var swing_x := _part(leg).rotation.x
+		knees[leg] = -swing_x if sitting else -maxf(0.0, -swing_x) * 0.9
+	_rig.drive(elbows, knees)
+
+
+## Части тела: у цельной модели — узлы CharacterRig, у старой модели из частей — её узлы.
+func _setup_parts() -> void:
+	_rig = CharacterRig.new()
+	if _rig.setup(_model):
+		_parts = _rig.parts
+		return
+	_rig = null
+	for part_name in ["Torso", "Head", "ArmL", "ArmR", "LegL", "LegR"]:
+		_parts[part_name] = _model.get_node(part_name)
+	# Голова и руки — внутри туловища: при наклоне (приседание) они наклоняются вместе с ним.
+	for limb in ["Head", "ArmL", "ArmR"]:
+		_part(limb).reparent(_part("Torso"), true)
+
+
+## Куда крепить предметы на части тела (у цельной модели — гнездо с поправкой на размеры).
+func _socket(part_name: String) -> Node3D:
+	if _rig and _rig.sockets.has(part_name):
+		return _rig.sockets[part_name] as Node3D
+	return _part(part_name)
 
 
 ## Пьяный: всё тело покачивается из стороны в сторону, медленно «плывёт».
@@ -506,10 +540,12 @@ func wear(slot: int, item_id: String) -> void:
 		var piece_3d := piece as Node3D
 		item.remove_child(piece_3d)
 		_part(String(piece.name)).add_child(piece_3d)
-		piece_3d.transform = Transform3D.IDENTITY
 		# Слои одежды: шапка шире головы (голова не торчит на бегу), верх поверх штанов,
 		# обувь поверх штанин — внешний слой чуть шире по X/Z вокруг оси части тела.
-		piece_3d.scale = LAYER_SCALE.get(slot, Vector3.ONE)
+		# У цельной модели одежда прежнего тела подгоняется под новое (CharacterRig.fit).
+		var layer: Vector3 = LAYER_SCALE.get(slot, Vector3.ONE)
+		piece_3d.transform = CharacterRig.fit(String(piece.name), layer) if _rig \
+			else Transform3D(Basis.from_scale(layer), Vector3.ZERO)
 		_recolor(piece_3d)
 		_apply_layer(piece_3d)
 		pieces.append(piece_3d)
@@ -537,7 +573,7 @@ func _shirt_number() -> Label3D:
 	number.outline_modulate = Color(0.1, 0.1, 0.12)
 	number.pixel_size = 0.0022
 	# Спина туловища: в координатах части Torso (сустав — таз).
-	number.position = Vector3(0, 0.3, 0.215)
+	number.position = Vector3(0, 0.3, 0.12 if _rig else 0.215)
 	_part("Torso").add_child(number)
 	_apply_layer(number)
 	return number
@@ -630,7 +666,7 @@ func _collect_geometry(node: Node, out: Array[GeometryInstance3D]) -> void:
 ## Прикрепить предмет к части тела (Torso/Head/ArmL/ArmR/LegL/LegR), например трубку к уху.
 ## Предмет получает слой видимости персонажа (от первого лица своя трубка не мешает обзору).
 func attach_to_part(part_name: String, node: Node3D) -> void:
-	_part(part_name).add_child(node)
+	_socket(part_name).add_child(node)
 	_apply_layer(node)
 
 

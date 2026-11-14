@@ -16,10 +16,12 @@ const PROFILE_PATH := "user://profile.cfg"
 const COLORS: Array[Color] = [
 	Color("d93a2b"), Color("2f6fd6"), Color("f2c230"), Color("3aa655"), Color("f08a24"),
 	Color("8e44ad"), Color("1fb5b5"), Color("e86aa8"), Color("e8e4da"), Color("8b5a2b"),
+	Color("3a3d42"),
 ]
 const COLOR_NAMES: Array[String] = [
 	"Красный", "Синий", "Жёлтый", "Зелёный", "Оранжевый",
 	"Фиолетовый", "Бирюзовый", "Розовый", "Белый", "Коричневый",
+	"Тёмно-серый",
 ]
 
 ## Имена ботов.
