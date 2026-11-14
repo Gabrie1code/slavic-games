@@ -331,7 +331,7 @@ func _build_living_room() -> void:
 	_breakable("book_stack_music", dining + Vector3(-0.1, 0.78, -0.45), books_b, 0.4)
 	# Бальзам «Звёздочка» — маленькая красная жестянка на салфетке (tools/blender/kitchen.py).
 	var balm := Breakable.new()
-	balm.position = dining + Vector3(-0.2, 0.78, 0.32)
+	balm.position = dining + Vector3(-0.07, 0.78, 0.36) # правее граммофона, ближе к середине салфетки
 	balm.rotation.y = 0.4
 	add_child(balm)
 	var balm_colors: Array[Color] = [Color("9e0a10"), Color("e8be3c"), Color("1e7846")]
