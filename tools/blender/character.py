@@ -25,10 +25,14 @@ os.makedirs(os.path.join(OUT, "cosmetics"), exist_ok=True)
 ## Число полос на костюме «Абибас» (перед релизом можно сменить на 2).
 STRIPES = 3
 
+## Голова поднята над плечами на столько (между ними видна шея). Сдвигаются и голова, и всё,
+## что на ней надето (part() двигает куски части Head вместе с точкой поворота).
+HEAD_LIFT = 0.07
+
 # Точки поворота частей тела.
 PIVOTS = {
     "Torso": (0, 0, 0.55),
-    "Head": (0, 0, 1.05),
+    "Head": (0, 0, 1.05 + HEAD_LIFT),
     "ArmL": (-0.31, 0, 1.0),
     "ArmR": (0.31, 0, 1.0),
     "LegL": (-0.13, 0, 0.55),
@@ -97,6 +101,9 @@ def sphere(r, loc, m, scale=(1, 1, 1), segs=12, rings=8, rot=(0, 0, 0)):
 
 def part(name, pieces):
     """Склеить куски в одну часть тела и поставить точку поворота в сустав."""
+    if name == "Head":                                     # голова выше — над шеей
+        for o in pieces:
+            o.location.z += HEAD_LIFT
     for o in pieces:
         for mod in list(o.modifiers):
             bpy.context.view_layer.objects.active = o
@@ -143,33 +150,77 @@ def export(path, objs):
 
 # ======================= Базовое тело =======================
 
+def lathe(profile, m, segs=28, depth=1.0, center=(0, 0)):
+    """Тело вращения по профилю [(радиус, z), ...] снизу вверх; концы с радиусом 0 — закрыты.
+    depth — сплющивание вперёд-назад (Y). Сглаженное (без граней)."""
+    verts, faces = [], []
+    rings = []
+    for r, z in profile:
+        if r <= 0.0001:
+            rings.append([len(verts)])
+            verts.append((center[0], center[1], z))
+            continue
+        ring = []
+        for k in range(segs):
+            a = k * math.tau / segs
+            ring.append(len(verts))
+            verts.append((center[0] + math.cos(a) * r, center[1] + math.sin(a) * r * depth, z))
+        rings.append(ring)
+    for a, b in zip(rings, rings[1:]):
+        if len(a) == 1:
+            faces += [(a[0], b[(k + 1) % segs], b[k]) for k in range(segs)]
+        elif len(b) == 1:
+            faces += [(a[k], a[(k + 1) % segs], b[0]) for k in range(segs)]
+        else:
+            faces += [(a[k], a[(k + 1) % segs], b[(k + 1) % segs], b[k]) for k in range(segs)]
+    me = bpy.data.meshes.new("Lathe")
+    me.from_pydata(verts, [], faces)
+    o = bpy.data.objects.new("Lathe", me)
+    bpy.context.scene.collection.objects.link(o)
+    o.data.materials.append(m)
+    smooth(o)
+    return o
+
+
+def smooth(o):
+    for p in o.data.polygons:
+        p.use_smooth = True
+    return o
+
+
 def build_base():
     P = primary()
     WHITE = mat("EyeWhite", (0.95, 0.95, 0.95), 0.4)
     BLACK = mat("EyeBlack", (0.03, 0.03, 0.03), 0.3)
     parts = []
-    # Туловище: чуть шире к плечам.
-    torso = [cyl(0.23, 0.55, (0, 0, 0.78), P, verts=10, r2=0.27, scale=(1, 0.72, 1))]
-    torso.append(sphere(0.27, (0, 0, 1.03), P, scale=(1, 0.72, 0.35), segs=10, rings=5))
-    torso.append(sphere(0.23, (0, 0, 0.53), P, scale=(1, 0.72, 0.4), segs=10, rings=5))
+    # Туловище — гладкое «тело вращения»: округлый низ, к плечам чуть шире, плечи покатые
+    # (плавно уходят вниз к рукам, как у игрушечной фигурки), сверху — короткая толстая шея.
+    torso = [lathe([(0.0, 0.49), (0.12, 0.5), (0.19, 0.52), (0.225, 0.56), (0.235, 0.62),
+                    (0.245, 0.75), (0.255, 0.85), (0.255, 0.9), (0.245, 0.95), (0.225, 0.99),
+                    (0.195, 1.025), (0.16, 1.052), (0.128, 1.072), (0.115, 1.09), (0.11, 1.13), (0.1, 1.2),
+                    (0.0, 1.21)], P, segs=32, depth=0.72)]
     parts.append(part("Torso", torso))
     # Голова: большая, как у фишки. Глаза и рот смотрят в +Y.
-    head = [sphere(0.3, (0, 0, 1.33), P, scale=(1, 0.95, 0.95))]
+    head = [smooth(sphere(0.3, (0, 0, 1.33), P, scale=(1, 0.95, 0.95), segs=32, rings=20))]
     for x in (-0.11, 0.11):
-        head.append(sphere(0.075, (x, 0.255, 1.37), WHITE, scale=(1, 0.5, 1.15), segs=10, rings=6))
-        head.append(sphere(0.042, (x, 0.29, 1.36), BLACK, scale=(1, 0.5, 1.2), segs=8, rings=5))
+        head.append(smooth(sphere(0.075, (x, 0.255, 1.37), WHITE, scale=(1, 0.5, 1.15), segs=20, rings=12)))
+        head.append(smooth(sphere(0.042, (x, 0.29, 1.36), BLACK, scale=(1, 0.5, 1.2), segs=16, rings=10)))
     # Рта в базовой голове нет: он — отдельная вещь слота «Рот» (mouth_*, по умолчанию mouth_line).
     parts.append(part("Head", head))
-    # Руки: плечо → кисть вниз по -Z.
+    # Руки: плечо → кисть вниз по -Z; гладкие, плечо скруглено и прижато к покатому плечу.
     for side, x in (("ArmL", -0.31), ("ArmR", 0.31)):
-        arm = [cyl(0.075, 0.38, (x, 0, 0.81), P, verts=8)]
-        arm.append(sphere(0.075, (x, 0, 1.0), P, segs=8, rings=5))
-        arm.append(sphere(0.088, (x, 0, 0.6), P, segs=8, rings=5))
+        s = -1 if x < 0 else 1
+        arm = [lathe([(0.0, 0.53), (0.06, 0.535), (0.085, 0.56), (0.09, 0.6), (0.084, 0.66),
+                      (0.077, 0.72), (0.076, 0.85), (0.079, 0.91), (0.07, 0.96), (0.045, 0.99),
+                      (0.0, 1.0)], P, segs=20, center=(x - s * 0.012, 0))]
         parts.append(part(side, arm))
-    # Ноги со ступнями.
+    # Ноги: гладкие, ступня — скруглённый «ботинок».
     for side, x in (("LegL", -0.13), ("LegR", 0.13)):
-        leg = [cyl(0.09, 0.43, (x, 0, 0.335), P, verts=8)]
-        leg.append(box((0.17, 0.27, 0.1), (x, 0.04, 0.06), P, bevel=0.03))
+        leg = [lathe([(0.0, 0.1), (0.075, 0.11), (0.085, 0.16), (0.09, 0.3), (0.095, 0.45),
+                      (0.1, 0.52), (0.07, 0.56), (0.0, 0.57)], P, segs=20, center=(x, 0))]
+        foot = box((0.17, 0.27, 0.1), (x, 0.04, 0.06), P, bevel=0.045)
+        foot.modifiers["Bevel"].segments = 4
+        leg.append(smooth(foot))
         parts.append(part(side, leg))
     return parts
 
