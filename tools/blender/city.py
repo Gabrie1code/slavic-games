@@ -155,8 +155,9 @@ SKI = mat("CSki", (0.75, 0.15, 0.1), 0.5)
 
 
 # ---------------- Окна и балконы ----------------
-def window(B, rng, x, y, z, w, h, frame=FRAME_W, dress=True, out=-1):
-    """Окно на стене в плоскости y (out = −1: лицо в −Y). Рама, стекло, переплёт и «жизнь»."""
+def window(B, rng, x, y, z, w, h, frame=FRAME_W, dress=True, out=-1, reveal=0.0):
+    """Окно в глубине проёма: y — плоскость стекла (out = −1: лицо в −Y), reveal — глубина
+    проёма (насколько стена впереди). Рама, стекло, переплёт и «жизнь» (картинка за стеклом)."""
     f = out
     B.box((w + 0.16, 0.08, h + 0.16), (x, y + f * 0.02, z), frame)
     B.box((w, 0.1, h), (x, y + f * 0.03, z), GLASS)
@@ -185,8 +186,8 @@ def window(B, rng, x, y, z, w, h, frame=FRAME_W, dress=True, out=-1):
     if rng.random() < 0.12:                                                        # открытая форточка
         B.box((w * 0.33, 0.012, h * 0.36), (x - w * 0.32, yy + f * 0.01, z + h * 0.2), DARK)
     if rng.random() < 0.08:                                                        # кондиционер
-        B.box((0.7, 0.32, 0.45), (x + w * 0.4, y + f * 0.2, z - h / 2 - 0.4), mat("CAC", (0.85, 0.85, 0.82)))
-        B.box((0.55, 0.02, 0.25), (x + w * 0.4, y + f * 0.365, z - h / 2 - 0.4), SEAM)
+        B.box((0.7, 0.32, 0.45), (x + w * 0.4, y + f * (0.2 + reveal), z - h / 2 - 0.4), mat("CAC", (0.85, 0.85, 0.82)))
+        B.box((0.55, 0.02, 0.25), (x + w * 0.4, y + f * (0.365 + reveal), z - h / 2 - 0.4), SEAM)
     if rng.random() < 0.1:                                                         # цветок на окне
         B.box((0.16, 0.12, 0.12), (x + w * 0.25, y + f * 0.12, z - h / 2 + 0.03), mat("CPot", (0.6, 0.3, 0.15)))
         B.cyl(0.11, 0.18, (x + w * 0.25, y + f * 0.12, z - h / 2 + 0.17), GREEN, n=6, r2=0.04)
@@ -288,28 +289,61 @@ def antennas(B, xs, y, top):
             B.box((1.2 - k * 0.25, 0.03, 0.03), (x, y, top + 1.6 + k * 0.3), METAL)
 
 
+REVEAL = 0.22                                                                     # глубина оконных проёмов
+
+
+def facade(B, W, H, y_face, out, openings, mat_at, depth=REVEAL):
+    """Стена-фасад с настоящими проёмами: полосы стены толщиной depth (от y_face внутрь) между
+    окнами. openings — (x, z, w, h) проёмов (с рамой). mat_at(z) — материал стены на высоте z."""
+    rows = {}
+    for x, z, w, h in openings:
+        rows.setdefault((round(z - h / 2, 3), round(z + h / 2, 3)), []).append((x - w / 2, x + w / 2))
+    yc = y_face - out * depth / 2
+
+    def band(z0, z1):
+        if z1 - z0 > 0.001:
+            B.box((W, depth, z1 - z0), (0, yc, (z0 + z1) / 2), mat_at((z0 + z1) / 2))
+
+    z = 0.0
+    for (zb, zt) in sorted(rows):
+        band(z, zb)
+        x = -W / 2
+        for x0, x1 in sorted(rows[(zb, zt)]) + [(W / 2, W / 2)]:
+            if x0 - x > 0.001:
+                B.box((x0 - x, depth, zt - zb), ((x + x0) / 2, yc, (zb + zt) / 2), mat_at((zb + zt) / 2))
+            x = x1
+        z = zt
+    band(z, H)
+
+
 def slab_building(name, W, D, floors, fh, wall, cols, entrances, balcony_cols, rng, base=0.6,
                   band=None, band_every=1, roof_edge=SEAM, back=True):
     """Типовая коробка: стены, швы/пояски, окна на лицевой (и тыльной) стороне, балконы, подъезды."""
     B = Builder()
     H = base + floors * fh
-    B.box((W, D, H), (0, 0, H / 2), wall)
+    B.box((W, D - 2 * REVEAL, H), (0, 0, H / 2), wall)                              # «тело» за проёмами
     B.box((W + 0.3, D + 0.3, 0.35), (0, 0, H + 0.17), roof_edge)
     for fl in range(1, floors + 1):
         B.box((W + 0.04, D + 0.04, 0.06), (0, 0, base + fl * fh), SEAM)
     xs = [-W / 2 + 1.3 + c * (W - 2.6) / (cols - 1) for c in range(cols)]
+    front, rear = [], []
     for fl in range(floors):
         z = base + fl * fh + 1.45
         if band and fl % band_every == 0:
-            B.box((W + 0.02, D + 0.02, 0.5), (0, 0, base + fl * fh + 0.45), band)
+            B.box((W + 0.02, D + 0.02, 0.44), (0, 0, base + fl * fh + 0.42), band)
         for c, x in enumerate(xs):
             if fl == 0 and c in entrances:
                 continue
-            window(B, rng, x, -D / 2, z, 1.2, 1.4)
+            window(B, rng, x, -D / 2 + REVEAL, z, 1.2, 1.4, reveal=REVEAL)
+            front.append((x, z, 1.36, 1.56))
             if back:
-                window(B, rng, x, D / 2, z, 1.2, 1.4, dress=rng.random() < 0.3, out=1)
+                window(B, rng, x, D / 2 - REVEAL, z, 1.2, 1.4, dress=rng.random() < 0.3, out=1,
+                       reveal=REVEAL)
+                rear.append((x, z, 1.36, 1.56))
             if fl >= 1 and c in balcony_cols:
                 balcony(B, rng, x + 0.3, -D / 2, base + fl * fh)
+    facade(B, W, H, -D / 2, -1, front, lambda z: wall)
+    facade(B, W, H, D / 2, 1, rear, lambda z: wall)
     for c in entrances:
         entrance(B, xs[c], -D / 2)
     return B, H, xs
@@ -351,10 +385,8 @@ ROOF_GREEN = mat("CRoofGreen", (0.2, 0.3, 0.26), 0.6, 0.3)
 W, D, FL, FH = 28.0, 13.0, 5, 3.3
 B = Builder()
 H = FL * FH + 0.5
-B.box((W, D, H), (0, 0, H / 2), OCHRE)
-B.box((W + 0.1, D + 0.1, FH + 0.5), (0, 0, (FH + 0.5) / 2), RUST_BASE)              # рустованный низ
-for k in range(1, 6):
-    B.box((W + 0.14, D + 0.14, 0.05), (0, 0, k * 0.65), SEAM)
+B.box((W, D - REVEAL, H), (0, REVEAL / 2, H / 2), OCHRE)                          # «тело» за фасадом
+B.box((W + 0.1, D - REVEAL, FH + 0.5), (0, REVEAL / 2, (FH + 0.5) / 2), RUST_BASE)  # рустованный низ
 B.box((W + 0.9, D + 0.9, 0.5), (0, 0, H + 0.1), STUCCO)                             # карниз
 B.box((W + 0.5, D + 0.5, 0.25), (0, 0, H - 0.3), STUCCO)
 # Скатная крыша (вальмовая): низ — контур карниза, верх — конёк.
@@ -366,12 +398,14 @@ for x in (-9, 0, 9):                                                            
     B.box((0.7, 0.7, 2.0), (x, 1.5, H + 2.2), mat("CChimneyBrick", (0.5, 0.26, 0.18), 0.9))
 cols = 11
 xs = [-W / 2 + 1.5 + c * (W - 3.0) / (cols - 1) for c in range(cols)]
+front = []
 for fl in range(FL):
     z = 0.5 + fl * FH + 1.7
     for c, x in enumerate(xs):
         if fl == 0 and c in (2, 5, 8):
             continue
-        window(B, rng, x, -D / 2, z, 1.2, 1.8, frame=FRAME_WOOD)
+        window(B, rng, x, -D / 2 + REVEAL, z, 1.2, 1.8, frame=FRAME_WOOD, reveal=REVEAL)
+        front.append((x, z, 1.36, 1.96))
         B.box((1.6, 0.12, 0.25), (x, -D / 2 - 0.06, z + 1.12), STUCCO)              # сандрик над окном
         if fl in (2, 3) and c in (4, 6):                                           # балкончики с балясинами
             yb = -D / 2 - 0.5
@@ -379,6 +413,7 @@ for fl in range(FL):
             for k in range(9):
                 B.cyl(0.05, 0.75, (x - 0.8 + k * 0.2, yb - 0.4, 0.5 + fl * FH + 0.45), STUCCO, n=6)
             B.box((1.9, 0.12, 0.1), (x, yb - 0.4, 0.5 + fl * FH + 0.85), STUCCO)
+facade(B, W, H, -D / 2, -1, front, lambda z: RUST_BASE if z < FH + 0.5 else OCHRE)
 for c in (2, 8):
     entrance(B, xs[c], -D / 2, door=FRAME_WOOD, canopy=STUCCO)
 # Арка во двор посередине: тёмный проём с полукруглым верхом.
@@ -394,29 +429,35 @@ STRIPE = mat("CTowerStripe", (0.85, 0.45, 0.18), 0.6)
 S, FL, FH = 16.0, 14, 2.8
 B = Builder()
 H = 0.6 + FL * FH
-B.box((S, S, H), (0, 0, H / 2), TOWER)
+B.box((S - 2 * REVEAL, S - 2 * REVEAL, H), (0, 0, H / 2), TOWER)                   # «тело» за проёмами
 B.box((S + 0.3, S + 0.3, 0.35), (0, 0, H + 0.17), SEAM)
 for s in (-1, 1):                                                                   # оранжевые полосы по углам
     for t in (-1, 1):
         B.box((0.9, 0.9, H - 1.0), (s * (S / 2 - 0.35), t * (S / 2 - 0.35), H / 2 + 0.5), STRIPE)
 B.box((5, 5, 3.0), (0, 0, H + 1.5), TOWER)
-for fl in range(FL):
-    z = 0.6 + fl * FH + 1.45
-    for side in range(4):
-        rot = side * math.pi / 2
+for side in range(4):
+    # Сторона side: строим как лицевую (в −Y), потом поворачиваем. Передняя и задняя — во всю
+    # ширину, боковые — между ними (без наложения на углах).
+    Bs = Builder()
+    width = S if side % 2 == 0 else S - 2 * REVEAL
+    opens = []
+    for fl in range(FL):
+        z = 0.6 + fl * FH + 1.45
         for c in range(5):
             u = -S / 2 + 2.0 + c * (S - 4.0) / 4
-            # Окно на стороне side: поворачиваем точку и «лицо».
-            Bw = Builder()
-            window(Bw, rng, u, -S / 2, z, 1.2, 1.4, dress=rng.random() < 0.5)
+            if side == 0 and fl == 0 and c == 2:
+                continue                                                           # подъезд
+            window(Bs, rng, u, -S / 2 + REVEAL, z, 1.2, 1.4, dress=rng.random() < 0.5, reveal=REVEAL)
+            opens.append((u, z, 1.36, 1.56))
             if fl >= 1 and c in (1, 3) and side == 0:
-                balcony(Bw, rng, u, -S / 2, 0.6 + fl * FH, w=2.0, depth=1.0)
-            R = Matrix.Rotation(rot, 3, "Z")
-            base = len(B.verts)
-            B.verts += [tuple(R @ Vector(v)) for v in Bw.verts]
-            for face, mi in zip(Bw.faces, Bw.mats):
-                B.faces.append(tuple(base + i for i in face))
-                B.mats.append(B._mi(Bw.mat_list[mi]))
+                balcony(Bs, rng, u, -S / 2, 0.6 + fl * FH, w=2.0, depth=1.0)
+    facade(Bs, width, H, -S / 2, -1, opens, lambda z: TOWER)
+    R = Matrix.Rotation(side * math.pi / 2, 3, "Z")
+    base = len(B.verts)
+    B.verts += [tuple(R @ Vector(v)) for v in Bs.verts]
+    for face, mi in zip(Bs.faces, Bs.mats):
+        B.faces.append(tuple(base + i for i in face))
+        B.mats.append(B._mi(Bs.mat_list[mi]))
 entrance(B, 0, -S / 2)
 antennas(B, (-4, 4), 4, H)
 export("tower_block", B)

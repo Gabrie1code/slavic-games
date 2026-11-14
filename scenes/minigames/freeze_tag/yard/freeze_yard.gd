@@ -3,7 +3,8 @@ extends Node3D
 ## Двор 90-х для «Морожки»: разные дома вокруг на все 360° (хрущёвки, девятиэтажка, сталинка,
 ## башни, гаражи; вдали труба ТЭЦ, водокачка, краны), забор, лавочки, открытая песочница
 ## с «грибком», деревья, фонари и площадка — горка, качели, карусель (см. их скрипты),
-## у краёв — шведская стенка, «глобус» и дуга-лесенка (препятствия); облака разных видов.
+## у краёв — шведская стенка, «глобус» и дуга-лесенка (препятствия); облака разных видов;
+## тропинки и тротуары вокруг (YardPaths).
 ## Площадка игры — X −15.75..15.75, Z −9.75..9.75 (в 1.5 раза больше прежней; забор-столкновения
 ## в сцене, здесь — модели). В песочнице — ведёрко, лопатка и формочка.
 
@@ -72,6 +73,9 @@ var _clouds: Node3D
 func _ready() -> void:
 	_build_surroundings()
 	_build_clouds()
+	var paths := YardPaths.new()
+	add_child(paths)
+	paths.build(SURROUNDINGS)
 	_build_fence()
 	_solid(PLAYGROUND + "sandbox", Vector3(3.0, 0.3, 3.0), SANDBOX)
 	_build_sand_toys()
@@ -131,6 +135,12 @@ func _build_far_ground() -> void:
 func _process(delta: float) -> void:
 	if _clouds:
 		_clouds.rotation.y += CLOUD_DRIFT * delta
+
+
+## Перекрасить облака (в дождь — серые тучи, RainWeather).
+func tint_clouds(color: Color) -> void:
+	for cloud in _clouds.get_children():
+		(cloud as Sprite3D).modulate = color
 
 
 ## Облака разных видов по кругу (seed постоянный — каждый раз одинаково): плоские картинки,

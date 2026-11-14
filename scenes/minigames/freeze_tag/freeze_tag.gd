@@ -56,6 +56,8 @@ const FOG_LAYER := 1 << 17
 const HUD_LAYER := 1 << 16
 ## Пелена вне радиуса: 80% черноты на старте, каждые 8 сек на 10% меньше.
 const FOG_START := 0.8
+## Шанс дождя в раунде (только картинка, RainWeather). ТЕСТ: 1.0 — дождь всегда; потом вернуть 0.1.
+const RAIN_CHANCE := 1.0
 const FOG_STEP := 0.1
 const FOG_STEP_TIME := 8.0
 const RUNNER_SPAWNS: Array[Vector3] = [
@@ -147,6 +149,10 @@ func _ready() -> void:
 	_yard.slide.ride_finished.connect(_on_playground_done)
 	_yard.slide.ride_finished.connect(_on_slide_done)
 	_yard.swing.sit_finished.connect(_on_playground_done)
+	if randf() < RAIN_CHANCE: # до видов: туман водящего копирует уже «дождливое» окружение
+		var rain := RainWeather.new()
+		add_child(rain)
+		rain.start(get_node("WorldEnvironment") as WorldEnvironment, _sun, _yard)
 	_spawn_racers()
 	_setup_views()
 	_prewarm_effects()
