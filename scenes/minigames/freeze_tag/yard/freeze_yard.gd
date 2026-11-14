@@ -6,7 +6,7 @@ extends Node3D
 ## у краёв — шведская стенка, «глобус» и дуга-лесенка (препятствия); облака разных видов;
 ## тропинки и тротуары вокруг (YardPaths); вдали — деревья до горизонта.
 ## Площадка игры — X −15.75..15.75, Z −9.75..9.75 (в 1.5 раза больше прежней; забор-столкновения
-## в сцене, здесь — модели). В песочнице — ведёрко, лопатка и формочка.
+## в сцене, здесь — модели). Игрушки в песочнице — в её модели (playground.py).
 
 const COURTYARD := "res://assets/models/courtyard/"
 const PLAYGROUND := "res://assets/models/playground/"
@@ -90,7 +90,6 @@ func _ready() -> void:
 	paths.build(SURROUNDINGS)
 	_build_fence()
 	_solid(PLAYGROUND + "sandbox", Vector3(3.0, 0.3, 3.0), SANDBOX)
-	_build_sand_toys()
 	_bench(Vector3(1.5, 0, -6.6) * S, 0.0)
 	_bench(Vector3(10.2, 0, -2.0) * S, -PI / 2)
 	_bench(Vector3(-10.2, 0, -1.0) * S, PI / 2)
@@ -230,71 +229,6 @@ func _build_fence() -> void:
 		for side in [-FENCE_X, FENCE_X]:
 			_place(PLAYGROUND + "fence", Vector3(side, 0, z2), PI / 2)
 		z2 += 2.0
-
-
-## Игрушки в песочнице: красное ведёрко, синяя лопатка, жёлтая формочка (только для красоты).
-func _build_sand_toys() -> void:
-	var sand_y := 0.27
-	var bucket := MeshInstance3D.new()
-	var bucket_mesh := CylinderMesh.new()
-	bucket_mesh.top_radius = 0.13
-	bucket_mesh.bottom_radius = 0.1
-	bucket_mesh.height = 0.2
-	bucket_mesh.radial_segments = 12
-	bucket.mesh = bucket_mesh
-	bucket.material_override = _toy_mat(Color("d93a2a"))
-	bucket.position = SANDBOX + Vector3(0.6, sand_y + 0.1, 0.4)
-	add_child(bucket)
-	var handle := MeshInstance3D.new()
-	var handle_mesh := TorusMesh.new()
-	handle_mesh.inner_radius = 0.12
-	handle_mesh.outer_radius = 0.135
-	handle.mesh = handle_mesh
-	handle.material_override = _toy_mat(Color("f6c343"))
-	handle.rotation = Vector3(PI / 2, 0, 0.5)
-	handle.position = Vector3(0, 0.1, 0)
-	bucket.add_child(handle)
-	# Лопатка лежит на песке: черенок и плоский совок.
-	var shovel := Node3D.new()
-	shovel.position = SANDBOX + Vector3(-0.4, sand_y + 0.02, 0.2)
-	shovel.rotation = Vector3(0, 0.7, 0)
-	add_child(shovel)
-	var blue := _toy_mat(Color("3a6fd9"))
-	_toy_box(shovel, Vector3(0.04, 0.03, 0.4), Vector3(0, 0, -0.1), blue)
-	_toy_box(shovel, Vector3(0.16, 0.02, 0.18), Vector3(0, -0.005, 0.18), blue)
-	# Формочка-«звёздочка» вверх дном и куличик рядом.
-	var mold := MeshInstance3D.new()
-	var mold_mesh := CylinderMesh.new()
-	mold_mesh.top_radius = 0.07
-	mold_mesh.bottom_radius = 0.1
-	mold_mesh.height = 0.08
-	mold_mesh.radial_segments = 5
-	mold.mesh = mold_mesh
-	mold.material_override = _toy_mat(Color("f2d23a"))
-	mold.position = SANDBOX + Vector3(0.1, sand_y + 0.04, -0.6)
-	add_child(mold)
-	var cake := MeshInstance3D.new()
-	cake.mesh = mold_mesh
-	cake.material_override = _toy_mat(Color("d9c08a"))
-	cake.position = SANDBOX + Vector3(0.35, sand_y + 0.04, -0.5)
-	add_child(cake)
-
-
-func _toy_mat(color: Color) -> StandardMaterial3D:
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = color
-	mat.roughness = 0.4
-	return mat
-
-
-func _toy_box(parent: Node3D, size: Vector3, pos: Vector3, mat: Material) -> void:
-	var mesh_instance := MeshInstance3D.new()
-	var box := BoxMesh.new()
-	box.size = size
-	mesh_instance.mesh = box
-	mesh_instance.material_override = mat
-	mesh_instance.position = pos
-	parent.add_child(mesh_instance)
 
 
 func _bench(pos: Vector3, yaw: float) -> void:
