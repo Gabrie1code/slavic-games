@@ -15,9 +15,9 @@ const OPEN_TIME := 25.0
 const JOKE := preload("res://assets/models/apartment/drawer_joke.glb")
 const JOKE_CHANCE := 0.1
 const JOKE_POS := Vector3(0.0, 0.345, 0.02)
-## «Цензура» на кончике предмета: кубик из крупных пикселей (как в передачах, где что-то скрыто).
+## «Цензура» над кончиком предмета: плашки из крупных пикселей (как в передачах, где что-то скрыто).
 const CENSOR := preload("res://assets/textures/fx/censor_mosaic.png")
-const CENSOR_POS := Vector3(0.066, 0.024, 0.0)
+const CENSOR_POS := Vector3(0.062, 0.052, 0.0) # чуть выше верха кончика (0.045)
 const SLIDE := 0.25
 ## Баллончик лежит на боку на дне ящика (в координатах ящика).
 ## Ровно посередине ящика, поперёк (баллончик длиной ~0.19 м: дно слева, сопло справа).
@@ -112,18 +112,26 @@ func _restock() -> void:
 	can.store_in(_drawer, CAN_POS, CAN_ROT)
 
 
-## Кубик «цензуры» вокруг кончика: пиксели остаются квадратными (фильтр «ближайший»), без теней,
-## светится ровно — сразу видно, что «там что-то запрещённое».
-static func _make_censor() -> MeshInstance3D:
-	var censor := MeshInstance3D.new()
-	var box := BoxMesh.new()
-	box.size = Vector3(0.07, 0.065, 0.065)
-	censor.mesh = box
+## «Цензура» над кончиком: две плоские плашки из крупных пикселей, лежат над предметом
+## (видно сверху, когда ящик открыт). Сам предмет не меняется.
+static func _make_censor() -> Node3D:
+	var root := Node3D.new()
 	var mat := StandardMaterial3D.new()
 	mat.albedo_texture = CENSOR
 	mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	censor.material_override = mat
-	censor.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	censor.position = CENSOR_POS
-	return censor
+	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	for spec: Array in [[Vector2(0.075, 0.06), Vector3(0, 0, 0), 0.0],
+			[Vector2(0.045, 0.036), Vector3(-0.022, 0.003, 0.018), 0.35]]:
+		var piece := MeshInstance3D.new()
+		var quad := PlaneMesh.new()
+		quad.size = spec[0]
+		piece.mesh = quad
+		piece.material_override = mat
+		piece.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		piece.position = spec[1]
+		piece.rotation.y = spec[2]
+		root.add_child(piece)
+	root.position = CENSOR_POS
+	return root
