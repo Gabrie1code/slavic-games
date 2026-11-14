@@ -1932,6 +1932,15 @@ character_rig.py. Есть «Копировать настройки» (JSON) и
 сетку (у каждой детали формула расстояния, объединение плавным минимумом smin, поверхность —
 Surface Nets, в движении пересчёт ~12 раз/с); 100% — цельная, «отлитая».
 
+**Изучен файл владельца `BaseCharacter.blend`** (в проект пока НЕ добавлен — нужен источник и
+лицензия). Готовый персонаж: одна сетка Body (1062 полигона, гладких 160 — остальные граненые,
+материалы Skin тёмно-серый и Face — белые чёрточки глаз, без текстуры), высота 3.1 ед. (в игре
+масштаб ~0.47), T-поза. Скелет CharacterArmature, 23 кости (Hips, Abdomen, Torso, Neck, Head,
+Shoulder/UpperArm/LowerArm/Fist ×2, UpperLeg/LowerLeg/Foot ×2, IK-цели для ног). 17 анимаций:
+Idle, Walk, Walk_Carry, Run, Run_Carry, Jump, Punch, SwordSlash, Shoot_OneHanded, PickUp,
+RecieveHit, Roll, SitDown, StandUp, Victory, Defeat, Death. Стоп нет — ноги сужаются в точку,
+кисти — кулачки. Рендер: 4 ракурса + 8 кадров анимаций.
+
 ---
 
 ## 4. Текущее состояние игры (что есть сейчас)
