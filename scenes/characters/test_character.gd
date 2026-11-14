@@ -70,6 +70,10 @@ const JUMP_RISE_TIME := 7.0 / 24.0
 const JUMP_FALL_TIME := 13.0 / 24.0
 ## Присед: кадр анимации SitDown, где персонаж уже присел (сек).
 const SQUAT_TIME := 22.0 / 24.0
+## Удар — анимация Punch модели: начало (стойка) пропускаем и играем быстрее, чтобы кулак вылетал
+## сразу (удар засчитывается в момент нажатия).
+const PUNCH_ANIM_FROM := 0.15
+const PUNCH_ANIM_SPEED := 1.7
 ## Смерть: анимация Death чуть быстрее (успевает упасть до исчезновения).
 const DEATH_ANIM_SPEED := 1.5
 const SWING := 0.65
@@ -153,6 +157,8 @@ var _render_layer := 1
 var _parts: Dictionary = {}
 var _rig: CharacterRig = null
 var _dying := false
+## Сколько ещё секунд идёт разовое действие (удар) — анимация по состоянию его не перебивает.
+var _action_left := 0.0
 
 @onready var visual: Node3D = $Visual
 @onready var right_hand: Node3D = Node3D.new()
@@ -308,7 +314,8 @@ func _drive_rig(delta: float, walk_speed: float) -> void:
 	if _rig == null:
 		return
 	var airborne := _air > 0.3
-	if _rig.animated() and not _dying:
+	_action_left = maxf(0.0, _action_left - delta)
+	if _rig.animated() and not _dying and _action_left <= 0.0:
 		if sitting:
 			_rig.play("Idle")
 		elif airborne:
@@ -499,6 +506,10 @@ func _push_bodies() -> void:
 func punch() -> bool:
 	if _right_arm_busy:
 		return false
+	if _rig and _rig.animated():
+		_action_left = _rig.play_action("Punch", PUNCH_ANIM_SPEED, PUNCH_ANIM_FROM)
+		if _action_left > 0.0:
+			return true
 	set_arm_pose(0.15, 1.65, 0.07)
 	_finish_punch()
 	return true

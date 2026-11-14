@@ -121,6 +121,18 @@ func play(anim_name: String, speed: float = 1.0, blend: float = BLEND) -> void:
 		_anim.play(anim_name, blend)
 
 
+## Разовое действие (удар): анимация с момента from_time, заново даже если уже играет.
+## Возвращает, сколько секунд она будет идти (0 — такой анимации нет).
+func play_action(anim_name: String, speed: float, from_time: float = 0.0) -> float:
+	if _anim == null or not _anim.has_animation(anim_name):
+		return 0.0
+	_current = anim_name
+	_anim.speed_scale = speed
+	_anim.play(anim_name, 0.06)
+	_anim.seek(from_time, false)
+	return maxf(0.0, _anim.get_animation(anim_name).length - from_time) / speed
+
+
 ## Застыть на кадре анимации (время в секундах), например поза прыжка по скорости взлёта.
 func hold(anim_name: String, time: float) -> void:
 	if _anim == null or not _anim.has_animation(anim_name):
