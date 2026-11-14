@@ -15,8 +15,11 @@ const SUPER_BAT_SCENE := preload("res://assets/models/props/bat_super.glb")
 const CAN_SCENE := preload("res://assets/models/props/energy_can.glb")
 
 ## 250 HP: раунд не кончается слишком быстро (удар 20, супер-бита 34).
-## Куда смотрит камера: центр крыши (поле битвы по центру экрана).
-const CAMERA_TARGET := Vector3(0, 0, 0)
+## Камера: куда смотрит и откуда (сдвиг от этой точки). Точка выбрана так, чтобы в кадре
+## по центру была вся сцена битвы — крыша, ворота гаражей и машины с баками перед ними,
+## а дома сзади видно меньше (раньше камера смотрела в центр крыши — низ сцены обрезался).
+const CAMERA_TARGET := Vector3(0, -1.0, 3.75)
+const CAMERA_OFFSET := Vector3(0, 11.34, 10.0)
 const MAX_HP := 250
 const ROUND_TIME := 75.0
 const SPAWN_POINTS: Array[Vector3] = [
@@ -105,10 +108,7 @@ func _ready() -> void:
 		MatchState.start_new_match(1)
 
 	_sun.rotation_degrees = Vector3(-55, -30, 0)
-	# Камера на 20% ближе к центру крыши (было (0, 13.5, 12.5)) и на 5% выше, смотрит в центр.
-	var offset := (Vector3(0, 13.5, 12.5) - CAMERA_TARGET) * 0.8
-	offset.y *= 1.05
-	_camera.look_at_from_position(CAMERA_TARGET + offset, CAMERA_TARGET)
+	_camera.look_at_from_position(CAMERA_TARGET + CAMERA_OFFSET, CAMERA_TARGET)
 	_spawn_fighters()
 	# Двор вокруг крыши: дома, машины, голуби, собака.
 	var yard := GarageYard.new()
