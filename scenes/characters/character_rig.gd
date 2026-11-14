@@ -21,8 +21,6 @@ const ELBOWS := {"ArmL": "LowerArm.L", "ArmR": "LowerArm.R"}
 const KNEES := {"LegL": "LowerLeg.L", "LegR": "LowerLeg.R"}
 ## Ступни — отдельные кости (в анимациях это «ручки» IK); от кода ставятся вслед за голенью.
 const FEET := {"LegL": "Foot.L", "LegR": "Foot.R"}
-## Корень тела в анимациях (его подъём в прыжке гасится — прыгает физика игры).
-const ROOT_BONE := "Body"
 const ORDER: Array[String] = ["Torso", "Head", "ArmR", "ArmL", "LegR", "LegL"]
 ## Повторяются по кругу.
 const LOOPS: Array[String] = ["Idle", "Walk", "Run", "Walk_Carry", "Run_Carry"]
@@ -62,6 +60,8 @@ var _to_model: Transform3D
 var _root_bone := -1
 var _root_rest_y := 0.0
 var _root_shifted := false
+## После прыжка подъём ещё гасится, пока идёт плавный переход из Jump (иначе тело подскакивает).
+var _unlock_left := 0.0
 var _current := ""
 ## Часть -> {"bone", "offset", "bind_local", "lower", "lower_rest", "foot", "foot_rest"}.
 var _links: Dictionary = {}
@@ -83,7 +83,9 @@ func setup(model: Node3D) -> bool:
 			if _anim.has_animation(anim_name):
 				_anim.get_animation(anim_name).loop_mode = Animation.LOOP_LINEAR
 	_to_model = model.global_transform.affine_inverse() * _skeleton.global_transform
-	_root_bone = _find_bone(ROOT_BONE)
+	# Корень тела — родитель таза (кость «Body»; при импорте её могут переименовать в «Body_2»,
+	# потому что так же называется сетка модели).
+	_root_bone = _skeleton.get_bone_parent(_find_bone("Hips"))
 	if _root_bone >= 0:
 		_root_rest_y = _skeleton.get_bone_global_rest(_root_bone).origin.y
 	var torso := _make_part(model, model, "Torso")
@@ -117,6 +119,8 @@ func play(anim_name: String, speed: float = 1.0, blend: float = BLEND) -> void:
 		return
 	_anim.speed_scale = speed
 	if _current != anim_name:
+		if _current == "Jump":
+			_unlock_left = blend
 		_current = anim_name
 		_anim.play(anim_name, blend)
 
@@ -137,7 +141,9 @@ func play_action(anim_name: String, speed: float, from_time: float = 0.0) -> flo
 func hold(anim_name: String, time: float) -> void:
 	if _anim == null or not _anim.has_animation(anim_name):
 		return
-	play(anim_name, 0.0)
+	# Скорость не ноль: иначе не идёт и плавный переход от прошлой анимации (поза «застревает»).
+	# Кадр всё равно ставится каждый раз заново, сдвиг за кадр — доли миллисекунды.
+	play(anim_name, 1.0)
 	_anim.seek(time, false)
 
 
@@ -155,6 +161,7 @@ static func fit(part_name: String, layer: Vector3) -> Transform3D:
 func update(delta: float, elbow_bend: Dictionary, knee_bend: Dictionary) -> void:
 	if _anim:
 		_anim.advance(delta)
+	_unlock_left = maxf(0.0, _unlock_left - delta)
 	_lock_root()
 	var skel_inv := _skeleton.global_transform.affine_inverse()
 	for part_name in ORDER:
@@ -201,7 +208,7 @@ func _lock_root() -> void:
 	if top < 0:
 		return
 	var top_rest := _skeleton.get_bone_rest(top).origin
-	if not lock_root:
+	if not lock_root and _unlock_left <= 0.0:
 		if _root_shifted:
 			_skeleton.set_bone_pose_position(top, top_rest)
 			_root_shifted = false
