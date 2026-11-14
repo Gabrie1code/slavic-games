@@ -4,7 +4,7 @@ extends Node3D
 ## башни, гаражи; вдали труба ТЭЦ с дымом, водокачка, краны), забор, лавочки, открытая песочница
 ## с «грибком», деревья, фонари и площадка — горка, качели, карусель (см. их скрипты),
 ## у краёв — шведская стенка, «глобус» и дуга-лесенка (препятствия); облака разных видов;
-## тропинки и тротуары вокруг (YardPaths).
+## тропинки и тротуары вокруг (YardPaths); вдали — деревья до горизонта.
 ## Площадка игры — X −15.75..15.75, Z −9.75..9.75 (в 1.5 раза больше прежней; забор-столкновения
 ## в сцене, здесь — модели). В песочнице — ведёрко, лопатка и формочка.
 
@@ -57,7 +57,7 @@ const EXTRA_TREES: Array[Vector3] = [
 const SKY := "res://assets/textures/sky/"
 const CLOUD_KINDS: Array = [
 	["cloud_cumulus_a", 24.0, 40.0], ["cloud_cumulus_b", 20.0, 34.0], ["cloud_cumulus_a", 34.0, 52.0],
-	["cloud_cirrus", 45.0, 65.0], ["cloud_stratus", 18.0, 26.0], ["cloud_tower", 22.0, 30.0],
+	["cloud_cirrus", 45.0, 65.0], ["cloud_stratus", 18.0, 26.0], ["cloud_cumulus_a", 26.0, 36.0],
 	["cloud_cumulus_b", 40.0, 58.0],
 ]
 const CLOUD_COUNT := 44
@@ -76,6 +76,7 @@ var _clouds: Node3D
 
 func _ready() -> void:
 	_build_surroundings()
+	_build_far_trees()
 	_build_clouds()
 	smoke = ChimneySmoke.new()
 	smoke.position = Vector3(-111, 61, 100) # верх трубы ТЭЦ (см. SURROUNDINGS)
@@ -142,6 +143,37 @@ func _build_far_ground() -> void:
 func _process(delta: float) -> void:
 	if _clouds:
 		_clouds.rotation.y += CLOUD_DRIFT * delta
+
+
+## Деревья вдали (50–115 м) — закрывают пустые просветы до горизонта между домами. Крупнее
+## обычных (вдали их не разглядеть), не ставятся вплотную к дальним домам. Seed постоянный.
+func _build_far_trees() -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 404
+	var placed := 0
+	var tries := 0
+	while placed < 130 and tries < 900:
+		tries += 1
+		var angle := rng.randf() * TAU
+		var dist := rng.randf_range(50.0, 115.0)
+		var spot := Vector3(cos(angle) * dist, 0, sin(angle) * dist)
+		var free := true
+		for item: Array in SURROUNDINGS:
+			var house: Vector3 = item[1]
+			if house.length() > 50.0 and house.distance_to(spot) < 24.0:
+				free = false
+				break
+		if not free:
+			continue
+		var tree := _place(COURTYARD + ("tree_birch" if rng.randf() < 0.4 else "tree_poplar"), spot,
+			rng.randf() * TAU)
+		tree.scale = Vector3.ONE * rng.randf_range(2.6, 4.0)
+		placed += 1
+	# Роща в просвете на востоке (между кирпичной хрущёвкой и сталинкой виден горизонт).
+	for spot: Vector3 in [Vector3(58, 0, 22), Vector3(64, 0, 28), Vector3(70, 0, 21), Vector3(62, 0, 16),
+			Vector3(76, 0, 30), Vector3(68, 0, 35)]:
+		var grove := _place(COURTYARD + "tree_poplar", spot, rng.randf() * TAU)
+		grove.scale = Vector3.ONE * rng.randf_range(2.8, 3.8)
 
 
 ## Перекрасить облака (в дождь — серые тучи, RainWeather).

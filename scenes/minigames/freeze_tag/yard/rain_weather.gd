@@ -9,13 +9,17 @@ const DROPS := 7000
 const AREA := Vector2(46, 34)
 const HEIGHT := 22.0
 const PUDDLES := 16
-const SKY_RAIN := Color(0.36, 0.4, 0.46)
+## Небо в дождь (верх и горизонт градиента) и при вспышке молнии.
+const SKY_RAIN := Color(0.3, 0.33, 0.38)
+const HORIZON_RAIN := Color(0.44, 0.47, 0.52)
 const SKY_FLASH := Color(0.82, 0.86, 0.95)
 const CLOUD_RAIN := Color(0.42, 0.44, 0.5)
 ## Пауза между молниями (сек): случайно в этих пределах.
 const LIGHTNING_GAP := Vector2(6.0, 14.0)
 
 var _env: Environment
+## Градиент неба двора (ProceduralSkyMaterial; null — небо одним цветом).
+var _sky: ProceduralSkyMaterial
 var _sun: DirectionalLight3D
 var _sun_energy := 1.0
 var _next_flash := 0.0
@@ -26,7 +30,12 @@ var _next_flash := 0.0
 func start(world_env: WorldEnvironment, sun: DirectionalLight3D, yard: FreezeYard) -> void:
 	_env = world_env.environment.duplicate() as Environment
 	world_env.environment = _env
-	_env.background_color = SKY_RAIN
+	_env.background_color = HORIZON_RAIN
+	if _env.sky and _env.sky.sky_material is ProceduralSkyMaterial:
+		_env.sky = _env.sky.duplicate(true) as Sky
+		_sky = _env.sky.sky_material as ProceduralSkyMaterial
+		_sky.sun_angle_max = 0.0 # солнца за тучами не видно
+	_set_flash(0.0)
 	_env.ambient_light_energy *= 0.65
 	_sun = sun
 	_sun.light_energy *= 0.4
@@ -80,10 +89,12 @@ func _build_drops() -> void:
 ## Лужи: тёмные блестящие пятна разного размера и формы на земле (на площадке и вокруг).
 func _build_puddles() -> void:
 	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color(0.2, 0.23, 0.28, 0.8)
+	# Мокрый асфальт, а не зеркало: не «металл» (иначе у водящего, где небо затемнено, лужи
+	# отражали черноту и были чёрными дырами).
+	mat.albedo_color = Color(0.36, 0.4, 0.46, 0.55)
 	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	mat.metallic = 0.6
-	mat.roughness = 0.05
+	mat.metallic = 0.0
+	mat.roughness = 0.15
 	var mesh := CylinderMesh.new()
 	mesh.top_radius = 1.0
 	mesh.bottom_radius = 1.0
@@ -116,7 +127,11 @@ func _lightning() -> void:
 
 
 func _set_flash(amount: float) -> void:
-	_env.background_color = SKY_RAIN.lerp(SKY_FLASH, amount)
+	_env.background_color = HORIZON_RAIN.lerp(SKY_FLASH, amount)
+	if _sky:
+		_sky.sky_top_color = SKY_RAIN.lerp(SKY_FLASH, amount)
+		_sky.sky_horizon_color = HORIZON_RAIN.lerp(SKY_FLASH, amount)
+		_sky.ground_horizon_color = _sky.sky_horizon_color
 	_sun.light_energy = _sun_energy * (1.0 + amount * 4.0)
 
 

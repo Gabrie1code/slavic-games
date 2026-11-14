@@ -149,6 +149,7 @@ func _ready() -> void:
 	_yard.slide.ride_finished.connect(_on_playground_done)
 	_yard.slide.ride_finished.connect(_on_slide_done)
 	_yard.swing.sit_finished.connect(_on_playground_done)
+	_setup_sky()
 	if randf() < RAIN_CHANCE: # до видов: туман водящего копирует уже «дождливое» окружение
 		var rain := RainWeather.new()
 		add_child(rain)
@@ -789,20 +790,44 @@ func _setup_views() -> void:
 	_update_fog()
 
 
+## Небо двора — градиент (вверху синее, к горизонту светлее) вместо одного цвета. Свет от неба
+## не меняется (окружающий свет — свой цвет в сцене).
+func _setup_sky() -> void:
+	var world_env := get_node("WorldEnvironment") as WorldEnvironment
+	var env := world_env.environment.duplicate() as Environment
+	var sky_mat := ProceduralSkyMaterial.new()
+	sky_mat.sky_top_color = Color(0.3, 0.5, 0.78)
+	sky_mat.sky_horizon_color = Color(0.7, 0.79, 0.88)
+	sky_mat.sky_curve = 0.12
+	sky_mat.ground_horizon_color = sky_mat.sky_horizon_color
+	sky_mat.ground_bottom_color = Color(0.36, 0.5, 0.28)
+	var sky := Sky.new()
+	sky.sky_material = sky_mat
+	env.sky = sky
+	env.background_mode = Environment.BG_SKY
+	world_env.environment = env
+
+
 ## Туман водящего — своё окружение его камеры (копия окружения двора + туман): чёрная пелена
 ## по расстоянию от глаз, от FOG_RADIUS − 1 до FOG_RADIUS м. От первого лица глаза — это и есть
 ## водящий. (Раньше был экранный шейдер по буферу глубины — от первого лица сквозь него было
 ## видно всё.) Небо (фон-цвет) затемняется отдельно, в _update_fog.
 func _add_chaser_fog(camera: Camera3D) -> void:
 	var world_env := get_node("WorldEnvironment") as WorldEnvironment
-	_sky_color = world_env.environment.background_color
-	_fog_env = world_env.environment.duplicate() as Environment
+	var base := world_env.environment
+	_sky_color = base.background_color
+	if base.sky and base.sky.sky_material is ProceduralSkyMaterial:
+		_sky_color = (base.sky.sky_material as ProceduralSkyMaterial).sky_horizon_color
+	_fog_env = base.duplicate() as Environment
+	# Небо водящему — одним цветом, затемняется само (_update_fog): туман в режиме «глубина»
+	# закрашивал небо целиком — оно было чёрным весь раунд.
+	_fog_env.background_mode = Environment.BG_COLOR
 	_fog_env.fog_enabled = true
 	_fog_env.fog_mode = Environment.FOG_MODE_DEPTH
 	_fog_env.fog_light_color = Color.BLACK
 	_fog_env.fog_sun_scatter = 0.0
 	_fog_env.fog_aerial_perspective = 0.0
-	_fog_env.fog_sky_affect = 1.0
+	_fog_env.fog_sky_affect = 0.0
 	_fog_env.fog_depth_begin = FOG_RADIUS - 1.0
 	_fog_env.fog_depth_end = FOG_RADIUS
 	_fog_env.fog_depth_curve = 1.0

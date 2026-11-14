@@ -423,11 +423,12 @@ func _apply_boost(f: Fighter, type: Boost) -> void:
 		_message_label.text = "%s взял СУПЕР-БИТУ!" % f.player.display_name
 	else:
 		f.drink_left = DRINK_TIME
-		# +50 HP всегда, даже при полном здоровье (тогда сверх максимума, до MAX_HP + 50).
-		f.hp = mini(MAX_HP + DRINK_HEAL, f.hp + DRINK_HEAL)
+		# Лечит на 50 HP, но не выше максимума (раньше можно было набрать 300 / 250).
+		var healed := mini(MAX_HP, f.hp + DRINK_HEAL) - f.hp
+		f.hp += healed
 		_update_hp(f)
 		_message_label.text = "%s выпил «Ягуарр»! +%d HP и крутится быстрее!" \
-			% [f.player.display_name, DRINK_HEAL]
+			% [f.player.display_name, healed]
 	_clear_message_later()
 
 
