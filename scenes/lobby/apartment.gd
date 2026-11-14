@@ -310,7 +310,8 @@ func _build_living_room() -> void:
 	seats.append({"pos": chair_pos, "yaw": PI / 2 + PI, "approach": chair_pos + Vector3(0.9, 0, 0),
 		"name": "Сесть в кресло"})
 	_place(_model("wall_carpet"), Vector3(LEFT_X + 0.08, 0.85, -0.3)).rotation_degrees.y = 90.0
-	floor_lamp = _tippable("floor_lamp", Vector3(0.42, 1.75, 0.42), 0.88, Vector3(-1.0, 0, 1.45), 6.0)
+	# Торшер у правого подлокотника дивана (ближе к комнате, чем раньше: было z = 1.45).
+	floor_lamp = _tippable("floor_lamp", Vector3(0.42, 1.75, 0.42), 0.88, Vector3(-1.0, 0, 1.05), 6.0)
 	floor_lamp.add_box(Vector3(0.62, 0.36, 0.62), Vector3(0, 1.55, 0)) # абажур
 	floor_lamp.hammer_only = true # кулаком не сдвинуть, только молотком
 	_build_lamp_light()
