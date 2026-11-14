@@ -7,7 +7,7 @@
     python tools/blender/apartment_extras.py assets/models/apartment [--render превью.png]
 """
 import bpy, math, sys, os
-from mathutils import Vector
+from mathutils import Matrix, Vector
 
 args = [a for a in sys.argv[1:] if not a.startswith("--")]
 OUT = args[0] if args else "."
@@ -119,7 +119,16 @@ for x in (-0.19, 0.19):
     for y in (-0.16, 0.16):
         P.append(box((0.04, 0.04, 0.26), (x, y, 0.13), WOOD_D))
 P.append(box((0.41, 0.36, 0.02), (0, 0, 0.12), WOOD))              # нижняя полка
-P.append(box((0.3, 0.22, 0.03), (0.0, 0.0, 0.145), mat("Paper", (0.85, 0.82, 0.7), 0.8)))  # телефонная книга
+# Телефонный справочник на нижней полке: тёмно-синяя обложка, корешок, страницы видны с трёх
+# сторон (раньше — сплошной белый брусок), сверху тонкая записная книжка.
+COVER = mat("DirectoryCover", (0.12, 0.2, 0.42), 0.7)
+PAGES = mat("Paper", (0.85, 0.82, 0.7), 0.8)
+for z in (0.132, 0.162):
+    P.append(box((0.3, 0.22, 0.004), (0.0, 0.0, z), COVER))           # крышки
+P.append(box((0.006, 0.22, 0.034), (-0.147, 0.0, 0.147), COVER))     # корешок
+P.append(box((0.29, 0.212, 0.026), (0.004, 0.0, 0.147), PAGES))      # страницы
+P.append(box((0.16, 0.11, 0.012), (0.03, 0.02, 0.171), mat("NotebookRed", (0.55, 0.1, 0.08), 0.7),
+             rot=(0, 0, 0.25)))                                       # записная книжка
 export("phone_table", [join("PhoneTable", P)])
 
 # ---------------- Дисковый телефон: корпус ----------------
@@ -131,7 +140,10 @@ for x in (-0.085, 0.085):                                           # рычаг
 # Подложка диска на переднем скате (сам диск — отдельная модель, точка DIAL_POS).
 P.append(cyl(0.064, 0.006, (0, -0.045, 0.103), WHITE, verts=24, rot=(math.radians(16), 0, 0)))
 # Упор диска (чёрный «клювик») — на корпусе, а не на диске: он не крутится.
-P.append(box((0.006, 0.022, 0.014), (0.031, -0.0899, 0.1051), BLACK, rot=(math.radians(16), 0, 0)))
+# Стоит наискосок, по радиусу диска (снизу справа, «на 4–5 часов»): поворот в плоскости диска,
+# потом наклон диска.
+STOP = (Matrix.Rotation(math.radians(16), 3, "X") @ Matrix.Rotation(math.radians(35), 3, "Z")).to_euler()
+P.append(box((0.006, 0.022, 0.014), (0.031, -0.0899, 0.1051), BLACK, rot=tuple(STOP)))
 export("phone_base", [join("PhoneBase", P)])
 
 # Диск (крутится вокруг своей оси Z; в Godot — вокруг Y, наклон задаёт узел).
