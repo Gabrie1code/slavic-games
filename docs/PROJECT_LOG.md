@@ -1960,6 +1960,8 @@ RecieveHit, Roll, SitDown, StandUp, Victory, Defeat, Death. Стоп нет — 
 - test_character.tscn → character_rigged.glb. Палитра: добавлен «Тёмно-серый» (#3a3d42).
 Проверено: модель и подгонка одежды — рендером в Blender (те же числа), gdlint.
 **Не проверено в Godot** (новый .glb ещё не импортирован; set_bone_global_pose — Godot 4.3+).
+Исходник конструктора фигурки (`tools/constructor/index.html`) удалён из проекта по просьбе
+владельца: это внешняя страница, игре не нужна (сама страница-артефакт на claude.ai осталась).
 
 ---
 
