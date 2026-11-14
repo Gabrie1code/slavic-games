@@ -36,6 +36,10 @@ ARM_STRETCH = 1.25
 ## поэтому при взмахе рука не отрывается от плеча). Было 0.9 — плечи были опущены, «нездоровые»;
 ## теперь выше, плечи почти горизонтальные (скат от шеи ~17°).
 SHOULDER_Z = 0.96
+## Локоть: центр шарнира между плечом и предплечьем (обе части кончаются полусферами с этим
+## центром — при сгибе стык гладкий). Предплечье (ForearmL/R) — дочерняя часть руки.
+ELBOW_Z = 0.7
+ELBOW_R = 0.07
 
 # Точки поворота частей тела.
 PIVOTS = {
@@ -43,6 +47,8 @@ PIVOTS = {
     "Head": (0, 0, 1.05 + HEAD_LIFT),
     "ArmL": (-ARM_X, 0, SHOULDER_Z),
     "ArmR": (ARM_X, 0, SHOULDER_Z),
+    "ForearmL": (-ARM_X, 0, ELBOW_Z),
+    "ForearmR": (ARM_X, 0, ELBOW_Z),
     "LegL": (-0.13, 0, 0.55),
     "LegR": (0.13, 0, 0.55),
 }
@@ -251,18 +257,26 @@ def build_base():
     # Рта в базовой голове нет: он — отдельная вещь слота «Рот» (mouth_*, по умолчанию mouth_line).
     parts.append(part("Head", head))
     # Руки выходят из-под плеча: верх руки (до сустава) спрятан внутри плеча туловища.
-    for side, x in (("ArmL", -ARM_X), ("ArmR", ARM_X)):
-        # Рука на 20% длиннее: всё ниже плеча (z < 0.9) растянуто вниз в ARM_STRETCH раз.
-        prof = [(0.0, 0.53), (0.052, 0.535), (0.075, 0.56), (0.08, 0.6), (0.075, 0.66),
-                (0.07, 0.72), (0.073, 0.8), (0.075, 0.85)]
-        prof = [(r, z if z >= 0.9 else 0.9 - (0.9 - z) * ARM_STRETCH) for r, z in prof]
-        prof.append((0.075, SHOULDER_Z - 0.02))             # плечо выше — труба руки до сустава
-        # Верх руки — полусфера с центром в суставе, одной сеткой с рукой (без шва): при взмахе
-        # она вращается вокруг своего центра и остаётся на месте внутри плеча.
-        prof += [(0.075 * math.cos(math.radians(a)), SHOULDER_Z + 0.075 * math.sin(math.radians(a)))
-                 for a in range(0, 90, 10)] + [(0.0, SHOULDER_Z + 0.075)]
-        arm = [lathe(prof, P, segs=32, center=(x, 0))]
-        parts.append(part(side, arm))
+    def dome(cx, cz, r, up):
+        """Полусфера-шарнир: кольца от экватора к полюсу (up — вверх, иначе вниз)."""
+        sgn = 1 if up else -1
+        return [(r * math.cos(math.radians(a)), cz + sgn * r * math.sin(math.radians(a)))
+                for a in range(0, 90, 10)] + [(0.0, cz + sgn * r)]
+
+    # Рука из двух частей: плечо (ArmL/R: от сустава плеча до локтя) и предплечье с кистью
+    # (ForearmL/R, дочерняя часть руки, гнётся в локте вперёд). Кисть на прежней высоте (0.44).
+    for side, fore, x in (("ArmL", "ForearmL", -ARM_X), ("ArmR", "ForearmR", ARM_X)):
+        upper = list(reversed(dome(x, ELBOW_Z, ELBOW_R, False)))           # низ — купол локтя
+        upper += [(0.071, 0.76), (0.074, 0.85), (0.075, SHOULDER_Z - 0.02)]
+        upper += dome(x, SHOULDER_Z, 0.075, True)                         # верх — купол плеча
+        arm = part(side, [lathe(upper, P, segs=32, center=(x, 0))])
+        lower = [(0.0, 0.4375), (0.052, 0.444), (0.075, 0.475), (0.08, 0.512), (0.072, 0.55),
+                 (0.065, 0.6), (0.067, 0.65)]                              # кисть и предплечье
+        lower += dome(x, ELBOW_Z, ELBOW_R, True)                          # верх — купол локтя
+        forearm = part(fore, [lathe(lower, P, segs=32, center=(x, 0))])
+        forearm.parent = arm                                               # гнётся вместе с рукой
+        forearm.matrix_parent_inverse = arm.matrix_world.inverted()
+        parts += [arm, forearm]
     # Ноги: гладкие, ступня — скруглённый «ботинок».
     for side, x in (("LegL", -0.13), ("LegR", 0.13)):
         leg = [lathe([(0.0, 0.1), (0.075, 0.11), (0.085, 0.16), (0.09, 0.3), (0.095, 0.45),
