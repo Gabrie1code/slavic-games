@@ -17,6 +17,7 @@ const JOKE_CHANCE := 0.1
 const JOKE_POS := Vector3(0.0, 0.345, 0.02)
 ## «Цензура» над кончиком предмета: плашки из крупных пикселей (как в передачах, где что-то скрыто).
 const CENSOR := preload("res://assets/textures/fx/censor_mosaic.png")
+const CENSOR_SHADER := preload("res://scenes/lobby/props/censor_mosaic.gdshader")
 const CENSOR_POS := Vector3(0.062, 0.052, 0.0) # чуть выше верха кончика (0.045)
 const SLIDE := 0.25
 ## Баллончик лежит на боку на дне ящика (в координатах ящика).
@@ -112,26 +113,30 @@ func _restock() -> void:
 	can.store_in(_drawer, CAN_POS, CAN_ROT)
 
 
-## «Цензура» над кончиком: две плоские плашки из крупных пикселей, лежат над предметом
-## (видно сверху, когда ящик открыт). Сам предмет не меняется.
+## «Цензура» вокруг кончика: плашки из крупных пикселей сверху и по бокам (видно и сверху, и
+## присев), пиксели переливаются оттенками (censor_mosaic.gdshader). Сам предмет не меняется.
+## Плашки: [размер, место, поворот] относительно CENSOR_POS (кончик — на 3 см ниже, у x ≈ 0).
 static func _make_censor() -> Node3D:
 	var root := Node3D.new()
-	var mat := StandardMaterial3D.new()
-	mat.albedo_texture = CENSOR
-	mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
-	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
-	for spec: Array in [[Vector2(0.075, 0.06), Vector3(0, 0, 0), 0.0],
-			[Vector2(0.045, 0.036), Vector3(-0.022, 0.003, 0.018), 0.35]]:
+	var mat := ShaderMaterial.new()
+	mat.shader = CENSOR_SHADER
+	mat.set_shader_parameter("mosaic", CENSOR)
+	var pieces: Array = [
+		[Vector2(0.075, 0.06), Vector3(0, 0, 0), Vector3(-PI / 2, 0, 0)], # сверху
+		[Vector2(0.045, 0.036), Vector3(-0.022, 0.003, 0.018), Vector3(-PI / 2, 0.35, 0)],
+		[Vector2(0.065, 0.046), Vector3(0.004, -0.028, 0.031), Vector3.ZERO], # бока
+		[Vector2(0.065, 0.046), Vector3(0.004, -0.028, -0.031), Vector3.ZERO],
+		[Vector2(0.06, 0.046), Vector3(0.034, -0.028, 0), Vector3(0, PI / 2, 0)], # торец
+	]
+	for spec: Array in pieces:
 		var piece := MeshInstance3D.new()
-		var quad := PlaneMesh.new()
+		var quad := QuadMesh.new()
 		quad.size = spec[0]
 		piece.mesh = quad
 		piece.material_override = mat
 		piece.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		piece.position = spec[1]
-		piece.rotation.y = spec[2]
+		piece.rotation = spec[2]
 		root.add_child(piece)
 	root.position = CENSOR_POS
 	return root
