@@ -68,6 +68,8 @@ const ANIM_SPEED_MAX := 2.2
 ## Поза прыжка — кадр анимации Jump по скорости: взлёт (ноги поджимаются) … падение (тянутся вниз).
 const JUMP_RISE_TIME := 7.0 / 24.0
 const JUMP_FALL_TIME := 13.0 / 24.0
+## Присед: кадр анимации SitDown, где персонаж уже присел (сек).
+const SQUAT_TIME := 22.0 / 24.0
 ## Смерть: анимация Death чуть быстрее (успевает упасть до исчезновения).
 const DEATH_ANIM_SPEED := 1.5
 const SWING := 0.65
@@ -256,6 +258,9 @@ func _process(delta: float) -> void:
 	var swing := sin(_walk_phase) * SWING * amount
 	# Приседание: плавно опускаемся, корпус наклоняется вперёд, голова смотрит прямо.
 	crouch_amount = move_toward(crouch_amount, 1.0 if crouching else 0.0, delta * 6.0)
+	# У модели с анимациями присед — её анимация SitDown (см. _drive_rig); присед от кода — только
+	# у старой модели из частей.
+	var code_crouch := 0.0 if _rig and _rig.animated() else crouch_amount
 	# Ноги и руки качаются навстречу друг другу; в стойке — плавно возвращаются.
 	var legs_back := 1.0 - minf(1.0, delta * 10.0)
 	if sitting:
@@ -263,8 +268,8 @@ func _process(delta: float) -> void:
 		_part("LegR").rotation.x = SIT_LEGS
 	else:
 		# Присев, ноги чуть вынесены вперёд (crouch_legs); в стойке плавно возвращаются к нему.
-		var crouch_legs := CROUCH_LEGS * crouch_amount
-		swing *= 1.0 - 0.6 * crouch_amount # гуськом шаги меньше
+		var crouch_legs := CROUCH_LEGS * code_crouch
+		swing *= 1.0 - 0.6 * code_crouch # гуськом шаги меньше
 		var settle := 1.0 - legs_back
 		_part("LegL").rotation.x = swing + crouch_legs if amount > 0.05 \
 			else lerpf(_part("LegL").rotation.x, crouch_legs, settle)
@@ -275,20 +280,20 @@ func _process(delta: float) -> void:
 		_part("ArmR").rotation.x = swing * 0.8
 	else:
 		_part("ArmR").rotation.x = arm_pose_x
-	_part("Torso").rotation.x = -CROUCH_LEAN * crouch_amount - lean
+	_part("Torso").rotation.x = -CROUCH_LEAN * code_crouch - lean
 	_update_drunk(delta)
 	# Подпрыгивание при шаге и лёгкое «дыхание» в стойке.
 	# У модели с анимациями тело качается само (в анимации ходьбы), подпрыгивание от кода не нужно.
 	var bob := 0.0 if _rig and _rig.animated() else 0.06
 	_model.position.y = SIT_DROP if sitting else absf(sin(_walk_phase)) * bob * amount
-	if crouch_amount > 0.0 and not sitting:
+	if code_crouch > 0.0 and not sitting:
 		var legs := minf(absf(_part("LegL").rotation.x), absf(_part("LegR").rotation.x))
 		var rise := LEG_LENGTH * (1.0 - cos(legs)) - HEEL * sin(legs)
-		_model.position.y -= maxf(0.0, rise) * crouch_amount
+		_model.position.y -= maxf(0.0, rise) * code_crouch
 	# Голова смотрит туда же, куда игрок от первого лица (вверх/вниз) — видно другим и в зеркале.
 	# Не до конца (70% наклона взгляда), иначе голова «ломается» на шее.
 	_head_pitch = lerpf(_head_pitch, clampf(fp_pitch, -0.9, 0.9) * 0.7, minf(1.0, delta * 12.0))
-	_part("Head").rotation.x = sin(_idle_time * 2.0) * 0.04 + CROUCH_LEAN * crouch_amount * 0.8 \
+	_part("Head").rotation.x = sin(_idle_time * 2.0) * 0.04 + CROUCH_LEAN * code_crouch * 0.8 \
 		+ _head_pitch + head_tilt
 	# Свободный взгляд: голова поворачивается за камерой (не до конца — шея не ломается).
 	_part("Head").rotation.y = clampf(head_yaw, -1.3, 1.3)
@@ -309,6 +314,9 @@ func _drive_rig(delta: float, walk_speed: float) -> void:
 		elif airborne:
 			var rise := clampf(0.5 + 0.5 * velocity.y / JUMP_VELOCITY, 0.0, 1.0)
 			_rig.hold("Jump", lerpf(JUMP_FALL_TIME, JUMP_RISE_TIME, rise))
+		elif crouch_amount > 0.01:
+			# Присед — анимация SitDown модели: кадр по тому, насколько присел.
+			_rig.hold("SitDown", SQUAT_TIME * crouch_amount)
 		elif walk_speed > 0.3 and walk_speed < RUN_ANIM_FROM:
 			_rig.play("Walk", clampf(walk_speed / WALK_ANIM_SPEED, ANIM_SPEED_MIN, ANIM_SPEED_MAX))
 		elif walk_speed >= RUN_ANIM_FROM:
@@ -316,13 +324,13 @@ func _drive_rig(delta: float, walk_speed: float) -> void:
 		else:
 			_rig.play("Idle")
 	_rig.lock_root = airborne and not _dying
-	# Вес позы от кода: правая рука — держит предмет или замахивается; ноги — сидя и присев.
+	# Вес позы от кода: правая рука — держит предмет или замахивается; ноги — сидя.
 	# Без анимаций в модели всё тело — от кода.
 	var arm_r := _right_arm_busy or (_arm_tween != null and _arm_tween.is_running()) or manual_pose
 	var w_arm_r := 1.0 if arm_r else move_toward(float(_rig.weights["ArmR"]), 0.0, delta * 6.0)
 	var w_arm_l := move_toward(float(_rig.weights["ArmL"]), 1.0 if manual_pose else 0.0, delta * 6.0)
 	var w_legs := move_toward(float(_rig.weights["LegL"]),
-		1.0 if sitting or manual_pose else crouch_amount, delta * 8.0)
+		1.0 if sitting or manual_pose else 0.0, delta * 8.0)
 	if not _rig.animated():
 		w_arm_r = 1.0
 		w_arm_l = 1.0
