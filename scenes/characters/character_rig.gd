@@ -23,7 +23,9 @@ const KNEES := {"LegL": "LowerLeg.L", "LegR": "LowerLeg.R"}
 const FEET := {"LegL": "Foot.L", "LegR": "Foot.R"}
 const ORDER: Array[String] = ["Torso", "Head", "ArmR", "ArmL", "LegR", "LegL"]
 ## Повторяются по кругу.
-const LOOPS: Array[String] = ["Idle", "Walk", "Run", "Walk_Carry", "Run_Carry"]
+const LOOPS: Array[String] = [
+	"Idle", "Walk", "Run", "Walk_Carry", "Run_Carry", "Crouch", "CrouchWalk",
+]
 ## Плавный переход между анимациями, сек.
 const BLEND := 0.18
 ## Рука от кода «по умолчанию» отведена от тела на этот угол (рад); в модели руки — Т-поза.

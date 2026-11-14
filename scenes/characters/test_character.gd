@@ -68,8 +68,8 @@ const ANIM_SPEED_MAX := 2.2
 ## Поза прыжка — кадр анимации Jump по скорости: взлёт (ноги поджимаются) … падение (тянутся вниз).
 const JUMP_RISE_TIME := 7.0 / 24.0
 const JUMP_FALL_TIME := 13.0 / 24.0
-## Присед: кадр анимации SitDown, где персонаж уже присел (сек).
-const SQUAT_TIME := 22.0 / 24.0
+## Присед гуськом: скорость (м/с), при которой анимация CrouchWalk идёт с обычной скоростью.
+const CROUCH_WALK_SPEED := 1.1
 ## Удар — анимация Punch модели: начало (стойка) пропускаем и играем быстрее, чтобы кулак вылетал
 ## сразу (удар засчитывается в момент нажатия).
 const PUNCH_ANIM_FROM := 0.15
@@ -264,7 +264,7 @@ func _process(delta: float) -> void:
 	var swing := sin(_walk_phase) * SWING * amount
 	# Приседание: плавно опускаемся, корпус наклоняется вперёд, голова смотрит прямо.
 	crouch_amount = move_toward(crouch_amount, 1.0 if crouching else 0.0, delta * 6.0)
-	# У модели с анимациями присед — её анимация SitDown (см. _drive_rig); присед от кода — только
+	# У модели с анимациями присед — её анимации Crouch / CrouchWalk (см. _drive_rig); от кода — только
 	# у старой модели из частей.
 	var code_crouch := 0.0 if _rig and _rig.animated() else crouch_amount
 	# Ноги и руки качаются навстречу друг другу; в стойке — плавно возвращаются.
@@ -321,9 +321,13 @@ func _drive_rig(delta: float, walk_speed: float) -> void:
 		elif airborne:
 			var rise := clampf(0.5 + 0.5 * velocity.y / JUMP_VELOCITY, 0.0, 1.0)
 			_rig.hold("Jump", lerpf(JUMP_FALL_TIME, JUMP_RISE_TIME, rise))
-		elif crouch_amount > 0.01:
-			# Присед — анимация SitDown модели: кадр по тому, насколько присел.
-			_rig.hold("SitDown", SQUAT_TIME * crouch_amount)
+		elif crouching:
+			# Присед — свои анимации модели: на корточках (Crouch) и гуськом (CrouchWalk).
+			if walk_speed > 0.3:
+				_rig.play("CrouchWalk",
+					clampf(walk_speed / CROUCH_WALK_SPEED, ANIM_SPEED_MIN, ANIM_SPEED_MAX))
+			else:
+				_rig.play("Crouch")
 		elif walk_speed > 0.3 and walk_speed < RUN_ANIM_FROM:
 			_rig.play("Walk", clampf(walk_speed / WALK_ANIM_SPEED, ANIM_SPEED_MIN, ANIM_SPEED_MAX))
 		elif walk_speed >= RUN_ANIM_FROM:

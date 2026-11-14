@@ -80,6 +80,61 @@ for m in me.materials:
 # --- 4. Масштаб и разворот — трансформом объекта (не «применять»: иначе съедут сдвиги в анимациях).
 rig.scale = (SCALE, SCALE, SCALE)
 rig.rotation_euler = (0.0, 0.0, math.pi)
+# --- 5. Свои анимации: присед на корточки (Crouch) и ходьба присев (CrouchWalk).
+# Берём Idle / Walk и опускаем корень тела: ступни — цели IK, они остаются на земле, и колени сами
+# сгибаются вперёд (к полюсам IK). Таз наклоняем вперёд (корпус чуть к коленям), голову — обратно,
+# чтобы смотрел вперёд. У ходьбы шаг короче: присевший не дотянется ногой так далеко.
+# Оси костей: у Body/Hips/Head локальная Y — вверх, Z — вперёд; у ступней Y — вперёд, Z — вверх.
+CROUCH_DROP = 0.2 / SCALE    # насколько опускается таз (0.2 м в игре)
+CROUCH_LEAN = 0.45           # наклон корпуса вперёд, рад
+HEAD_BACK = 0.35             # голова поднимается обратно, рад
+
+
+def _curves(act, bone, prop):
+    path = 'pose.bones["%s"].%s' % (bone, prop)
+    fcs = sorted([fc for fc in act.fcurves if fc.data_path == path], key=lambda f: f.array_index)
+    return fcs
+
+
+def offset_loc(act, bone, idx, d, scale=1.0):
+    for fc in _curves(act, bone, "location"):
+        if fc.array_index == idx:
+            for kp in fc.keyframe_points:
+                for pt in (kp.co, kp.handle_left, kp.handle_right):
+                    pt[1] = pt[1] * scale + d
+
+
+def turn(act, bone, angle):
+    fcs = _curves(act, bone, "rotation_quaternion")
+    if len(fcs) != 4:
+        fcs = [act.fcurves.new('pose.bones["%s"].rotation_quaternion' % bone, index=i, action_group=bone)
+               for i in range(4)]
+        for i, fc in enumerate(fcs):
+            fc.keyframe_points.insert(act.frame_range[0], 1.0 if i == 0 else 0.0)
+    frames = sorted({round(kp.co[0], 3) for fc in fcs for kp in fc.keyframe_points})
+    vals = [[fc.evaluate(f) for fc in fcs] for f in frames]
+    add = Quaternion((1.0, 0.0, 0.0), angle)
+    for fc in fcs:
+        fc.keyframe_points.clear()
+    for f, v in zip(frames, vals):
+        q = add @ Quaternion(v)
+        for i, fc in enumerate(fcs):
+            fc.keyframe_points.insert(f, q[i], options={"FAST"})
+
+
+# Ходьба: таз чуть выше и почти не «проседает» на шаге (иначе встаёт на колени).
+for src, name, drop, bob, stride in (("Idle", "Crouch", CROUCH_DROP, 1.0, 1.0),
+                                     ("Walk", "CrouchWalk", CROUCH_DROP * 0.7, 0.3, 0.6)):
+    act = bpy.data.actions[src].copy()
+    act.name = name
+    offset_loc(act, "Body", 1, -drop, bob)
+    turn(act, "Hips", CROUCH_LEAN)
+    turn(act, "Head", -HEAD_BACK)
+    for side in ("L", "R"):
+        offset_loc(act, "Foot." + side, 1, 0.0, stride)
+        # Полюса коленей — вперёд и ниже, чтобы колени шли вперёд, а не вбок.
+        offset_loc(act, "PoleTarget." + side, 1, -CROUCH_DROP)
+
 # Все анимации — в NLA-дорожки, чтобы экспорт взял каждую отдельной анимацией.
 rig.animation_data_create()
 for a in bpy.data.actions:
