@@ -230,15 +230,42 @@ P = [cyl(0.04, 0.01, (0, 0, 0.005), GLASS, verts=8), cyl(0.008, 0.08, (0, 0, 0.0
 made.append(export("wine_glass", P))
 
 # ---------------- Банки ----------------
-def label_band(r, z0, z1, m, n=24):
-    """Этикетка вокруг банки: кольцо с UV (картинка оборачивается по кругу)."""
+def lathe(profile, m, n=32):
+    """Тело вращения по профилю [(r, z)] снизу вверх (r = 0 — закрыто), сглаженное по углу:
+    круглые бока гладкие, донышко и верх — с чёткой гранью."""
+    verts, faces = [], []
+    for r, z in profile:
+        for k in range(n):
+            a = k / n * math.tau
+            verts.append((math.cos(a) * r, math.sin(a) * r, z))
+    for i in range(len(profile) - 1):
+        for k in range(n):
+            a, b = i * n + k, i * n + (k + 1) % n
+            faces.append((a, b, b + n, a + n))
+    faces.append(tuple(range(n))[::-1])
+    top = (len(profile) - 1) * n
+    faces.append(tuple(range(top, top + n)))
+    me = bpy.data.meshes.new("Lathe")
+    me.from_pydata(verts, [], faces)
+    o = bpy.data.objects.new("Lathe", me)
+    bpy.context.scene.collection.objects.link(o)
+    flat(o, m)
+    bpy.ops.object.select_all(action="DESELECT")
+    o.select_set(True)
+    bpy.context.view_layer.objects.active = o
+    bpy.ops.object.shade_smooth_by_angle(angle=math.radians(40))
+    return o
+
+
+def label_band(r, z0, z1, m, n=24, span=math.radians(150)):
+    """Этикетка спереди банки (дуга span вокруг −Y Blender = к смотрящему): одна картинка."""
     verts, faces = [], []
     for k in range(n + 1):
-        a = k / n * math.tau
+        a = -math.pi / 2 + span / 2 - k / n * span                   # слева направо, если смотреть спереди
         verts += [(math.cos(a) * r, math.sin(a) * r, z0), (math.cos(a) * r, math.sin(a) * r, z1)]
     for k in range(n):
         i = 2 * k
-        faces.append((i, i + 2, i + 3, i + 1))
+        faces.append((i, i + 1, i + 3, i + 2))
     me = bpy.data.meshes.new("Label")
     me.from_pydata(verts, [], faces)
     uv = me.uv_layers.new(name="UVMap")
@@ -248,16 +275,21 @@ def label_band(r, z0, z1, m, n=24):
             uv.data[li].uv = ((vi // 2) / n, vi % 2)
     o = bpy.data.objects.new("Label", me)
     bpy.context.scene.collection.objects.link(o)
-    return flat(o, m)
+    flat(o, m)
+    for p in o.data.polygons:
+        p.use_smooth = True
+    return o
 
 
 def jar(name, fill, extra, lid=LID, label=None):
-    P = [cyl(0.1, 0.27, (0, 0, 0.135), JAR_GLASS, verts=12),
-         cyl(0.085, 0.03, (0, 0, 0.285), JAR_GLASS, verts=12),
-         cyl(0.088, 0.025, (0, 0, 0.31), lid, verts=12),
-         cyl(0.092, 0.2, (0, 0, 0.11), fill, verts=12)]
+    """Круглая банка: скруглённое дно, плечики, горлышко, крышка; этикетка спереди (−Y)."""
+    P = [lathe([(0, 0.0), (0.085, 0.0), (0.097, 0.008), (0.1, 0.025), (0.1, 0.235), (0.096, 0.258),
+                (0.088, 0.272), (0.084, 0.28), (0.084, 0.298)], JAR_GLASS),
+         lathe([(0, 0.293), (0.089, 0.293), (0.091, 0.298), (0.091, 0.318), (0.086, 0.324),
+                (0, 0.326)], lid),
+         lathe([(0, 0.006), (0.084, 0.006), (0.092, 0.02), (0.092, 0.21), (0, 0.21)], fill)]
     if label:
-        P.append(label_band(0.103, 0.07, 0.19, mat("Label_" + name, (1, 1, 1), 0.8, image=label), n=12))
+        P.append(label_band(0.102, 0.07, 0.19, mat("Label_" + name, (1, 1, 1), 0.8, image=label), n=16))
     P += extra
     made.append(export(name, P))
 

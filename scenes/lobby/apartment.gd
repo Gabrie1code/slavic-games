@@ -342,7 +342,8 @@ func _build_living_room() -> void:
 	for i in 3:
 		var jar := "jar_pickles" if i % 2 == 0 else "jar_jam"
 		var color := Color("5a7a2a") if i % 2 == 0 else Color("801010")
-		_breakable(jar, Vector3(LEFT_X + 0.16, 0, -3.1 + i * 0.3), [color, GLASS], 0.35)
+		var jar_item := _breakable(jar, Vector3(LEFT_X + 0.16, 0, -3.1 + i * 0.3), [color, GLASS], 0.35)
+		jar_item.rotation.y = PI / 2 # этикеткой в комнату (+X), а не вбок
 
 
 # ---------------- Спальня ----------------
