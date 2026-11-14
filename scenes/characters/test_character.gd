@@ -592,6 +592,8 @@ func play_death(fade_delay: float = 0.9, fade_time: float = 1.0) -> void:
 			meshes.append(bar)
 	create_tween().tween_property(visual, "rotation:x", PI / 2, 0.45) \
 		.set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
+	# Лёжа тело приподнято на половину толщины — не уходит наполовину в землю.
+	create_tween().tween_property(visual, "position:y", visual.position.y + 0.2, 0.45)
 	# Исчезновение — все части сразу, после падения и паузы.
 	var fade := create_tween().set_parallel(true)
 	var start := 0.45 + fade_delay

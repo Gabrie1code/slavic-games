@@ -40,7 +40,7 @@ const ENTRANCE_Z := 5.57
 const GARAGE_NUMBERS: Array[int] = [17, 18, 21, 23]
 ## Граффити на воротах (имена картинок в assets/textures/garage/).
 const GRAFFITI: Array[String] = [
-	"graffiti_tsoi", "", "graffiti_vasya", "graffiti_kino",
+	"graffiti_tsoi", "", "graffiti_vasya", "graffiti_sale",
 ]
 
 ## Бойцы: голуби улетают, если кто-то из них рядом.
@@ -296,15 +296,20 @@ func _wedge(side: float, material: Material) -> void:
 # ---------------- Дома, деревья, фонари ----------------
 
 func _build_buildings() -> void:
-	_place("khrushchevka", Vector3(0, GROUND_Y, -13.5))
-	_place("khrushchevka", Vector3(-31, GROUND_Y, -8.0), PI / 4)
-	_place("khrushchevka", Vector3(31, GROUND_Y, -8.0), -PI / 4)
+	# Выбитые бойцы улетают далеко: у домов, стволов и кустов есть столкновения, чтобы
+	# тело не пролетало внутрь дома и не тонуло в кусте (на кусте — лежит сверху).
+	for house: Array in [[Vector3(0, GROUND_Y, -13.5), 0.0], [Vector3(-31, GROUND_Y, -8.0), PI / 4],
+			[Vector3(31, GROUND_Y, -8.0), -PI / 4]]:
+		var node := _place("khrushchevka", house[0], house[1])
+		_blocker(node, _box_shape(Vector3(28.0, 14.1, 11.0)), Vector3(0, 7.05, 0))
 	# Деревья — только по бокам от гаражей: сзади их кроны закрывали крышу (поле битвы),
 	# а у дома — двери подъездов.
 	for spot: Vector3 in [Vector3(-12.5, 0, -2.0), Vector3(13.0, 0, 1.0)]:
 		var model := "tree_poplar" if int(spot.x) % 2 == 0 else "tree_birch"
-		_place(model, spot + Vector3(0, GROUND_Y, 0), randf() * TAU)
-	_place("tree_birch", Vector3(-18.6, GROUND_Y, 9.0)) # на траве за краем асфальта
+		var tree := _place(model, spot + Vector3(0, GROUND_Y, 0), randf() * TAU)
+		_blocker(tree, _cylinder_shape(0.3, 5.0), Vector3(0, 2.5, 0)) # ствол
+	var birch := _place("tree_birch", Vector3(-18.6, GROUND_Y, 9.0)) # на траве за краем асфальта
+	_blocker(birch, _cylinder_shape(0.25, 4.5), Vector3(0, 2.25, 0))
 	# Кусты на траве вокруг гаражей и у деревьев.
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 21
@@ -313,9 +318,13 @@ func _build_buildings() -> void:
 			Vector3(-13.5, 0, -3.6), Vector3(-9.8, 0, -3.8), Vector3(-13.3, 0, 2.4),
 			Vector3(11.3, 0, -1.2), Vector3(12.1, 0, 3.6), Vector3(13.8, 0, -3.1),
 			Vector3(13.9, 0, 2.6), Vector3(11.8, 0, -4.4), Vector3(-12.8, 0, -5.2)]:
-		var bush := _place("bush_round" if rng.randf() < 0.5 else "bush_wide",
+		var round_bush := rng.randf() < 0.5
+		var bush := _place("bush_round" if round_bush else "bush_wide",
 			spot + Vector3(0, GROUND_Y, 0), rng.randf() * TAU)
 		bush.scale = Vector3.ONE * rng.randf_range(0.8, 1.3)
+		var shape := _cylinder_shape(0.6, 0.75) if round_bush \
+			else _box_shape(Vector3(1.6, 0.7, 0.95))
+		_blocker(bush, shape, Vector3(0, 0.36, 0))
 	for x in [-10.5, 10.5]:
 		_place("lamp_post", Vector3(x, GROUND_Y, 9.5), PI) # плафон смотрит к гаражам
 
@@ -409,6 +418,29 @@ func _place(model_name: String, pos: Vector3, yaw: float = 0.0) -> Node3D:
 	node.position = pos
 	node.rotation.y = yaw
 	return node
+
+
+## Твёрдое тело-препятствие внутри декорации node (поворот и размер — как у неё).
+func _blocker(node: Node3D, shape: Shape3D, offset: Vector3) -> void:
+	var body := StaticBody3D.new()
+	var collision := CollisionShape3D.new()
+	collision.shape = shape
+	collision.position = offset
+	body.add_child(collision)
+	node.add_child(body)
+
+
+func _box_shape(size: Vector3) -> BoxShape3D:
+	var box := BoxShape3D.new()
+	box.size = size
+	return box
+
+
+func _cylinder_shape(radius: float, height: float) -> CylinderShape3D:
+	var cylinder := CylinderShape3D.new()
+	cylinder.radius = radius
+	cylinder.height = height
+	return cylinder
 
 
 ## Неподвижная вещь с коробкой столкновений (размер size, низ коробки — на земле).

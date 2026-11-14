@@ -93,6 +93,7 @@ graffiti("graffiti_tsoi", "ЦОЙ ЖИВ", (240, 240, 235), tilt=-5)
 graffiti("graffiti_spartak", "СПАРТАК —\nЧЕМПИОН", (220, 40, 40), tilt=3)
 graffiti("graffiti_vasya", "Здесь был\nВася", (70, 150, 255), tilt=-3)
 graffiti("graffiti_kino", "КИНО", (255, 210, 40), tilt=6)
+graffiti("graffiti_sale", "ПРОДАМ ГАРАЖ\nт. 2-15-48", (245, 245, 240), tilt=-2)
 for n in (17, 18, 21, 23):
     plate(n)
 print("DONE")
