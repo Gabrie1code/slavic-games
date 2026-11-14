@@ -114,18 +114,121 @@ for k in range(2):
 export("bench", [join("Bench", P)])
 
 # ---------------- Открытая песочница 3×3 с «грибком» в углу ----------------
-P = [box((2.8, 2.8, 0.18), (0, 0, 0.09), SAND)]
+# Песок неровный (горка посередине, ямки, следы), борта — крашеные доски с щелями и широкой
+# доской-сиденьем сверху, угловые столбики. «Грибок»: гладкая куполом шляпка с толщиной и светлым
+# исподом, белые пятна лежат на шляпке (повторяют её изгиб), ножка — крашеная труба с кольцом.
+SAND_DARK = mat("SandDamp", (0.66, 0.55, 0.36), 1.0)
+BOARD = mat("BoardGreen", (0.2, 0.46, 0.3), 0.75)
+BOARD_EDGE = mat("BoardYellow", (0.86, 0.68, 0.2), 0.7)
+CAP = mat("MushroomRed", (0.78, 0.13, 0.1), 0.45)
+CAP_UNDER = mat("MushroomUnder", (0.93, 0.86, 0.72), 0.8)
+DOT = mat("Dot", (0.96, 0.95, 0.9), 0.5)
+STEM = mat("MushroomStem", (0.92, 0.88, 0.78), 0.6)
+
+
+def grid_surface(nx, ny, size, height, m):
+    """Поверхность песка: сетка nx × ny на квадрате size, высота height(x, y)."""
+    verts, faces = [], []
+    for j in range(ny + 1):
+        for i in range(nx + 1):
+            x = -size / 2 + size * i / nx
+            y = -size / 2 + size * j / ny
+            verts.append((x, y, height(x, y)))
+    for j in range(ny):
+        for i in range(nx):
+            a = j * (nx + 1) + i
+            faces.append((a, a + 1, a + nx + 2, a + nx + 1))
+    me = bpy.data.meshes.new("Sand")
+    me.from_pydata(verts, [], faces)
+    o = bpy.data.objects.new("Sand", me)
+    bpy.context.scene.collection.objects.link(o)
+    flat(o, m)
+    for p in o.data.polygons:
+        p.use_smooth = True
+    return o
+
+
+def sand_h(x, y):
+    h = 0.25 + 0.025 * math.sin(x * 2.3) * math.cos(y * 1.9)
+    h += 0.07 * math.exp(-((x + 0.5) ** 2 + (y + 0.6) ** 2) / 0.15)       # горка
+    h -= 0.04 * math.exp(-((x - 0.7) ** 2 + (y - 0.3) ** 2) / 0.05)       # ямка
+    return h
+
+
+def lathe_mesh(profile, m, n=28, smooth=True):
+    """Тело вращения по профилю [(r, z)] (замкнутый контур идёт по кругу — без крышек)."""
+    verts, faces = [], []
+    for r, z in profile:
+        for k in range(n):
+            a = k / n * math.tau
+            verts.append((math.cos(a) * r, math.sin(a) * r, z))
+    for i in range(len(profile) - 1):
+        for k in range(n):
+            a, b = i * n + k, i * n + (k + 1) % n
+            faces.append((a, b, b + n, a + n))
+    me = bpy.data.meshes.new("Lathe")
+    me.from_pydata(verts, [], faces)
+    o = bpy.data.objects.new("Lathe", me)
+    bpy.context.scene.collection.objects.link(o)
+    flat(o, m)
+    for p in o.data.polygons:
+        p.use_smooth = smooth
+    return o
+
+
+P = [box((2.8, 2.8, 0.2), (0, 0, 0.1), SAND), grid_surface(24, 24, 2.74, sand_h, SAND)]
+for x, y, r in ((0.4, -0.9, 0.22), (-0.9, 0.6, 0.18)):                     # влажные пятна
+    P.append(cyl(r, 0.004, (x, y, sand_h(x, y) + 0.003), SAND_DARK, verts=14))
+# Борта: по две доски на сторону со щелью, сверху широкая доска-сиденье с жёлтой кромкой.
 for s in (-1, 1):
-    P.append(box((3.0, 0.15, 0.3), (0, s * 1.425, 0.15), WOOD))
-    P.append(box((0.15, 2.7, 0.29), (s * 1.425, 0, 0.145), WOOD))
-P.append(cyl(0.05, 2.0, (1.25, 1.25, 1.0), WOOD, verts=8))
-P.append(cyl(0.9, 0.45, (1.25, 1.25, 2.1), RED, verts=10, r2=0.05))
-for i in range(6):                                                            # белые точки на шляпке
-    a = i * math.pi / 3
-    P.append(cyl(0.09, 0.02, (1.25 + math.cos(a) * 0.5, 1.25 + math.sin(a) * 0.5, 2.06),
-                 mat("Dot", (0.95, 0.95, 0.9), 0.6), verts=8, rot=(0, -0.45 * math.sin(a), 0.45 * math.cos(a))))
-P.append(box((0.5, 0.3, 0.25), (-0.7, -0.6, 0.3), SAND))                      # куличики
-P.append(cyl(0.12, 0.2, (0.5, -0.8, 0.28), BLUE, verts=8, r2=0.08))           # ведёрко
+    for z in (0.09, 0.25):
+        P.append(box((2.9, 0.06, 0.13), (0, s * 1.4, z), BOARD))
+        P.append(box((0.06, 2.74, 0.13), (s * 1.4, 0, z), BOARD))
+    P.append(box((3.04, 0.22, 0.04), (0, s * 1.41, 0.34), WOOD))
+    P.append(box((0.22, 2.6, 0.04), (s * 1.41, 0, 0.34), WOOD))
+    P.append(box((3.06, 0.025, 0.045), (0, s * 1.525, 0.34), BOARD_EDGE))
+    P.append(box((0.025, 3.06, 0.045), (s * 1.525, 0, 0.34), BOARD_EDGE))
+for sx in (-1, 1):                                                          # угловые столбики
+    for sy in (-1, 1):
+        P.append(box((0.12, 0.12, 0.42), (sx * 1.44, sy * 1.44, 0.21), WOOD))
+# «Грибок» в углу.
+MX, MY = 1.2, 1.2
+P.append(cyl(0.055, 2.05, (MX, MY, 1.03), STEM, verts=14))
+P.append(cyl(0.085, 0.06, (MX, MY, 0.32), STEM, verts=14))                 # хомут у песка
+for k in range(3):                                                          # красные полоски на ножке
+    P.append(cyl(0.058, 0.07, (MX, MY, 0.8 + k * 0.38), CAP, verts=14))
+cap_top = [(0.0, 2.52), (0.25, 2.5), (0.5, 2.42), (0.72, 2.28), (0.88, 2.12), (0.95, 2.02)]
+cap = lathe_mesh(cap_top + [(0.95, 1.99)], CAP)
+under = lathe_mesh([(0.94, 1.99), (0.7, 2.05), (0.35, 2.1), (0.06, 2.11)], CAP_UNDER)
+for o in (cap, under):
+    o.location = (MX, MY, 0)
+    bpy.context.view_layer.update()
+P += [cap, under]
+P.append(cyl(0.07, 0.04, (MX, MY, 2.08), STEM, verts=14))                  # шляпка садится на ножку
+
+
+def cap_z(r):
+    for (r0, z0), (r1, z1) in zip(cap_top, cap_top[1:]):
+        if r0 <= r <= r1:
+            return z0 + (z1 - z0) * (r - r0) / (r1 - r0)
+    return cap_top[-1][1]
+
+
+for i, (rr, a) in enumerate(((0.0, 0.0), (0.45, 0.3), (0.5, 1.9), (0.47, 3.4), (0.48, 4.9),
+                             (0.75, 1.1), (0.74, 2.6), (0.76, 4.1), (0.73, 5.6))):
+    z = cap_z(rr)
+    slope = math.atan2(cap_z(max(0.0, rr - 0.05)) - cap_z(rr + 0.05), 0.1) if rr > 0 else 0.0
+    bpy.ops.mesh.primitive_uv_sphere_add(segments=14, ring_count=6, radius=1.0,
+                                         location=(MX + math.cos(a) * rr, MY + math.sin(a) * rr, z + 0.004))
+    dot = bpy.context.object
+    size = 0.1 if i == 0 else (0.08 if rr < 0.6 else 0.065)
+    dot.scale = (size, size * 0.85, 0.012)
+    dot.rotation_euler = (0, slope, a)                                     # по наклону шляпки
+    bpy.ops.object.transform_apply(scale=True, rotation=True)
+    flat(dot, DOT)
+    for p in dot.data.polygons:
+        p.use_smooth = True
+    P.append(dot)
 export("sandbox", [join("Sandbox", P)])
 
 # ---------------- Горка: лесенка на +X, площадка, скат к −X ----------------
