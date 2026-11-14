@@ -6,14 +6,15 @@ extends Node3D
 
 const SCENE := preload("res://assets/models/courtyard/dog.glb")
 const SPEED := 1.3
-const MIN_X := -9.0
-const MAX_X := 9.0
 ## Обход: ровный участок ±AVOID_HALF вокруг avoid_x, плавный заход длиной AVOID_RAMP.
 const AVOID_HALF := 0.8
 const AVOID_RAMP := 0.6
 
 ## Где по X препятствие у стены (INF — обходить нечего).
 var avoid_x := INF
+## Где гуляет по X (двор может сузить: справа стоит гелик вплотную к гаражам).
+var min_x := -9.0
+var max_x := 9.0
 ## На сколько отойти от стены у препятствия.
 var avoid_depth := 1.0
 
@@ -51,9 +52,14 @@ func _process(delta: float) -> void:
 			var before := position
 			position.x += signf(dx) * minf(SPEED * delta, absf(dx))
 			position.z = _base_z + _detour(position.x)
-			# Собака смотрит по -Z: поворот по направлению шага.
+			# Собака смотрит по -Z: поворот по направлению шага. Разворот назад — через «лицом к
+			# гаражам» (угол 0): так голова не тычется в машины и баки перед гаражами, а до стены
+			# гаражей ей хватает места (dog стоит в 0.8 м от ворот, голова — 0.7 м от центра).
 			var step := position - before
-			rotation.y = lerp_angle(rotation.y, atan2(-step.x, -step.z), minf(1.0, delta * 6.0))
+			var want := atan2(-step.x, -step.z)
+			if absf(angle_difference(rotation.y, want)) > 2.6:
+				want = 0.0
+			rotation.y = lerp_angle(rotation.y, want, minf(1.0, delta * 6.0))
 	_animate(walking, delta)
 
 
@@ -66,7 +72,7 @@ func _detour(x: float) -> float:
 
 
 func _pick_target() -> void:
-	_target_x = randf_range(MIN_X, MAX_X)
+	_target_x = randf_range(min_x, max_x)
 	_sniff = false
 
 

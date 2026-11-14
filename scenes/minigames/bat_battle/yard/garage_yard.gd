@@ -58,10 +58,13 @@ func _ready() -> void:
 	_build_front()
 	_build_garage_details()
 	var dog := YardDog.new()
-	dog.position = Vector3(0, GROUND_Y, 4.95)
+	# В 0.8 м от ворот: голова (0.7 м от центра) не достаёт до стены, даже если собака
+	# повернулась к гаражам. Гуляет левее гелика (он стоит вплотную к гаражам).
+	dog.position = Vector3(0, GROUND_Y, 5.35)
+	dog.max_x = GELIK_POS.x - 2.35 - 0.75
 	# Обходит открытую створку (левая: от петли x−1.65 уходит вправо-вперёд).
 	dog.avoid_x = DOOR_X[OPEN_GARAGE] - 1.65 + 0.45
-	dog.avoid_depth = 1.45
+	dog.avoid_depth = 1.0
 	add_child(dog)
 	for i in PIGEON_COUNT:
 		_spawn_pigeon(false)
