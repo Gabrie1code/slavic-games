@@ -150,6 +150,29 @@ LAUNDRY_FAMILIES = [(0, 11), (1, 6), (2, 8), (3, 9), (4, 7, 10), (5,)]
 def laundry_set(n, rnd):
     """n разных по цвету вещей для одной верёвки (n <= 6)."""
     return [LAUNDRY[rnd.choice(fam)] for fam in rnd.sample(LAUNDRY_FAMILIES, n)]
+# Картинка за стеклом (tools/textures/khrush_glass.py: тюль, шторы, кот, фольга…), 8 вариантов.
+# Чуть впереди стекла, но позади переплёта и «горящего» стекла ночью (window_view.gd).
+KHRUSH_GLASS = mat("KhrushGlass", (1, 1, 1), 0.15, image="assets/textures/city/khrush_glass.png")
+
+
+def glass_pic(x, y, z, side, w=1.1, h=1.2):
+    """Квадрат с картинкой окна: side −1 — лицом в −Y, +1 — в +Y."""
+    k = random.randrange(8)
+    u0, v0 = (k % 4) * 0.25, (k // 4) * 0.5
+    xs = (x - w / 2, x + w / 2) if side < 0 else (x + w / 2, x - w / 2)
+    verts = [(xs[0], y, z - h / 2), (xs[1], y, z - h / 2), (xs[1], y, z + h / 2), (xs[0], y, z + h / 2)]
+    me = bpy.data.meshes.new("Pic")
+    me.from_pydata(verts, [], [(0, 1, 2, 3)])
+    me.materials.append(KHRUSH_GLASS)
+    uv = me.uv_layers.new(name="UVMap")
+    for li, c in zip(me.polygons[0].loop_indices, ((u0, v0), (u0 + 0.25, v0), (u0 + 0.25, v0 + 0.5),
+                                                    (u0, v0 + 0.5))):
+        uv.data[li].uv = c
+    o = bpy.data.objects.new("Pic", me)
+    bpy.context.scene.collection.objects.link(o)
+    return o
+
+
 cols = 12
 dish_spots = []
 for f in range(FLOORS):
@@ -162,6 +185,7 @@ for f in range(FLOORS):
                 continue                                                           # подъезды
             P.append(box((1.3, 0.06, 1.4), (x, y, z), FRAME))
             P.append(box((1.1, 0.08, 1.2), (x, y, z), GLASS))
+            P.append(glass_pic(x, side * (D / 2 + 0.065), z, side))
             P.append(box((0.06, 0.1, 1.2), (x, y, z), FRAME))
         # Балконы на лицевой стороне через окно, начиная со 2-го этажа.
         if f >= 1 and c % 2 == 1:
@@ -272,15 +296,54 @@ export("tree_birch", [join("TreeBirch", P)])
 BUSH = mat("Bush", (0.22, 0.45, 0.17), 0.9)
 BUSH2 = mat("Bush2", (0.3, 0.55, 0.2), 0.9)
 BERRY = mat("Berry", (0.75, 0.12, 0.12), 0.6)
+
+
+def inside(o, p):
+    """Точка p (мир) внутри замкнутой сетки o?"""
+    local = o.matrix_world.inverted() @ p
+    ok, near, normal, _ = o.closest_point_on_mesh(local)
+    return ok and (local - near).dot(normal) < 0
+
+
+def berries_on(blobs, seed, clusters):
+    """Гроздья ягод ПРЯМО на поверхности шаров куста (луч снаружи к центру шара — точка
+    попадания), наполовину утоплены. Раньше ягоды ставились «на глаз» и висели в воздухе:
+    у грубого многогранника поверхность местами глубже, чем радиус."""
+    rnd = random.Random(seed)
+    out = []
+    for _ in range(clusters * 12):
+        if len(out) >= clusters * 3:
+            break
+        o = rnd.choice(blobs)
+        a = rnd.uniform(0, math.tau)
+        d = Vector((math.cos(a), math.sin(a), rnd.uniform(-0.1, 0.6))).normalized()
+        centre = sum((v.co for v in o.data.vertices), Vector()) / len(o.data.vertices)
+        hit, loc, normal, _ = o.ray_cast(centre + d * 3.0, -d)
+        if not hit:
+            continue
+        p = o.matrix_world @ loc
+        if p.z < 0.12 or any(inside(b, p + d * 0.03) for b in blobs if b is not o):
+            continue                                                            # у земли или в соседнем шаре
+        side = Vector((-d.y, d.x, 0)).normalized()
+        for off in (Vector((0, 0, 0)), side * 0.05 + Vector((0, 0, 0.03)), side * -0.04 + Vector((0, 0, -0.03))):
+            q = p + off
+            # вторую и третью ягоду тоже прижать к поверхности
+            hit2, loc2, _, _ = o.ray_cast(o.matrix_world.inverted() @ (q + d * 0.5), -d)
+            if hit2:
+                q = o.matrix_world @ loc2
+            out.append(sphere(0.04, tuple(q - d * 0.005), BERRY, segs=6, rings=4))
+    return out
+
+
 P = []
 for (x, y, z, r) in [(0, 0, 0.45, 0.55), (0.4, 0.15, 0.35, 0.4), (-0.38, -0.1, 0.35, 0.42), (0.1, -0.3, 0.3, 0.35)]:
     P.append(ico(r, (x, y, z), BUSH if r > 0.4 else BUSH2, scale=(1, 1, 0.8)))
+P += berries_on(P, 7, 4)
 export("bush_round", [join("BushRound", P)])
 P = []
 for (x, y, z, r) in [(-0.5, 0, 0.3, 0.38), (0, 0.05, 0.38, 0.45), (0.5, -0.05, 0.3, 0.38), (0.25, 0.3, 0.25, 0.3)]:
     P.append(ico(r, (x, y, z), BUSH2 if x > 0 else BUSH, scale=(1, 0.8, 0.75)))
-for (x, y, z) in [(0.1, -0.38, 0.45), (-0.3, -0.3, 0.4), (0.45, -0.3, 0.35)]:
-    P.append(sphere(0.035, (x, y, z), BERRY, segs=6, rings=4))                    # ягоды
+P += berries_on(P, 21, 5)
 export("bush_wide", [join("BushWide", P)])
 
 # ---------------- Фонарь ----------------
@@ -410,8 +473,69 @@ for x in (-0.55, 0.55):
 P.append(box((1.0, 0.02, 0.25), (0, -0.51, 0.75), mat("BinStripe", (0.95, 0.85, 0.2), 0.6)))
 for k in range(3):                                                               # мусор сверху
     P.append(box((0.3, 0.25, 0.2), (-0.4 + k * 0.4, 0.1, 1.2 + k * 0.03),
-                 random.choice([WHITE, mat("Bag", (0.1, 0.1, 0.1), 0.4)]), rot=(0, 0, k)))
+                 random.choice([WHITE, mat("Bag", (0.03, 0.032, 0.035), 0.62)]), rot=(0, 0, k)))
 export("trash_bin", [join("TrashBin", P)])
+# ---------------- Мусорные мешки (два вида) и канализационный люк ----------------
+# Мешок: «мешковатая» форма — плоское осевшее дно, неровные бока со складками, сверху
+# перетянутое горлышко и два завязанных «ушка». Матовый полиэтилен (не блестит, не металл).
+BAG = mat("TrashBag", (0.028, 0.03, 0.034), 0.62)
+
+
+def trash_bag(name, seed, rx, ry, h):
+    rnd = random.Random(seed)
+    bpy.ops.mesh.primitive_uv_sphere_add(segments=18, ring_count=12, radius=1.0, location=(0, 0, 0))
+    o = bpy.context.object
+    folds = [(rnd.uniform(0, math.tau), rnd.uniform(0.05, 0.12)) for _ in range(7)]
+    for v in o.data.vertices:
+        x, y, z = v.co
+        a = math.atan2(y, x)
+        k = 1.0
+        for fa, depth in folds:                                                 # вертикальные складки
+            d = math.atan2(math.sin(a - fa), math.cos(a - fa))
+            k -= depth * math.exp(-(d / 0.18) ** 2) * (1 - abs(z))
+        k += 0.04 * math.sin(a * 3 + seed) * (1 - z * z) + rnd.uniform(-0.02, 0.02)
+        if z < 0:                                                               # осевшее широкое дно
+            k *= 1.0 + 0.18 * (-z)
+            z = max(z, -0.6)                                                    # плоско лежит на земле
+        if z > 0.55:                                                            # стянуто к горлышку
+            k *= 1.0 - (z - 0.55) * 1.35
+        v.co = (x * k * rx, y * k * ry, (z + 0.6) * h / 1.6)
+    flat(o, BAG)
+    for p_ in o.data.polygons:
+        p_.use_smooth = True
+    top = h * 0.98
+    parts = [o, cyl(0.06, 0.12, (0, 0, top + 0.03), BAG, verts=8, r2=0.035)]  # горлышко
+    for s_ in (-1, 1):                                                          # «ушки» узла
+        ear = box((0.05, 0.02, 0.13), (s_ * 0.06, 0, top + 0.12), BAG, rot=(0, s_ * 0.7, rnd.uniform(-0.3, 0.3)))
+        parts.append(ear)
+    export(name, [join(name, parts)])
+
+
+trash_bag("trash_bag", 3, 0.3, 0.27, 0.62)
+trash_bag("trash_bag_fat", 8, 0.38, 0.33, 0.52)
+
+# Люк: чугунная крышка с узором (кольца, лучи, сетка в середине) в кольце-обойме, вокруг —
+# заплатка тёмного асфальта. Лицом вверх, начало координат — на земле.
+IRON = mat("ManholeIron", (0.09, 0.09, 0.095), 0.75, 0.3)
+IRON_TOP = mat("ManholeIronTop", (0.16, 0.155, 0.15), 0.55, 0.3)
+P = [cyl(0.62, 0.02, (0, 0, 0.01), mat("AsphaltPatch", (0.11, 0.11, 0.115), 0.95), verts=24),
+     cyl(0.43, 0.04, (0, 0, 0.02), IRON, verts=28),                            # обойма
+     cyl(0.38, 0.045, (0, 0, 0.023), IRON_TOP, verts=28)]                       # крышка
+for r in (0.355, 0.27, 0.17):                                                  # рельефные кольца
+    bpy.ops.mesh.primitive_torus_add(major_radius=r, minor_radius=0.011, major_segments=32,
+                                     minor_segments=4, location=(0, 0, 0.046))
+    P.append(flat(bpy.context.object, IRON))
+for k in range(16):                                                            # лучи
+    a = k * math.tau / 16
+    m = Vector((math.cos(a), math.sin(a), 0))
+    P.append(box((0.08, 0.016, 0.012), tuple(m * 0.31 + Vector((0, 0, 0.046))), IRON, rot=(0, 0, a)))
+for i in range(-2, 3):                                                         # сетка в середине
+    P.append(box((0.26, 0.014, 0.012), (0, i * 0.05, 0.046), IRON))
+    P.append(box((0.014, 0.26, 0.012), (i * 0.05, 0, 0.046), IRON))
+for a in (0.4, 3.5):                                                           # пазы для лома
+    P.append(box((0.07, 0.025, 0.01), (math.cos(a) * 0.37, math.sin(a) * 0.37, 0.047), DARK, rot=(0, 0, a)))
+export("manhole", [join("Manhole", P)])
+
 P = [box((0.12, 0.05, 0.12), (0, 0, 0), METAL)]
 bpy.ops.mesh.primitive_torus_add(major_radius=0.045, minor_radius=0.012, major_segments=10,
                                  minor_segments=4, location=(0, 0, 0.07), rotation=(math.pi / 2, 0, 0))
@@ -486,7 +610,7 @@ if RENDER:
              "pigeon": (0.5, -6, 0), "dog": (-0.5, -6, 0), "bush_round": (-10, 0, 0), "bush_wide": (10, 0, 0)}
     for name, objs in KEEP:
         for o in objs:
-            o.location += Vector(place[name])
+            o.location += Vector(place.get(name, (0, -8, 0)))
     cam = bpy.data.objects.new("Cam", bpy.data.cameras.new("Cam"))
     scene.collection.objects.link(cam)
     scene.camera = cam

@@ -6,7 +6,7 @@ extends Node3D
 ##   спереди — разбитый асфальт и лужи, чёрный «гелик» (без эмблем), «копейка» на кирпичах,
 ##   мусорные баки, бочки, ящики, лестница к крыше; на воротах — номера, замки и надписи.
 ## Голуби сидят по краям крыши и на мусорных баках и улетают (сами или если рядом боец);
-## под гаражами бродит собака. У баков — чёрные мусорные мешки.
+## под гаражами бродит собака. У баков — чёрные мусорные мешки, на асфальте лужи и люки.
 ## За партию 1–2 раза случайная дверь подъезда хрущёвки сама открывается и закрывается.
 ## Если боец падает на гелик — у гелика мигают фары и поворотники (но падение всё равно выбивает).
 
@@ -154,36 +154,18 @@ func _schedule_doors() -> void:
 			.set_ease(Tween.EASE_IN)
 
 
-## Чёрные мусорные мешки у баков (завязаны сверху «хвостиком»).
+## Чёрные мусорные мешки у баков: модели trash_bag / trash_bag_fat (tools/blender/courtyard.py) —
+## осевшее дно, складки, завязанные «ушки», матовый полиэтилен (раньше — блестящие шары).
 func _build_trash_bags() -> void:
-	var bag_mat := _mat(Color(0.05, 0.05, 0.06), 0.25)
 	var spots: Array[Vector3] = [
 		Vector3(-9.35, 0, 6.9), Vector3(-9.6, 0, 7.5), Vector3(-11.3, 0, 7.2),
 		Vector3(-13.1, 0, 6.9), Vector3(-12.7, 0, 7.5),
 	]
 	for i in spots.size():
-		var bag := MeshInstance3D.new()
-		var sphere := SphereMesh.new()
-		sphere.radius = 0.32
-		sphere.height = 0.5
-		sphere.radial_segments = 10
-		sphere.rings = 6
-		bag.mesh = sphere
-		bag.material_override = bag_mat
-		bag.position = Vector3(spots[i].x, GROUND_Y + 0.24, spots[i].z)
-		bag.scale = Vector3(1.0 + (i % 2) * 0.2, 1.0, 0.9)
-		bag.rotation.y = i * 1.3
-		add_child(bag)
-		var knot := MeshInstance3D.new()
-		var cone := CylinderMesh.new()
-		cone.top_radius = 0.02
-		cone.bottom_radius = 0.07
-		cone.height = 0.14
-		cone.radial_segments = 6
-		knot.mesh = cone
-		knot.material_override = bag_mat
-		knot.position = Vector3(0, 0.29, 0)
-		bag.add_child(knot)
+		var bag := _place("trash_bag_fat" if i % 2 else "trash_bag",
+			Vector3(spots[i].x, GROUND_Y, spots[i].z), i * 1.3)
+		bag.rotation.z = (i % 3 - 1) * 0.08 # чуть завалился набок
+		bag.scale = Vector3.ONE * (0.95 + (i % 3) * 0.08)
 
 
 # ---------------- Земля ----------------
@@ -201,24 +183,34 @@ func _build_ground() -> void:
 		var size := Vector3(rng.randf_range(0.6, 2.4), 0.02, rng.randf_range(0.4, 1.6))
 		var pos := Vector3(rng.randf_range(-15, 15), GROUND_Y + 0.045, rng.randf_range(5.0, 17.0))
 		_box(size, pos, patch).rotation.y = rng.randf_range(0, PI)
-	# Лужи: тёмные и блестящие.
+	# Лужи — только на асфальте: неровное пятно из 2–3 сплюснутых кругов, мокрый тёмный асфальт
+	# с бликом неба. Не «металл»: металл в игре без отражений становится чёрным (были «чёрные
+	# дыры»), и раньше одна лужа лежала на траве.
 	var water := StandardMaterial3D.new()
-	water.albedo_color = Color(0.18, 0.22, 0.27)
-	water.metallic = 0.6
-	water.roughness = 0.05
-	for spot: Vector3 in [Vector3(-1.2, 0, 6.2), Vector3(0.9, 0, 7.3), Vector3(-9.5, 0, 8.0),
-			Vector3(11.0, 0, 5.8), Vector3(-12.5, 0, 3.0), Vector3(7.8, 0, 8.5)]:
-		var puddle := MeshInstance3D.new()
-		var mesh := CylinderMesh.new()
-		mesh.top_radius = rng.randf_range(0.6, 1.3)
-		mesh.bottom_radius = mesh.top_radius
-		mesh.height = 0.02
-		mesh.radial_segments = 14
-		puddle.mesh = mesh
-		puddle.material_override = water
-		puddle.position = spot + Vector3(0, GROUND_Y + 0.06, 0)
-		puddle.scale = Vector3(1.0, 1.0, rng.randf_range(0.5, 0.9))
-		add_child(puddle)
+	water.albedo_color = Color(0.15, 0.16, 0.18)
+	water.metallic = 0.0
+	water.roughness = 0.06
+	for spot: Vector3 in [Vector3(-1.2, 0, 6.2), Vector3(0.9, 0, 7.6), Vector3(-8.2, 0, 8.6),
+			Vector3(11.6, 0, 6.4), Vector3(7.8, 0, 9.0)]:
+		for k in rng.randi_range(2, 3):
+			var puddle := MeshInstance3D.new()
+			var mesh := CylinderMesh.new()
+			mesh.top_radius = rng.randf_range(0.35, 0.8)
+			mesh.bottom_radius = mesh.top_radius
+			mesh.height = 0.01
+			mesh.radial_segments = 16
+			mesh.rings = 1
+			puddle.mesh = mesh
+			puddle.material_override = water
+			puddle.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			var offset := Vector3(rng.randf_range(-0.5, 0.5), 0, rng.randf_range(-0.3, 0.3))
+			puddle.position = spot + offset + Vector3(0, GROUND_Y + 0.06, 0)
+			puddle.scale = Vector3(1.0, 1.0, rng.randf_range(0.5, 0.85))
+			puddle.rotation.y = rng.randf() * TAU
+			add_child(puddle)
+	# Канализационные люки (чугунная крышка с узором, вокруг — заплатка асфальта).
+	for spot: Vector3 in [Vector3(2.6, 0, 10.2), Vector3(-6.8, 0, 13.4)]:
+		_place("manhole", spot + Vector3(0, GROUND_Y + 0.05, 0), rng.randf() * TAU)
 
 
 # ---------------- Дома, деревья, фонари ----------------
