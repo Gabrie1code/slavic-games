@@ -105,9 +105,10 @@ func _ready() -> void:
 		MatchState.start_new_match(1)
 
 	_sun.rotation_degrees = Vector3(-55, -30, 0)
-	# Камера на 20% ближе к центру крыши (было (0, 13.5, 12.5)), смотрит в тот же центр.
-	_camera.look_at_from_position(CAMERA_TARGET + (Vector3(0, 13.5, 12.5) - CAMERA_TARGET) * 0.8,
-		CAMERA_TARGET)
+	# Камера на 20% ближе к центру крыши (было (0, 13.5, 12.5)) и на 5% выше, смотрит в центр.
+	var offset := (Vector3(0, 13.5, 12.5) - CAMERA_TARGET) * 0.8
+	offset.y *= 1.05
+	_camera.look_at_from_position(CAMERA_TARGET + offset, CAMERA_TARGET)
 	_spawn_fighters()
 	# Двор вокруг крыши: дома, машины, голуби, собака.
 	var yard := GarageYard.new()
