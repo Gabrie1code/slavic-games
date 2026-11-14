@@ -12,6 +12,7 @@ const COURTYARD := "res://assets/models/courtyard/"
 const SKY_SHADER := preload("res://scenes/lobby/window_sky.gdshader")
 const TINT_SHADER := preload("res://scenes/lobby/window_tint.gdshader")
 const CLOUDS := preload("res://assets/textures/window/window_clouds.png")
+const MOON := preload("res://assets/textures/window/moon.png")
 const GROUND_Y := -6.0
 const PIGEONS := 5
 ## Где гуляют голуби (x — вбок, z — вглубь от стены).
@@ -141,6 +142,7 @@ func _build_sky() -> void:
 	_sky_mat = ShaderMaterial.new()
 	_sky_mat.shader = SKY_SHADER
 	_sky_mat.set_shader_parameter("clouds", CLOUDS)
+	_sky_mat.set_shader_parameter("moon_tex", MOON)
 	quad.material_override = _sky_mat
 	quad.position = Vector3(0, SKY_TOP - SKY_SIZE.y / 2.0, -60)
 	_sky_quad = quad

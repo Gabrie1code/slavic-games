@@ -14,9 +14,12 @@ uniform float sun_alpha = 1.0;
 uniform vec2 moon_uv = vec2(0.5, 0.7);
 uniform float moon_alpha = 0.0;
 uniform sampler2D clouds : source_color, repeat_enable, filter_linear_mipmap;
+uniform sampler2D moon_tex : source_color, filter_linear_mipmap;
 
 const vec2 SIZE = vec2(600.0, 320.0);
 const float HORIZON = 0.82;
+// Радиус луны (м на квадрате неба).
+const float MOON_R = 2.6;
 
 float hash(vec2 p) {
 	return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
@@ -34,12 +37,15 @@ void fragment() {
 	float sun_r = length((uv - sun_uv) * SIZE);
 	col += sun_color * sun_alpha * 0.45 * exp(-sun_r / 9.0);
 	col = mix(col, sun_color, sun_alpha * (1.0 - smoothstep(3.2, 3.6, sun_r)));
-	// Луна: светлый диск с тенью (месяц).
+	// Луна: картинка «реалистичный месяц» (tools/textures/moon.py) — кратеры, пепельный свет;
+	// вокруг мягкое голубое сияние.
 	vec2 m = (uv - moon_uv) * SIZE;
-	float disc = 1.0 - smoothstep(2.2, 2.5, length(m));
-	float shade = 1.0 - smoothstep(2.0, 2.3, length(m - vec2(1.1, -0.5)));
 	col += vec3(0.75, 0.8, 1.0) * moon_alpha * 0.12 * exp(-length(m) / 8.0);
-	col = mix(col, vec3(0.95, 0.93, 0.82), moon_alpha * disc * (1.0 - shade * 0.88));
+	vec2 muv = m / (MOON_R * 2.0) + 0.5;
+	if (muv.x > 0.0 && muv.x < 1.0 && muv.y > 0.0 && muv.y < 1.0) {
+		vec4 moon = texture(moon_tex, muv);
+		col = mix(col, moon.rgb, moon.a * moon_alpha);
+	}
 	// Облака плывут медленно вбок.
 	vec2 cuv = vec2(uv.x * 4.0 + TIME * 0.002, (uv.y - 0.45) / 0.37);
 	if (cuv.y > 0.0 && cuv.y < 1.0) {
