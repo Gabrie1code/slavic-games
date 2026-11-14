@@ -152,6 +152,7 @@ FRAME_W = mat("CFrameWhite", (0.86, 0.85, 0.8))
 FRAME_WOOD = mat("CFrameWood", (0.42, 0.27, 0.14))
 GLASS = mat("CGlass", (0.16, 0.22, 0.28), 0.15)
 GLASS_SKY = mat("CGlassSky", (0.4, 0.52, 0.6), 0.1)
+DISH = mat("CDish", (0.82, 0.83, 0.84), 0.5, 0.2)
 # Стекло застеклённых балконов: картинка «что за стеклом» (tools/textures/balcony_glass.py, 8 вариантов).
 BALCONY_GLASS = mat("CBalconyGlass", (1, 1, 1), 0.15, image="assets/textures/city/balcony_glass.png")
 
@@ -316,9 +317,18 @@ def balcony(B, rng, x, y, z_floor, w=2.4, depth=1.1, style=None, out=-1):
         B.box((0.14, 0.14, 0.14), (cx + 0.2, yf, z_floor + H + 0.27), CAT)              # голова
     elif r < 0.82:                                                                  # санки
         B.box((0.9, 0.35, 0.05), (x, yc, z_floor + 0.75), mat("CSled", (0.55, 0.35, 0.18)), rot=(0, 1.3, 0))
-    if rng.random() < 0.25:                                                         # тарелка
-        B.cyl(0.32, 0.1, (x + w / 2 - 0.2, yf + f * 0.15, z_floor + 1.7), METAL, n=12, r2=0.05,
-              rot=(math.radians(-70 * f * -1), 0, math.radians(20)))
+    if rng.random() < 0.25:                                                         # спутниковая тарелка
+        # Чаша смотрит НАРУЖУ и чуть вверх (раньше — в стену: была видна тёмная изнанка),
+        # светло-серая, на кронштейне от перил, с конвертером на штанге.
+        dx, dz = x + w / 2 - 0.25, z_floor + 1.55
+        dy = yf + f * 0.35
+        tilt = math.radians(-70 * f)                                                 # ось: наружу и вверх
+        B.box((0.04, 0.35, 0.04), (dx, yf + f * 0.17, dz - 0.15), METAL)              # кронштейн
+        B.cyl(0.3, 0.07, (dx, dy, dz), DISH, n=16, r2=0.12, rot=(tilt, 0, 0))
+        axis = Vector((0, -math.sin(tilt), math.cos(tilt)))
+        tip = Vector((dx, dy, dz)) + axis * 0.32
+        B.box((0.03, 0.03, 0.34), tuple(Vector((dx, dy, dz)) + axis * 0.16), METAL, rot=(tilt, 0, 0))
+        B.box((0.07, 0.07, 0.09), tuple(tip), DARK, rot=(tilt, 0, 0))                 # конвертер
 
 
 def entrance(B, x, y, ground=0.0, w=1.4, canopy=CONCRETE, door=DOOR, out=-1):

@@ -1,12 +1,12 @@
 class_name YardPaths
 extends Node3D
 ## Тропинки и тротуары вокруг площадки «Морожки» (только картинка, без столкновений):
-## асфальтовое кольцо вокруг забора, тротуары вдоль домов, дорожки от них к кольцу,
-## асфальт перед гаражами и протоптанные «народные тропы» через газон.
+## асфальтовое кольцо вокруг забора, тротуары вдоль домов, прямые дорожки от ровно стоящих
+## домов к кольцу, асфальт перед гаражами. Всё асфальтовое — одного цвета и на одной высоте
+## (раньше коричневые тропы и дорожки ложились поверх тротуаров «слоями» и шли ломаными).
 
 const ASPHALT := Color(0.33, 0.33, 0.35)
 const ASPHALT_OLD := Color(0.4, 0.39, 0.38)
-const DIRT := Color(0.5, 0.41, 0.29)
 ## Половина размера кольца (по средней линии) и его ширина.
 const RING := Vector2(19.0, 13.0)
 const RING_W := 1.6
@@ -15,16 +15,6 @@ const SIZES := {
 	"khrushchevka": Vector2(28, 11), "brick_khrushchevka": Vector2(26, 10),
 	"panel_ninestory": Vector2(30, 12), "stalinka": Vector2(28, 13), "tower_block": Vector2(16, 16),
 }
-## Протоптанные тропы через газон (точки по земле, x/z).
-const TRAILS: Array = [
-	[Vector2(-19, 8), Vector2(-24, 11), Vector2(-29, 14.5), Vector2(-33, 21)],
-	[Vector2(19, -8), Vector2(23.5, -13), Vector2(26, -19), Vector2(27, -24)],
-	[Vector2(-8, -13), Vector2(-7, -16), Vector2(-5.5, -18.7)],
-	[Vector2(-14, -19.6), Vector2(-19, -22), Vector2(-24, -24.5)],
-	[Vector2(8, 13), Vector2(9.2, 16.5), Vector2(10.2, 19.6)],
-	[Vector2(-19, -3), Vector2(-23, -2), Vector2(-27, -1.5)],
-]
-
 var _mats: Dictionary = {}
 
 
@@ -49,25 +39,23 @@ func build(buildings: Array) -> void:
 		var size: Vector2 = SIZES[model]
 		var walk := pos + front * (size.y / 2.0 + 2.4) # за балконами и козырьками подъездов
 		_strip(walk, Vector2(size.x, 1.8), yaw, ASPHALT, 0.0)
-		if walk.x > 15.0 and walk.z > 15.0:
-			continue # дом за гаражами: прямая дорожка шла бы сквозь них
-		# Дорожка от тротуара к кольцу (по прямой к центру двора).
-		var scale_to_ring := minf(RING.x / maxf(absf(walk.x), 0.01), RING.y / maxf(absf(walk.z), 0.01))
-		var target := walk * minf(1.0, scale_to_ring)
-		_segment(walk, target, 1.4, ASPHALT if i % 2 == 0 else DIRT, 0.003)
-	for trail: Array in TRAILS:
-		for k in trail.size() - 1:
-			var a: Vector2 = trail[k]
-			var b: Vector2 = trail[k + 1]
-			_segment(Vector3(a.x, 0, a.y), Vector3(b.x, 0, b.y), 0.9, DIRT, 0.006)
+		# Прямая дорожка к кольцу — только от домов, стоящих ровно (лицом по оси двора).
+		# Встык, без наложения: от края тротуара (0.9 м) до края кольца (RING_W / 2).
+		var inward := -front
+		if absf(front.x) > 0.99:
+			var ring_x := signf(walk.x) * (RING.x + RING_W / 2.0)
+			_segment(walk + inward * 0.9, Vector3(ring_x, 0, walk.z), 1.4, ASPHALT, 0.0)
+		elif absf(front.z) > 0.99:
+			var ring_z := signf(walk.z) * (RING.y + RING_W / 2.0)
+			_segment(walk + inward * 0.9, Vector3(walk.x, 0, ring_z), 1.4, ASPHALT, 0.0)
 
 
-## Отрезок дорожки от a до b шириной width (lift — чуть выше, чтобы пересечения не мерцали).
+## Отрезок дорожки от a до b шириной width.
 func _segment(a: Vector3, b: Vector3, width: float, color: Color, lift: float) -> void:
 	var d := b - a
 	if d.length() < 0.2:
 		return
-	_strip((a + b) / 2.0, Vector2(width, d.length() + width * 0.6), atan2(d.x, d.z), color, lift)
+	_strip((a + b) / 2.0, Vector2(width, d.length()), atan2(d.x, d.z), color, lift)
 
 
 ## Плоская полоса: size.x — поперёк (по X после поворота), size.y — вдоль (по Z).
