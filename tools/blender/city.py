@@ -586,16 +586,43 @@ GATES = [mat("CGate%d" % i, c, 0.6, 0.3) for i, c in enumerate(
 B = Builder()
 n, gw, gd, gh = 6, 3.4, 6.0, 2.6
 L = n * gw
-B.box((L, gd, gh), (0, gd / 2, gh / 2), GARAGE_WALL)
+OPEN = 3                                                                        # приоткрытый гараж
+ox = -L / 2 + gw / 2 + OPEN * gw
+# Корпус — без бокса открытого гаража: он полый (пол, стены, потолок, вещи внутри).
+B.box((ox - gw / 2 + L / 2, gd, gh), ((-L / 2 + ox - gw / 2) / 2, gd / 2, gh / 2), GARAGE_WALL)
+B.box((L / 2 - ox - gw / 2, gd, gh), ((ox + gw / 2 + L / 2) / 2, gd / 2, gh / 2), GARAGE_WALL)
 B.box((L + 0.4, gd + 0.4, 0.15), (0, gd / 2, gh + 0.07), ROOF)
+WARM = mat("CGarageInside", (0.62, 0.48, 0.3), 0.9)
+WARM_D = mat("CGarageInsideDark", (0.4, 0.3, 0.2), 0.9)
+B.box((gw - 0.1, 0.1, gh), (ox, gd - 0.05, gh / 2), WARM)                      # задняя стена
+B.box((gw - 0.1, gd, 0.08), (ox, gd / 2, gh - 0.04), WARM_D)                   # потолок
+B.box((gw - 0.1, gd, 0.02), (ox, gd / 2, 0.01), mat("CGarageFloor", (0.35, 0.34, 0.32), 0.9))
+for sx in (-1, 1):
+    B.box((0.06, gd, gh), (ox + sx * (gw / 2 - 0.08), gd / 2, gh / 2), WARM)     # боковые стены
+# Внутри: стеллаж с банками и коробками, стопка покрышек, верстак, лампочка, канистра.
+for z in (0.6, 1.2, 1.8):
+    B.box((0.5, 1.6, 0.04), (ox + 1.3, 2.4, z), WARM_D)
+    for k in range(4):
+        B.box((0.16, 0.16, 0.2), (ox + 1.3, 1.8 + k * 0.38, z + 0.12),
+              rng.choice([mat("CJarG", (0.5, 0.6, 0.35), 0.4), mat("CBoxC", (0.65, 0.5, 0.3), 0.9),
+                          mat("CCanR", (0.6, 0.15, 0.12), 0.5)]))
+for k in range(3):
+    B.cyl(0.33, 0.2, (ox - 1.0, 1.2, 0.1 + k * 0.2), DARK, n=14)
+B.box((1.4, 0.6, 0.08), (ox - 0.4, gd - 0.45, 0.9), WARM_D)                     # верстак
+for sx in (-1, 1):
+    B.box((0.06, 0.06, 0.88), (ox - 0.4 + sx * 0.6, gd - 0.45, 0.44), WARM_D)
+B.box((0.03, 0.03, 0.4), (ox, 3.0, gh - 0.28), DARK)                           # лампочка
+B.cyl(0.07, 0.12, (ox, 3.0, gh - 0.52), mat("CBulbWarm", (1.0, 0.85, 0.5), 0.3), n=10)
+B.box((0.25, 0.15, 0.35), (ox + 0.9, 0.7, 0.18), mat("CCanister", (0.55, 0.12, 0.1), 0.5))
+B.box((2.6, 1.8, 0.012), (ox + 0.2, -0.9, 0.006), mat("CLightSpill", (0.5, 0.44, 0.34), 0.9))  # свет на асфальте
 for k in range(n):
     x = -L / 2 + gw / 2 + k * gw
     B.box((0.15, 0.1, gh), (x - gw / 2, -0.04, gh / 2), SEAM)
     g = rng.choice(GATES)
     rng.random()                                                                # (порядок случайностей прежний)
-    if k == 3:                                                                  # приоткрытые ворота
-        B.box((2.6, 0.06, 2.1), (x, 0.03, 1.05), DARK)                          # темнота внутри
+    if k == OPEN:                                                               # приоткрытые ворота
         B.box((1.28, 0.08, 2.1), (x - 0.66, -0.04, 1.05), g)                    # левая створка закрыта
+        B.box((gw, 0.1, gh - 2.1), (x, -0.04, (gh + 2.1) / 2), GARAGE_WALL)     # над воротами
         a = math.radians(-55)                                                   # правая — на петле наружу
         hinge = Vector((x + 1.3, -0.04, 0))
         mid = hinge + Vector((-math.cos(a) * 0.64, math.sin(a) * 0.64, 1.05))

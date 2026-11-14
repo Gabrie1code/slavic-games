@@ -132,6 +132,13 @@ func _build_surroundings() -> void:
 		bush.scale = Vector3.ONE * (0.8 + 0.1 * (i % 3))
 	# У гаражей: «жигуль» носом к гаражу (ворота четвёртого гаража приоткрыты — в модели).
 	_place(COURTYARD + "zhiguli", Vector3(27.1, 0, 16.8), -PI / 2)
+	# В приоткрытом гараже горит лампочка: тёплый свет внутри и на асфальте перед воротами.
+	var garage_light := OmniLight3D.new()
+	garage_light.light_color = Color(1.0, 0.78, 0.5)
+	garage_light.light_energy = 1.4
+	garage_light.omni_range = 5.0
+	garage_light.position = Vector3(20.3, 2.0, 22.5)
+	add_child(garage_light)
 
 
 ## Земля до горизонта: основной газон сцены — 90 × 90 м, дальше — большая плоскость чуть ниже

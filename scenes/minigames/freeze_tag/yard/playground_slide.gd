@@ -24,7 +24,7 @@ var riders: Array[PlayerCharacter] = []
 
 func _ready() -> void:
 	add_child(SCENE.instantiate())
-	# Твёрдая только башенка с лесенкой; под скатом можно пробегать.
+	# Твёрдые башенка с лесенкой и скат.
 	var body := StaticBody3D.new()
 	var shape := CollisionShape3D.new()
 	var box := BoxShape3D.new()
@@ -32,6 +32,18 @@ func _ready() -> void:
 	shape.shape = box
 	shape.position = Vector3(1.35, 0.85, 0)
 	body.add_child(shape)
+	# Скат тоже твёрдый (наклонная плита по пути катания): раньше на него можно было запрыгнуть
+	# с площадки и провалиться сквозь. Под низким концом ската всё равно не пройти.
+	var chute := CollisionShape3D.new()
+	var chute_box := BoxShape3D.new()
+	var top := PATH[3]
+	var bottom := PATH[4]
+	var length := Vector2(top.x - bottom.x, top.y - bottom.y).length()
+	chute_box.size = Vector3(length, 0.08, 0.7)
+	chute.shape = chute_box
+	chute.position = (top + bottom) / 2.0 + Vector3(0, -0.06, 0)
+	chute.rotation.z = atan2(top.y - bottom.y, top.x - bottom.x)
+	body.add_child(chute)
 	add_child(body)
 	var badge := ZoneBadge.new().setup("zone_slide", 2.8)
 	badge.position += Vector3(1.3, 0, 0)
