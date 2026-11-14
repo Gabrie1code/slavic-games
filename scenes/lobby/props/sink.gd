@@ -18,6 +18,8 @@ const WATER_RIM_Y := 0.88
 const BOWL_R_TOP := 0.2
 ## Где встаёт моющий руки (перед раковиной).
 const STAND := Vector3(0, 0, 0.75)
+## Отошёл от места у раковины дальше этого (м) — руки больше не под краном.
+const WALK_AWAY := 0.6
 ## Губка лежит на краю раковины; взяли и не вернули — новая появится через SPONGE_BACK сек.
 const SPONGE_SPOT := Vector3(-0.17, 0.882, 0.33)
 const SPONGE_BACK := 15.0
@@ -41,6 +43,8 @@ var busy := false
 ## Губка на раковине (null — её взяли).
 var sponge: Sponge
 
+## Кто сейчас моет руки: отошёл от раковины — рука «под краном» сразу опускается.
+var _washer: PlayerCharacter
 var _tap_hot: Node3D
 var _tap_cold: Node3D
 var _water: Node3D
@@ -88,6 +92,9 @@ func _ready() -> void:
 
 
 func _process(_delta: float) -> void:
+	if _washer and (not is_instance_valid(_washer) \
+			or _washer.global_position.distance_to(stand_point()) > WALK_AWAY):
+		_release_washer()
 	if _water.visible and funnel:
 		# Ширина воды — по стенкам воронки на этой высоте (+чуть-чуть, чтобы не было белой
 		# каймы: иначе на дне вода выглядела «шайбой»).
@@ -101,6 +108,21 @@ func _process(_delta: float) -> void:
 		_stream_mesh.height = length
 		_stream.position = Vector3(nozzle.x, nozzle.y - length / 2.0, nozzle.z)
 		_stream.scale.x = 1.0 + sin(Time.get_ticks_msec() * 0.05) * 0.1 # чуть дрожит
+
+
+## Опустить руку моющего (если он за это время не взял что-то в руку — тогда поза его вещи).
+func _release_washer() -> void:
+	var character := _washer
+	_washer = null
+	if is_instance_valid(character) and not _holds_item(character):
+		character.set_arm_angle(PlayerCharacter.ARM_DOWN, 0.25)
+
+
+## В правой руке что-то есть: вещь в гнезде кисти (рядом с точкой «в руке») или в самой точке.
+static func _holds_item(character: PlayerCharacter) -> bool:
+	var hand := character.right_hand
+	return hand.get_child_count() > 0 or (hand.get_parent() != null
+		and hand.get_parent().get_child_count() > 1)
 
 
 func can_use(p: PlayerData) -> bool:
@@ -158,6 +180,7 @@ func use(p: PlayerData, character: PlayerCharacter) -> void:
 	busy = true
 	_ready_at[p.id] = Time.get_ticks_msec() / 1000.0 + COOLDOWN
 	if character:
+		_washer = character
 		character.set_arm_pose(0.2, 1.1, 0.25) # руки под кран
 	_water.position.y = water_low
 	_water.scale = Vector3.ONE
@@ -180,5 +203,4 @@ func use(p: PlayerData, character: PlayerCharacter) -> void:
 	tween.tween_callback(func() -> void:
 		_water.visible = false
 		busy = false
-		if is_instance_valid(character):
-			character.set_arm_angle(PlayerCharacter.ARM_DOWN, 0.25))
+		_release_washer())
