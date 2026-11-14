@@ -101,6 +101,9 @@ var arm_pose_x := 0.0
 var sitting := false
 ## Позу рук и ног целиком задаёт внешний код через part() (пьедестал итогов) — без анимации.
 var manual_pose := false
+## Точка, куда тянется кулак правой руки (координаты модели; INF — по направлению руки). Её задаёт
+## set_arm_pose, а вещь может двигать её каждый кадр (бутылка: горлышко — в рот).
+var hand_target := Vector3.INF
 ## Вид от первого лица: движение относительно взгляда.
 var first_person := false
 ## Насколько персонаж присел: 0 — стоит, 1 — сидит на корточках (плавно).
@@ -161,9 +164,8 @@ var _rig: CharacterRig = null
 var _dying := false
 ## Сколько ещё секунд идёт разовое действие (удар) — анимация по состоянию его не перебивает.
 var _action_left := 0.0
-## Рука от кода: расстояние плечо — кулак и точка, куда тянется кулак (INF — по направлению руки).
+## Рука от кода: расстояние плечо — кулак.
 var _arm_reach := CharacterRig.DEFAULT_REACH
-var _arm_target := Vector3.INF
 ## Поза руки задана, когда в руке был предмет: предмет пропал — руку опускаем сами.
 var _pose_item := false
 
@@ -361,7 +363,7 @@ func _drive_rig(delta: float, walk_speed: float) -> void:
 	# Пьедестал: руки почти прямые (кубок над головой).
 	_rig.arm_reach["ArmR"] = MANUAL_REACH if manual_pose else _arm_reach
 	_rig.arm_reach["ArmL"] = MANUAL_REACH if manual_pose else CharacterRig.DEFAULT_REACH
-	_rig.arm_target["ArmR"] = _arm_target
+	_rig.arm_target["ArmR"] = hand_target
 	# Предмет выпал из руки (бросили, отобрали), а поза «держит» осталась — опустить руку.
 	if _right_arm_busy and _pose_item and not _hand_has_item() \
 			and not (_arm_tween != null and _arm_tween.is_running()):
@@ -552,7 +554,7 @@ func set_arm_angle(angle: float, time: float = 0.15) -> void:
 	_right_arm_busy = absf(angle - ARM_DOWN) > 0.01
 	arm_pose_x = 0.0
 	_arm_reach = CharacterRig.DEFAULT_REACH
-	_arm_target = Vector3.INF
+	hand_target = Vector3.INF
 	_pose_item = false
 	if _arm_tween:
 		_arm_tween.kill()
@@ -568,7 +570,7 @@ func set_arm_pose(angle_z: float, angle_x: float, time: float = 0.15,
 		reach: float = CharacterRig.DEFAULT_REACH, target: Vector3 = Vector3.INF) -> void:
 	_right_arm_busy = true
 	_arm_reach = reach
-	_arm_target = target
+	hand_target = target
 	_pose_item = _hand_has_item()
 	if _arm_tween:
 		_arm_tween.kill()

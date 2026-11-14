@@ -12,8 +12,11 @@ const MODEL := preload("res://assets/models/kitchen/kitchen_bottle.glb")
 const FLOOR_LIFE := 7.0
 ## Где бутылку сжимает кулак (над дном).
 const GRIP := 0.12
-## Куда тянется кулак с бутылкой, когда пьёт (координаты модели персонажа): перед ртом.
-const MOUTH_HAND := Vector3(0.06, 1.1, -0.32)
+## Рот персонажа (координаты модели): от сустава шеи (высота NECK_Y) — вверх и вперёд.
+const NECK_Y := 1.13
+const MOUTH_FROM_NECK := Vector3(0.0, 0.115, -0.25)
+## От хвата до кончика горлышка (бутылка 0.322 м, хват GRIP от дна) — кончик чуть в губах.
+const NECK_TIP := 0.322 - GRIP - 0.015
 
 var state := State.HOME
 var holder: PlayerData
@@ -22,6 +25,8 @@ var drinking := false
 
 var _model: Node3D
 var _tilt := 0.0
+## Кто сейчас пьёт (кулак ведём так, чтобы горлышко было во рту).
+var _drinker: PlayerCharacter
 var _loose_time := 0.0
 
 
@@ -46,12 +51,22 @@ func _ready() -> void:
 	_set_loose_physics(false)
 
 
+## Где должен быть кулак, чтобы кончик горлышка был во рту: бутылка наклонена на _tilt (вверх по
+## бутылке — вверх по миру, с наклоном к лицу), голова запрокинута на head_tilt (рот поднимается).
+func _hand_for_mouth(head_tilt: float) -> Vector3:
+	var mouth := Vector3(0.0, NECK_Y, 0.0) + MOUTH_FROM_NECK.rotated(Vector3.RIGHT, head_tilt)
+	var up := Vector3(0.0, cos(_tilt), -sin(_tilt)) # вперёд у модели — это −Z
+	return mouth - up * NECK_TIP
+
+
 static func make_model() -> Node3D:
 	return MODEL.instantiate() as Node3D
 
 
 func _process(delta: float) -> void:
 	if state == State.HELD:
+		if drinking and is_instance_valid(_drinker):
+			_drinker.hand_target = _hand_for_mouth(_drinker.head_tilt)
 		HandHold.follow(self, GRIP, _tilt)
 		return
 	if state != State.LOOSE:
@@ -86,7 +101,8 @@ func drink(character: PlayerCharacter, view: Node3D, done: Callable) -> void:
 		return
 	drinking = true
 	# Кулак с бутылкой — перед ртом (у модели со скелетом локоть гнётся сам).
-	character.set_arm_pose(0.5, 2.15, 0.3, CharacterRig.DEFAULT_REACH, MOUTH_HAND)
+	_drinker = character
+	character.set_arm_pose(0.5, 2.15, 0.3, CharacterRig.DEFAULT_REACH, _hand_for_mouth(0.0))
 	var tween := create_tween()
 	# Поднести ко рту, запрокинуть.
 	tween.tween_property(self, "_tilt", -1.3, 0.3).set_trans(Tween.TRANS_SINE)

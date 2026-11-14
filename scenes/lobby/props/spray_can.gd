@@ -30,6 +30,8 @@ const PAINT_LIFE := 20.0
 const PAINT_FADE := 1.5
 const SPLAT_STEP := 0.05
 const STREAM_TIME := 0.25
+## Хват: столько метров от дна баллончика до кулака (меньше — баллончик выше над кулаком).
+const HOLD_GRIP := 0.075
 
 ## Все следы краски (старые удаляются, когда их больше MAX_SPLATS).
 static var _splats: Array[Decal] = []
@@ -88,7 +90,7 @@ func _process(delta: float) -> void:
 		transform = _stored_at
 		return
 	if state == State.HELD:
-		HandHold.follow(self, 0.09) # ровно в кулаке, как бы ни была повёрнута рука
+		HandHold.follow(self, HOLD_GRIP) # ровно в кулаке, как бы ни была повёрнута рука
 		return
 	if state != State.LOOSE:
 		return
@@ -121,7 +123,7 @@ func hold(p: PlayerData, character: PlayerCharacter) -> void:
 	character.attach_to_part("ArmR", self)
 	_stream.layers = 1 # струю видно всем (от первого лица — см. spray_at: своя струя из кадра)
 	_owner_layer = 1 << (p.slot + 1) # слой модели игрока (как в лобби)
-	HandHold.place(self, 0.09) # ровно стоит в кулаке, сжат посередине
+	HandHold.place(self, HOLD_GRIP) # ровно стоит в кулаке, сжат чуть ниже середины
 	character.set_arm_pose(0.15, 0.9, 0.2)
 
 
