@@ -1,6 +1,6 @@
 """Плакаты для квартиры-лобби в духе советских плакатов (плоские цвета, крупные буквы,
 диагональ). Всё придуманное, без чужих брендов: «К звёздам!», календарь-1991 с котёнком,
-«Пейте кефир!», «Хоккей», ночной «Тишина! Соседи спят».
+«Пейте кефир!», «Хоккей», тёмный «Береги лес от пожара!».
 
 Запуск (Python с Pillow):
     python3 tools/textures/home_posters.py assets/textures/posters
@@ -137,45 +137,45 @@ big_text(d, "ХОККЕЙ", 610, 92, RED, DARK)
 d.text((W / 2, 672), "ТРУС НЕ ИГРАЕТ В ХОККЕЙ!", font=font(24), fill=DARK, anchor="mm")
 finish(img, "home_hockey")
 
-# 5. «ТИШИНА! СОСЕДИ СПЯТ» — тёмный ночной плакат: синее небо, месяц, звёзды, хрущёвка
-# с парой горящих окон. (Был жёлтый «Береги электроэнергию» — слишком яркий для стены.)
-NIGHT = (14, 20, 46)
-img = Image.new("RGB", (W, H), NIGHT)
+# 5. «БЕРЕГИ ЛЕС ОТ ПОЖАРА!» — тёмный плакат: ночной хвойный лес силуэтами, костёр, который
+# заливают водой из ведра. (Раньше были жёлтый «Береги электроэнергию» и ночной «Тишина!».)
+img = Image.new("RGB", (W, H), (12, 30, 24))
 d = ImageDraw.Draw(img)
-for y in range(0, 470):                                              # небо светлеет к горизонту
+for y in range(0, 470):                                              # небо: тёмно-зелёное к горизонту
     k = y / 470
-    d.line((0, y, W, y), fill=(int(14 + 22 * k), int(20 + 26 * k), int(46 + 40 * k)))
-for _ in range(70):
-    x, y = random.randint(20, W - 20), random.randint(20, 380)
-    r = random.choice((1, 1, 2))
-    d.ellipse((x - r, y - r, x + r, y + r), fill=(235, 228, 200))
-d.ellipse((330, 70, 440, 180), fill=(242, 226, 160))                 # месяц: круг минус круг
-cut = Image.new("L", (W, H), 0)
-ImageDraw.Draw(cut).ellipse((306, 52, 416, 162), fill=255)
-sky = Image.new("RGB", (W, H))
-sd = ImageDraw.Draw(sky)
-for y in range(H):                                                   # то же небо, без звёзд
-    k = min(y, 470) / 470
-    sd.line((0, y, W, y), fill=(int(14 + 22 * k), int(20 + 26 * k), int(46 + 40 * k)))
-img.paste(sky, (0, 0), cut)
-d = ImageDraw.Draw(img)
-BLD = (8, 10, 24)
-d.rectangle((40, 250, 330, 470), fill=BLD)                           # хрущёвка
-d.rectangle((300, 300, 480, 470), fill=(11, 14, 32))                 # дом подальше
-lit = {(1, 2), (3, 0), (4, 3)}
-for row in range(5):
-    for col in range(6):
-        x, y = 62 + col * 44, 268 + row * 40
-        on = (row, col) in lit
-        d.rectangle((x, y, x + 22, y + 24), fill=(240, 190, 90) if on else (24, 30, 56))
-for row in range(4):
-    for col in range(4):
-        x, y = 318 + col * 40, 318 + row * 36
-        d.rectangle((x, y, x + 18, y + 20), fill=(220, 170, 80) if (row, col) == (2, 1) else (22, 28, 50))
-big_text(d, "ТИШИНА!", 540, 92, (242, 226, 160), BLD)
-big_text(d, "СОСЕДИ СПЯТ", 615, 50, (215, 222, 240))
-d.text((W / 2, 672), "ПОСЛЕ 23:00 — НЕ ШУМИ", font=font(24), fill=(170, 180, 210), anchor="mm")
-finish(img, "home_night")
+    d.line((0, y, W, y), fill=(int(10 + 20 * k), int(26 + 34 * k), int(22 + 20 * k)))
+d.ellipse((60, 60, 130, 130), fill=(225, 215, 160))                  # луна
+for _ in range(40):
+    x, y = random.randint(20, W - 20), random.randint(20, 250)
+    d.point((x, y), fill=(220, 220, 190))
+
+
+def fir(x, base, h, color):
+    for k in range(4):                                               # ярусы ёлки
+        w = h * (0.42 - k * 0.08)
+        y0 = base - h * (0.28 + k * 0.2)
+        d.polygon([(x - w, y0 + h * 0.3), (x + w, y0 + h * 0.3), (x, y0 - h * 0.08)], fill=color)
+    d.rectangle((x - h * 0.03, base - h * 0.06, x + h * 0.03, base), fill=color)
+
+
+for x, h in ((30, 230), (110, 300), (200, 250), (320, 320), (420, 260), (490, 220)):
+    fir(x, 470, h, (6, 18, 14))
+for x, h in ((70, 160), (260, 190), (380, 170), (460, 150)):
+    fir(x, 470, h, (4, 12, 10))
+d.rectangle((0, 465, W, H), fill=(14, 24, 18))
+# Костёр: поленья и пламя, сверху — струя воды из ведра.
+for a in (-0.5, 0.5):
+    d.line((256 - 60 * math.cos(a), 455 + 18 * math.sin(a), 256 + 60 * math.cos(a), 455 - 18 * math.sin(a)),
+           fill=(90, 55, 30), width=14)
+d.polygon([(220, 450), (292, 450), (256, 360)], fill=(230, 110, 30))
+d.polygon([(236, 450), (276, 450), (256, 395)], fill=(250, 200, 70))
+d.polygon([(330, 300), (390, 300), (380, 345), (340, 345)], fill=(150, 160, 170))  # ведро
+for k in range(5):
+    d.line((338 + k * 4, 345, 275 + k * 6, 420), fill=(120, 180, 230), width=4)
+big_text(d, "БЕРЕГИ ЛЕС", 540, 84, (240, 140, 50), (6, 18, 14))
+big_text(d, "ОТ ПОЖАРА!", 615, 60, (230, 225, 200))
+d.text((W / 2, 672), "УХОДЯ — ПОТУШИ КОСТЁР", font=font(24), fill=(170, 190, 160), anchor="mm")
+finish(img, "home_forest")
 
 # 6. «БЕРЕГИ РАБОЧЕЕ ВРЕМЯ!» (на кухню) — зелёный фон, большие часы, красный рабочий с молотом.
 img = Image.new("RGB", (W, H), (38, 112, 88))

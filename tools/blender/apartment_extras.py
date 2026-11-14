@@ -140,10 +140,13 @@ for x in (-0.085, 0.085):                                           # рычаг
 # Подложка диска на переднем скате (сам диск — отдельная модель, точка DIAL_POS).
 P.append(cyl(0.064, 0.006, (0, -0.045, 0.103), WHITE, verts=24, rot=(math.radians(16), 0, 0)))
 # Упор диска (чёрный «клювик») — на корпусе, а не на диске: он не крутится.
-# Стоит наискосок, по радиусу диска (снизу справа, «на 4–5 часов»): поворот в плоскости диска,
-# потом наклон диска.
-STOP = (Matrix.Rotation(math.radians(16), 3, "X") @ Matrix.Rotation(math.radians(35), 3, "Z")).to_euler()
-P.append(box((0.006, 0.022, 0.014), (0.031, -0.0899, 0.1051), BLACK, rot=tuple(STOP)))
+# Стоит наискосок, по радиусу диска, на «4 часах» — дальше последнего отверстия (иначе сливался
+# с ним): точка на диске → наклон диска 16° → корпус.
+TILT = Matrix.Rotation(math.radians(16), 3, "X")
+A = math.radians(-32)
+STOP_POS = Vector((0, -0.045, 0.103)) + TILT @ Vector((math.cos(A) * 0.056, math.sin(A) * 0.056, 0.004))
+STOP = (TILT @ Matrix.Rotation(A + math.pi / 2, 3, "Z")).to_euler()
+P.append(box((0.006, 0.022, 0.014), tuple(STOP_POS), BLACK, rot=tuple(STOP)))
 export("phone_base", [join("PhoneBase", P)])
 
 # Диск (крутится вокруг своей оси Z; в Godot — вокруг Y, наклон задаёт узел).

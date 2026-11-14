@@ -261,7 +261,7 @@ def label_band(r, z0, z1, m, n=24, span=math.radians(150)):
     """Этикетка спереди банки (дуга span вокруг −Y Blender = к смотрящему): одна картинка."""
     verts, faces = [], []
     for k in range(n + 1):
-        a = -math.pi / 2 + span / 2 - k / n * span                   # слева направо, если смотреть спереди
+        a = -math.pi / 2 + span / 2 - k / n * span                   # от правого края к левому (спереди)
         verts += [(math.cos(a) * r, math.sin(a) * r, z0), (math.cos(a) * r, math.sin(a) * r, z1)]
     for k in range(n):
         i = 2 * k
@@ -272,7 +272,7 @@ def label_band(r, z0, z1, m, n=24, span=math.radians(150)):
     for poly in me.polygons:
         for li in poly.loop_indices:
             vi = me.loops[li].vertex_index
-            uv.data[li].uv = ((vi // 2) / n, vi % 2)
+            uv.data[li].uv = (1.0 - (vi // 2) / n, vi % 2)            # картинка не зеркальная
     o = bpy.data.objects.new("Label", me)
     bpy.context.scene.collection.objects.link(o)
     flat(o, m)

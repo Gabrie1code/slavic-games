@@ -1,6 +1,5 @@
 """Этикетки банок с заготовками — спереди банки, одна крупная понятная картинка в рамке:
-  jar_label_pickles.png — один огурец;  jar_label_jam.png — одна вишня (ягода с хвостиком
-  и листиком). Пропорция картинки 9 : 4 — как у этикетки на банке (дуга 150°, высота 12 см).
+  jar_label_pickles.png — один огурец;  jar_label_jam.png — две вишни на веточке с листиком. Пропорция картинки 9 : 4 — как у этикетки на банке (дуга 150°, высота 12 см).
 Запуск: python3 tools/textures/jar_labels.py  →  assets/textures/apartment/
 """
 import math
@@ -34,10 +33,16 @@ for k in range(-4, 5):                                                # пупы
 d.rectangle((cx + dx + r - 6, cy + dy - 8, cx + dx + r + 14, cy + dy + 8), fill=(120, 150, 60))  # хвостик
 img.save(OUT + "jar_label_pickles.png")
 
-img, d = base((150, 25, 35))                                          # вишня
-d.line((W / 2, 150, W / 2 + 40, 50), fill=(90, 60, 25), width=9)
-d.polygon([(W / 2 + 40, 50), (W / 2 + 130, 34), (W / 2 + 85, 80)], fill=(70, 140, 50))
-d.ellipse((W / 2 - 62, 112, W / 2 + 62, 236 - 8), fill=(175, 20, 32))
-d.ellipse((W / 2 - 35, 132, W / 2 - 8, 160), fill=(240, 130, 130))
+img, d = base((150, 25, 35))                                          # две вишни на веточке
+cx = W / 2
+top = (cx + 6, 52)                                                    # где сходятся хвостики
+d.line((cx - 52, 136, top[0], top[1]), fill=(90, 60, 25), width=8)
+d.line((cx + 58, 140, top[0], top[1]), fill=(90, 60, 25), width=8)
+d.polygon([(top[0], top[1]), (top[0] + 70, top[1] - 14), (top[0] + 92, top[1] + 4),
+           (top[0] + 46, top[1] + 26)], fill=(70, 140, 50))           # листик целиком внутри рамки
+d.line((top[0] + 4, top[1] + 4, top[0] + 80, top[1] - 4), fill=(45, 105, 35), width=3)
+for bx, by in ((cx - 52, 168), (cx + 58, 172)):
+    d.ellipse((bx - 38, by - 38, bx + 38, by + 38), fill=(175, 20, 32))
+    d.ellipse((bx - 22, by - 26, bx - 5, by - 9), fill=(240, 130, 130))
 img.save(OUT + "jar_label_jam.png")
 print("saved labels")
