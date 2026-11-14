@@ -199,6 +199,7 @@ func _apply_time() -> void:
 	# Солнце и луна появляются и исчезают у горизонта плавно, а не вспышкой.
 	_sky_mat.set_shader_parameter("sun_alpha", clampf(sun_up * 6.0, 0.0, 1.0))
 	# Низкое солнце — оранжевое.
+	_sky_mat.set_shader_parameter("sun_haze", 1.0 - clampf(sun_up * 2.0, 0.0, 1.0))
 	_sky_mat.set_shader_parameter("sun_color",
 		Color(1.0, 0.55, 0.25).lerp(Color(1.0, 0.96, 0.78), clampf(sun_up * 2.0, 0.0, 1.0)))
 	var night_len := 24.0 - sunset + sunrise

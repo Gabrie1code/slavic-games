@@ -11,6 +11,7 @@ uniform float night = 0.0;
 uniform vec2 sun_uv = vec2(0.5, 0.7);
 uniform vec3 sun_color : source_color = vec3(1.0, 0.95, 0.75);
 uniform float sun_alpha = 1.0;
+uniform float sun_haze = 0.0;
 uniform vec2 moon_uv = vec2(0.5, 0.7);
 uniform float moon_alpha = 0.0;
 uniform sampler2D clouds : source_color, repeat_enable, filter_linear_mipmap;
@@ -33,10 +34,17 @@ void fragment() {
 	vec2 cell = floor(uv * SIZE * 2.0);
 	float star = step(0.995, hash(cell)) * (0.6 + 0.4 * sin(TIME * 2.0 + hash(cell + 3.0) * 30.0));
 	col += vec3(star) * night * smoothstep(0.05, 0.4, up);
-	// Солнце: диск и мягкое сияние вокруг.
+	// Солнце (выбрано владельцем): днём — «яркое с сиянием» (светлый диск, широкое тёплое
+	// сияние); на закате/рассвете — «сквозь дымку», оранжевое: размытое большое пятно.
+	// sun_haze: 0 — день, 1 — солнце у горизонта.
 	float sun_r = length((uv - sun_uv) * SIZE);
-	col += sun_color * sun_alpha * 0.45 * exp(-sun_r / 9.0);
-	col = mix(col, sun_color, sun_alpha * (1.0 - smoothstep(3.2, 3.6, sun_r)));
+	vec3 day_glow = vec3(1.0, 0.95, 0.8) * 0.6 * exp(-sun_r / 4.0);
+	vec3 haze_glow = vec3(1.0, 0.55, 0.25) * 0.75 * exp(-sun_r / 3.5);
+	col += mix(day_glow, haze_glow, sun_haze) * sun_alpha;
+	float day_disc = 1.0 - smoothstep(3.1, 3.4, sun_r);
+	float haze_disc = 1.0 - smoothstep(2.5, 4.5, sun_r);
+	vec3 disc_col = mix(vec3(1.0, 0.98, 0.88), vec3(1.0, 0.62, 0.3), sun_haze);
+	col = mix(col, disc_col, sun_alpha * mix(day_disc, haze_disc, sun_haze));
 	// Луна: картинка «реалистичный месяц» (tools/textures/moon.py) — кратеры, пепельный свет;
 	// вокруг мягкое голубое сияние.
 	vec2 m = (uv - moon_uv) * SIZE;
