@@ -5,6 +5,10 @@ extends Node3D
 ##   сзади — хрущёвка с бельём, тарелками и антеннами; по бокам — деревья и фонари;
 ##   спереди — разбитый асфальт и лужи, чёрный «гелик» (без эмблем), «копейка» на кирпичах,
 ##   мусорные баки, бочки, ящики, лестница к крыше; на воротах — номера, замки и надписи.
+## Баки стоят наискосок; правый приоткрыт и полон мусора, на его углу сидит «местный» голубь.
+## Второй гараж («№18») приоткрыт — внутри картинка-заглушка (garage_inside.png) и лампочка.
+## Асфальт: площадка перед гаражами, тротуар вдоль дома сзади (подъезды выходят прямо на него),
+## тротуары у боковых домов и проезды по бокам от гаражей — всё одним цветом и на одной высоте.
 ## Голуби сидят по краям крыши и на мусорных баках и улетают (сами или если рядом боец);
 ## под гаражами бродит собака. У баков — чёрные мусорные мешки, на асфальте лужи и люки.
 ## За партию 1–2 раза случайная дверь подъезда хрущёвки сама открывается и закрывается.
@@ -18,8 +22,17 @@ const DOOR_X: Array[float] = [-6.375, -2.125, 2.125, 6.375]
 const DOOR_Z := 4.58
 const GELIK_POS := Vector3(4.6, GROUND_Y, 6.35)
 const PIGEON_COUNT := 6
-## Мусорные баки (на них тоже садятся голуби).
-const BINS: Array[Vector3] = [Vector3(-10.4, GROUND_Y, 6.4), Vector3(-12.1, GROUND_Y, 6.3)]
+## Мусорные баки: правый (открытый, с мусором) и левый (закрыт, на него садятся голуби).
+## Стоят в ряд наискосок (поворот BIN_YAW).
+const BINS: Array[Vector3] = [Vector3(-10.4, GROUND_Y, 6.4), Vector3(-11.98, GROUND_Y, 7.16)]
+const BIN_YAW := 0.45
+## Приоткрытый гараж (номер в DOOR_X) и на сколько открыта правая створка.
+const OPEN_GARAGE := 1
+const OPEN_LEAF_ANGLE := 0.6
+## Лужи и люки на асфальте перед гаражами.
+const PUDDLES: Array[Vector3] = [Vector3(-1.2, 0, 6.2), Vector3(0.9, 0, 7.6), Vector3(-8.2, 0, 9.4),
+	Vector3(11.6, 0, 6.4), Vector3(7.8, 0, 9.0)]
+const MANHOLES: Array[Vector3] = [Vector3(2.6, 0, 10.2), Vector3(-6.8, 0, 13.4)]
 ## Хрущёвка сзади и её подъезды (x дверей — как в tools/blender/courtyard.py).
 const HOUSE_POS := Vector3(0, GROUND_Y, -13.5)
 const ENTRANCE_X: Array[float] = [-8.145, 1.164, 10.473]
@@ -27,7 +40,7 @@ const ENTRANCE_Z := 5.57
 const GARAGE_NUMBERS: Array[int] = [17, 18, 21, 23]
 ## Граффити на воротах (имена картинок в assets/textures/garage/).
 const GRAFFITI: Array[String] = [
-	"graffiti_tsoi", "graffiti_spartak", "graffiti_vasya", "graffiti_kino",
+	"graffiti_tsoi", "", "graffiti_vasya", "graffiti_kino",
 ]
 
 ## Бойцы: голуби улетают, если кто-то из них рядом.
@@ -50,6 +63,7 @@ func _ready() -> void:
 	for i in PIGEON_COUNT:
 		_spawn_pigeon(false)
 	_build_trash_bags()
+	_build_open_garage()
 	_schedule_doors()
 
 
@@ -103,9 +117,9 @@ func _on_pigeon_flown(pigeon: YardPigeon) -> void:
 ## Случайная точка на краю крыши (только по краям, не посередине) или на мусорном баке.
 func _edge_spot() -> Vector3:
 	var inset := 0.18
-	if randf() < 0.25:
-		var bin: Vector3 = BINS.pick_random()
-		return bin + Vector3(randf_range(-0.55, 0.55), 1.22, randf_range(-0.3, 0.3))
+	if randf() < 0.2: # на закрытый бак (открытый занят «местным» голубем)
+		var offset := Vector3(randf_range(-0.55, 0.55), 1.22, randf_range(-0.3, 0.3))
+		return BINS[1] + offset.rotated(Vector3.UP, BIN_YAW)
 	if randf() < 0.5:
 		var x := randf_range(-ROOF_HALF.x + 0.5, ROOF_HALF.x - 0.5)
 		var z := (ROOF_HALF.y - inset) * (1.0 if randf() < 0.5 else -1.0)
@@ -157,32 +171,105 @@ func _schedule_doors() -> void:
 ## Чёрные мусорные мешки у баков: модели trash_bag / trash_bag_fat (tools/blender/courtyard.py) —
 ## осевшее дно, складки, завязанные «ушки», матовый полиэтилен (раньше — блестящие шары).
 func _build_trash_bags() -> void:
+	var front := Vector3(sin(BIN_YAW), 0, cos(BIN_YAW)) # «лицо» баков
+	var along := Vector3(cos(BIN_YAW), 0, -sin(BIN_YAW)) # вдоль ряда баков (вправо)
 	var spots: Array[Vector3] = [
-		Vector3(-9.35, 0, 6.9), Vector3(-9.6, 0, 7.5), Vector3(-11.3, 0, 7.2),
-		Vector3(-13.1, 0, 6.9), Vector3(-12.7, 0, 7.5),
+		BINS[0] + front * 0.95 - along * 0.35, BINS[0] + front * 0.85 + along * 0.5,
+		BINS[0] + along * 1.2 + front * 0.15, BINS[1] + front * 0.95 + along * 0.1,
+		BINS[1] - along * 1.15 + front * 0.25,
 	]
 	for i in spots.size():
-		var bag := _place("trash_bag_fat" if i % 2 else "trash_bag",
-			Vector3(spots[i].x, GROUND_Y, spots[i].z), i * 1.3)
+		var bag := _place("trash_bag_fat" if i % 2 else "trash_bag", spots[i], i * 1.3)
 		bag.rotation.z = (i % 3 - 1) * 0.08 # чуть завалился набок
 		bag.scale = Vector3.ONE * (0.95 + (i % 3) * 0.08)
+	# «Местный» голубь на переднем правом углу открытого бака: машет крыльями, не улетает.
+	var pigeon := YardPigeon.new()
+	pigeon.resident = true
+	add_child(pigeon)
+	pigeon.global_position = BINS[0] + Vector3(0.66, 1.1, 0.44).rotated(Vector3.UP, BIN_YAW)
+	pigeon.rotation.y = BIN_YAW + 0.4
+
+
+## Гараж OPEN_GARAGE приоткрыт: левая створка закрыта, правая открыта наружу; за ней —
+## картинка внутренности (свет лампочки, полки, шины, велосипед) и тёплый свет.
+func _build_open_garage() -> void:
+	var x := DOOR_X[OPEN_GARAGE]
+	var inside := MeshInstance3D.new()
+	var quad := QuadMesh.new()
+	quad.size = Vector2(3.24, 2.26)
+	inside.mesh = quad
+	var inside_mat := StandardMaterial3D.new()
+	inside_mat.albedo_texture = load("res://assets/textures/garage/garage_inside.png")
+	inside_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED # полумрак уже нарисован
+	inside.material_override = inside_mat
+	inside.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	inside.position = Vector3(x, -2.25, 4.505)
+	add_child(inside)
+	var leaf_mat := _mat(Color(0.5, 0.23, 0.12), 0.8)
+	for side: float in [-1.0, 1.0]:
+		var hinge := Node3D.new()
+		hinge.position = Vector3(x + side * 1.65, -2.25, 4.53)
+		hinge.rotation.y = OPEN_LEAF_ANGLE if side > 0.0 else 0.0
+		add_child(hinge)
+		var leaf := MeshInstance3D.new()
+		var mesh := BoxMesh.new()
+		mesh.size = Vector3(1.64, 2.3, 0.06)
+		leaf.mesh = mesh
+		leaf.material_override = leaf_mat
+		leaf.position = Vector3(-side * 0.82, 0, 0)
+		hinge.add_child(leaf)
+		if side > 0.0: # номер — на открытой створке
+			_decal("plate_%d" % GARAGE_NUMBERS[OPEN_GARAGE], Vector2(0.56, 0.28),
+				Vector3(-0.45, 0.83, 0.035), hinge)
+	var lamp := OmniLight3D.new()
+	lamp.light_color = Color(1.0, 0.78, 0.5)
+	lamp.light_energy = 0.8
+	lamp.omni_range = 3.0
+	lamp.position = Vector3(x, -1.4, 4.9)
+	add_child(lamp)
 
 
 # ---------------- Земля ----------------
 
 func _build_ground() -> void:
+	# Весь асфальт — один материал и одна высота: куски стыкуются встык или совпадают,
+	# ничего не лежит «слоями» (раньше заплатки разных оттенков наползали друг на друга).
 	var asphalt := _mat(Color(0.27, 0.27, 0.28), 0.95)
-	_box(Vector3(34, 0.04, 14), Vector3(0, GROUND_Y + 0.02, 11.5), asphalt)
-	_box(Vector3(34, 0.04, 4), Vector3(0, GROUND_Y + 0.02, -6.5), asphalt) # проезд сзади
-	# Разбитый асфальт: заплатки и ямы разных оттенков.
+	_box(Vector3(34, 0.04, 14), Vector3(0, GROUND_Y + 0.02, 11.5), asphalt) # перед гаражами
+	# Тротуар вдоль дома сзади: ступеньки всех трёх подъездов стоят прямо на нём.
+	_box(Vector3(45.6, 0.04, 2.0), Vector3(0, GROUND_Y + 0.02, -7.0), asphalt)
+	# Проезды по бокам от гаражей: соединяют тротуар у дома с площадкой спереди.
+	for side: float in [-1.0, 1.0]:
+		_box(Vector3(2.0, 0.04, 10.5), Vector3(side * 16.0, GROUND_Y + 0.02, -0.75), asphalt)
+		# Тротуар вдоль лицевой стороны бокового дома (дом повёрнут на 45°): подъезды на нём,
+		# конец тротуара у дома сзади сходится с ним по средней линии.
+		var house := Vector3(side * 31.0, GROUND_Y, -8.0)
+		var yaw := -side * PI / 4.0
+		var walk := _box(Vector3(28.0, 0.04, 2.0), Vector3.ZERO, asphalt)
+		walk.rotation.y = yaw
+		walk.position = house + Vector3(0, 0, 6.5).rotated(Vector3.UP, yaw) + Vector3(0, 0.02, 0)
+	# Разбитый асфальт: несколько заплаток на площадке перед гаражами, не касаются друг
+	# друга, луж и люков.
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 90
-	for i in 26:
-		var shade := rng.randf_range(0.18, 0.36)
-		var patch := _mat(Color(shade, shade, shade * 1.03), 1.0)
-		var size := Vector3(rng.randf_range(0.6, 2.4), 0.02, rng.randf_range(0.4, 1.6))
-		var pos := Vector3(rng.randf_range(-15, 15), GROUND_Y + 0.045, rng.randf_range(5.0, 17.0))
-		_box(size, pos, patch).rotation.y = rng.randf_range(0, PI)
+	var taken: Array[Vector3] = [] # x, z — центр, y — радиус
+	for spot: Vector3 in PUDDLES + MANHOLES:
+		taken.append(Vector3(spot.x, 1.4, spot.z))
+	var patch := _mat(Color(0.22, 0.22, 0.23), 1.0)
+	for i in 40:
+		if taken.size() >= PUDDLES.size() + MANHOLES.size() + 10:
+			break
+		var size := Vector3(rng.randf_range(0.7, 1.8), 0.02, rng.randf_range(0.5, 1.2))
+		var pos := Vector3(rng.randf_range(-15, 15), GROUND_Y + 0.045, rng.randf_range(5.5, 17.5))
+		var radius := Vector2(size.x, size.z).length() / 2.0
+		var free := true
+		for t in taken:
+			if Vector2(pos.x - t.x, pos.z - t.z).length() < radius + t.y + 0.3:
+				free = false
+				break
+		if free:
+			taken.append(Vector3(pos.x, radius, pos.z))
+			_box(size, pos, patch).rotation.y = rng.randf_range(0, PI)
 	# Лужи — только на асфальте: неровное пятно из 2–3 сплюснутых кругов, мокрый тёмный асфальт
 	# с бликом неба. Не «металл»: металл в игре без отражений становится чёрным (были «чёрные
 	# дыры»), и раньше одна лужа лежала на траве.
@@ -190,8 +277,7 @@ func _build_ground() -> void:
 	water.albedo_color = Color(0.15, 0.16, 0.18)
 	water.metallic = 0.0
 	water.roughness = 0.06
-	for spot: Vector3 in [Vector3(-1.2, 0, 6.2), Vector3(0.9, 0, 7.6), Vector3(-8.2, 0, 8.6),
-			Vector3(11.6, 0, 6.4), Vector3(7.8, 0, 9.0)]:
+	for spot: Vector3 in PUDDLES:
 		for k in rng.randi_range(2, 3):
 			var puddle := MeshInstance3D.new()
 			var mesh := CylinderMesh.new()
@@ -209,7 +295,7 @@ func _build_ground() -> void:
 			puddle.rotation.y = rng.randf() * TAU
 			add_child(puddle)
 	# Канализационные люки (чугунная крышка с узором, вокруг — заплатка асфальта).
-	for spot: Vector3 in [Vector3(2.6, 0, 10.2), Vector3(-6.8, 0, 13.4)]:
+	for spot: Vector3 in MANHOLES:
 		_place("manhole", spot + Vector3(0, GROUND_Y + 0.05, 0), rng.randf() * TAU)
 
 
@@ -219,18 +305,19 @@ func _build_buildings() -> void:
 	_place("khrushchevka", Vector3(0, GROUND_Y, -13.5))
 	_place("khrushchevka", Vector3(-31, GROUND_Y, -8.0), PI / 4)
 	_place("khrushchevka", Vector3(31, GROUND_Y, -8.0), -PI / 4)
-	for spot: Vector3 in [Vector3(-12.5, 0, -2.0), Vector3(13.0, 0, 1.0), Vector3(-11.0, 0, -6.5),
-			Vector3(10.5, 0, -6.8)]:
+	for spot: Vector3 in [Vector3(-12.5, 0, -2.0), Vector3(13.0, 0, 1.0), Vector3(-11.0, 0, -5.0),
+			Vector3(10.5, 0, -5.0)]:
 		var model := "tree_poplar" if int(spot.x) % 2 == 0 else "tree_birch"
 		_place(model, spot + Vector3(0, GROUND_Y, 0), randf() * TAU)
-	_place("tree_birch", Vector3(-14.5, GROUND_Y, 9.0))
+	_place("tree_birch", Vector3(-18.6, GROUND_Y, 9.0)) # на траве за краем асфальта
 	# Кусты на траве вокруг гаражей и у деревьев.
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 21
-	for spot: Vector3 in [Vector3(-10.2, 0, 0.8), Vector3(-11.6, 0, 3.4), Vector3(-13.8, 0, 0.3),
-			Vector3(-14.4, 0, -4.2), Vector3(-9.8, 0, -3.8), Vector3(-15.6, 0, 2.6),
-			Vector3(11.3, 0, -1.2), Vector3(12.1, 0, 3.6), Vector3(14.6, 0, -3.1),
-			Vector3(15.4, 0, 4.0), Vector3(11.8, 0, -4.4), Vector3(-12.0, 0, -7.4)]:
+	# (не на асфальте: проезды по бокам — x ±15..17, тротуар у дома — z −8..−6)
+	for spot: Vector3 in [Vector3(-10.2, 0, 0.8), Vector3(-11.6, 0, 3.4), Vector3(-13.6, 0, 0.3),
+			Vector3(-13.5, 0, -3.6), Vector3(-9.8, 0, -3.8), Vector3(-13.3, 0, 2.4),
+			Vector3(11.3, 0, -1.2), Vector3(12.1, 0, 3.6), Vector3(13.8, 0, -3.1),
+			Vector3(13.9, 0, 2.6), Vector3(11.8, 0, -4.4), Vector3(-12.8, 0, -5.2)]:
 		var bush := _place("bush_round" if rng.randf() < 0.5 else "bush_wide",
 			spot + Vector3(0, GROUND_Y, 0), rng.randf() * TAU)
 		bush.scale = Vector3.ONE * rng.randf_range(0.8, 1.3)
@@ -266,8 +353,8 @@ func _build_front() -> void:
 	gelik.add_child(sensor)
 
 	_solid("kopeyka", Vector3(4.1, 1.7, 1.65), Vector3(-4.4, GROUND_Y, 6.6), PI)
-	_solid("trash_bin", Vector3(1.5, 1.2, 1.0), Vector3(-10.4, GROUND_Y, 6.4))
-	_solid("trash_bin", Vector3(1.5, 1.2, 1.0), Vector3(-12.1, GROUND_Y, 6.3), 0.1)
+	_solid("trash_bin_open", Vector3(1.5, 1.2, 1.0), BINS[0], BIN_YAW)
+	_solid("trash_bin", Vector3(1.5, 1.2, 1.0), BINS[1], BIN_YAW)
 	_solid("barrel", Vector3(0.65, 0.9, 0.65), Vector3(9.4, GROUND_Y, 3.3))
 	_solid("barrel", Vector3(0.65, 0.9, 0.65), Vector3(9.9, GROUND_Y, 2.5))
 	_solid("crate", Vector3(0.6, 0.55, 0.6), Vector3(9.4, GROUND_Y, 1.4), 0.3)
@@ -283,6 +370,8 @@ func _build_front() -> void:
 ## tools/textures/garage_decals.py — чёткие, с прозрачностью; раньше были мыльные Label3D).
 func _build_garage_details() -> void:
 	for i in DOOR_X.size():
+		if i == OPEN_GARAGE:
+			continue # приоткрытый гараж — свои створки (_build_open_garage)
 		var x := DOOR_X[i]
 		var plate_pos := Vector3(x + 1.2, -1.42, DOOR_Z + 0.012)
 		_decal("plate_%d" % GARAGE_NUMBERS[i], Vector2(0.56, 0.28), plate_pos)
@@ -292,7 +381,7 @@ func _build_garage_details() -> void:
 
 
 ## Картинка-наклейка на стене (смотрит вперёд, +Z): освещается как стена, края мягкие.
-func _decal(texture_name: String, size: Vector2, pos: Vector3) -> void:
+func _decal(texture_name: String, size: Vector2, pos: Vector3, parent: Node3D = null) -> void:
 	var quad := MeshInstance3D.new()
 	var mesh := QuadMesh.new()
 	mesh.size = size
@@ -305,7 +394,7 @@ func _decal(texture_name: String, size: Vector2, pos: Vector3) -> void:
 	quad.material_override = decal_mat
 	quad.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	quad.position = pos
-	add_child(quad)
+	(parent if parent else self as Node3D).add_child(quad)
 
 
 func _set_gelik_lights(on: bool) -> void:

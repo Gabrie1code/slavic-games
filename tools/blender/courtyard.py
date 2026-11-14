@@ -464,17 +464,103 @@ for k in range(11):
     P.append(box((0.44, 0.04, 0.04), (0, 0, 0.25 + k * 0.32), WOOD))
 export("ladder", [join("Ladder", P)])
 BIN = mat("BinGreen", (0.2, 0.38, 0.25), 0.7, 0.3)
-P = [box((1.5, 1.0, 1.0), (0, 0, 0.6), BIN)]
-P.append(box((1.55, 1.05, 0.08), (0, 0.05, 1.14), mat("BinLid", (0.15, 0.3, 0.2), 0.7, 0.3),
-             rot=(math.radians(-8), 0, 0)))
-for x in (-0.55, 0.55):
-    for y in (-0.35, 0.35):
-        P.append(cyl(0.07, 0.06, (x, y, 0.07), DARK, verts=8, rot=(math.pi / 2, 0, 0)))
-P.append(box((1.0, 0.02, 0.25), (0, -0.51, 0.75), mat("BinStripe", (0.95, 0.85, 0.2), 0.6)))
-for k in range(3):                                                               # мусор сверху
-    P.append(box((0.3, 0.25, 0.2), (-0.4 + k * 0.4, 0.1, 1.2 + k * 0.03),
-                 random.choice([WHITE, mat("Bag", (0.03, 0.032, 0.035), 0.62)]), rot=(0, 0, k)))
-export("trash_bin", [join("TrashBin", P)])
+BIN_LID = mat("BinLid", (0.15, 0.3, 0.2), 0.7, 0.3)
+TRASH_MASS = mat("TrashMass", (0.16, 0.14, 0.11), 0.95)
+PAPER = mat("TrashPaper", (0.78, 0.76, 0.68), 0.9)
+CARDBOARD = mat("Cardboard", (0.5, 0.36, 0.2), 0.9)
+BOTTLE = mat("BottleGreen", (0.12, 0.35, 0.15), 0.3)
+BANANA = mat("Banana", (0.85, 0.72, 0.2), 0.7)
+
+
+def trash_bin(open_lid):
+    """Бак 1.5 × 1.0 × 1.1 м, лицом в −Y. open_lid — крышка откинута назад, внутри горка мусора."""
+    rnd = random.Random(4)
+    P = [box((1.5, 1.0, 1.0), (0, 0, 0.6), BIN)]
+    if open_lid:
+        a = math.radians(48)                                          # крышка приоткрыта (на петлях сзади)
+        hinge = Vector((0, 0.5, 1.12))
+        off = Vector((0, -0.525 * math.cos(a), 0.525 * math.sin(a)))
+        P.append(box((1.55, 1.05, 0.08), tuple(hinge + off), BIN_LID, rot=(-a, 0, 0)))
+        P.append(box((1.4, 0.9, 0.04), (0, 0, 1.08), TRASH_MASS))       # «дно» горки вровень с краем
+        mass = ico(1.0, (0, 0, 1.08), TRASH_MASS, scale=(0.72, 0.47, 0.3))
+        for v in mass.data.vertices:                                   # бугристая горка
+            v.co.z += rnd.uniform(-0.05, 0.05) if v.co.z > 0.0 else 0.0
+        P.append(mass)
+        for (x, y, r, m) in ((-0.45, 0.1, 0.22, mat("Bag", (0.03, 0.032, 0.035), 0.62)),
+                             (0.4, 0.15, 0.2, mat("BagBlue", (0.12, 0.2, 0.42), 0.6)),
+                             (0.05, -0.2, 0.17, WHITE)):              # пакеты
+            P.append(sphere(r, (x, y, 1.2), m, scale=(1, 0.9, 0.75)))
+        P.append(box((0.34, 0.26, 0.2), (0.15, 0.18, 1.3), CARDBOARD, rot=(0.3, 0.2, 0.5)))   # коробка
+        for k in range(4):                                             # газеты и бумажки
+            P.append(box((0.24, 0.18, 0.012), (rnd.uniform(-0.55, 0.55), rnd.uniform(-0.3, 0.25), 1.28),
+                         PAPER, rot=(rnd.uniform(-0.4, 0.4), rnd.uniform(-0.4, 0.4), rnd.uniform(0, 3))))
+        P.append(cyl(0.045, 0.28, (-0.2, -0.28, 1.25), BOTTLE, verts=8, rot=(1.3, 0, 0.6)))   # бутылка
+        P.append(cyl(0.04, 0.11, (0.55, -0.25, 1.2), mat("Tin", (0.6, 0.6, 0.62), 0.4, 0.3), verts=8,
+                     rot=(1.5, 0, 0)))     # консервная банка
+        P.append(rod((-0.62, -0.3, 1.2), (-0.5, -0.4, 1.26), 0.025, BANANA, verts=5))      # банановая кожура
+        P.append(rod((-0.62, -0.3, 1.2), (-0.72, -0.42, 1.14), 0.022, BANANA, verts=5))
+    else:
+        P.append(box((1.55, 1.05, 0.08), (0, 0.05, 1.14), BIN_LID, rot=(math.radians(-8), 0, 0)))
+        for k in range(3):                                             # мусор сверху
+            P.append(box((0.3, 0.25, 0.2), (-0.4 + k * 0.4, 0.1, 1.2 + k * 0.03),
+                         [WHITE, mat("Bag", (0.03, 0.032, 0.035), 0.62), WHITE][k], rot=(0, 0, k)))
+    for x in (-0.55, 0.55):
+        for y in (-0.35, 0.35):
+            P.append(cyl(0.07, 0.06, (x, y, 0.07), DARK, verts=8, rot=(math.pi / 2, 0, 0)))
+    P.append(box((1.0, 0.02, 0.25), (0, -0.51, 0.75), mat("BinStripe", (0.95, 0.85, 0.2), 0.6)))
+    for s_ in (-1, 1):                                                # ручки по бокам
+        P.append(box((0.04, 0.3, 0.05), (s_ * 0.77, 0, 0.95), DARK))
+    return P
+
+
+export("trash_bin", [join("TrashBin", trash_bin(False))])
+export("trash_bin_open", [join("TrashBinOpen", trash_bin(True))])
+
+# Шина на крыше гаражей (лежит плашмя): профиль покрышки вращением, протектор блоками по
+# кругу, боковина с ободком, в середине — дыра. R 0.6, высота 0.28, начало координат — на крыше.
+RUBBER = mat("Rubber", (0.035, 0.035, 0.038), 0.88)
+RUBBER_SIDE = mat("RubberSide", (0.06, 0.06, 0.062), 0.8)
+
+
+def roof_tire(name, seed):
+    rnd = random.Random(seed)
+    n = 36
+    prof = [(0.31, 0.03), (0.36, 0.0), (0.5, 0.0), (0.57, 0.03), (0.6, 0.08), (0.6, 0.2), (0.57, 0.25),
+            (0.5, 0.28), (0.36, 0.28), (0.31, 0.25)]                    # сечение (r, z) по кругу
+    verts, faces = [], []
+    for k in range(n):
+        a = k * math.tau / n
+        for r, z in prof:
+            verts.append((r * math.cos(a), r * math.sin(a), z))
+    m = len(prof)
+    for k in range(n):
+        k2 = (k + 1) % n
+        for j in range(m):
+            j2 = (j + 1) % m
+            faces.append((k * m + j, k2 * m + j, k2 * m + j2, k * m + j2))
+    me = bpy.data.meshes.new(name)
+    me.from_pydata(verts, [], faces)
+    me.materials.append(RUBBER_SIDE)
+    o = bpy.data.objects.new(name, me)
+    bpy.context.scene.collection.objects.link(o)
+    for poly in o.data.polygons:
+        poly.use_smooth = True
+    parts = [o]
+    for k in range(n):                                                  # протектор
+        a = (k + 0.5) * math.tau / n
+        for z, sh in ((0.09, 0.08), (0.19, -0.08)):
+            parts.append(box((0.03, 0.08, 0.075), (0.605 * math.cos(a), 0.605 * math.sin(a), z), RUBBER,
+                             rot=(0, 0, a + sh)))
+    for z in (0.002, 0.278):                                            # ободок на боковине
+        bpy.ops.mesh.primitive_torus_add(major_radius=0.45, minor_radius=0.008, major_segments=36,
+                                         minor_segments=3, location=(0, 0, z))
+        parts.append(flat(bpy.context.object, RUBBER))
+    t = join(name, parts)
+    t.rotation_euler = (rnd.uniform(-0.03, 0.03), rnd.uniform(-0.03, 0.03), rnd.uniform(0, math.tau))
+    export(name, [t])
+
+
+roof_tire("roof_tire", 1)
 # ---------------- Мусорные мешки (два вида) и канализационный люк ----------------
 # Мешок: «мешковатая» форма — плоское осевшее дно, неровные бока со складками, сверху
 # перетянутое горлышко и два завязанных «ушка». Матовый полиэтилен (не блестит, не металл).

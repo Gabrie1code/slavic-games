@@ -10,12 +10,16 @@ const SCARE_DISTANCE := 2.2
 const FLY_TIME := 2.6
 
 var flying := false
+## «Местный» голубь: сидит на месте, не пугается и не улетает, только время от времени машет
+## крыльями (на краю открытого мусорного бака).
+var resident := false
 
 var _body: Node3D
 var _wing_l: Node3D
 var _wing_r: Node3D
 var _time := 0.0
 var _peck := 0.0
+var _flap := 0.0
 
 
 func _ready() -> void:
@@ -35,6 +39,8 @@ func _process(delta: float) -> void:
 		_wing_l.rotation.z = -flap
 		_wing_r.rotation.z = flap
 		return
+	if resident:
+		_resident_flap(delta)
 	# Сидит: иногда клюёт (наклон вперёд) и крутит головой.
 	_peck = maxf(0.0, _peck - delta)
 	if _peck == 0.0 and randf() < delta * 0.4:
@@ -45,7 +51,7 @@ func _process(delta: float) -> void:
 
 ## Улететь от точки from (наружу и вверх), затем исчезнуть.
 func fly_away(from: Vector3) -> void:
-	if flying:
+	if flying or resident:
 		return
 	flying = true
 	var away := global_position - from
@@ -77,3 +83,14 @@ func land_at(spot: Vector3, far: Vector3 = Vector3.FORWARD) -> void:
 		_wing_l.rotation.z = 0.0
 		_wing_r.rotation.z = 0.0
 		rotation = Vector3(0, randf() * TAU, 0))
+
+
+## Местный голубь: раз в несколько секунд хлопает крыльями ~1 с (раскрыл, помахал, сложил).
+func _resident_flap(delta: float) -> void:
+	_flap = maxf(0.0, _flap - delta)
+	if _flap == 0.0 and randf() < delta * 0.35:
+		_flap = 1.1
+	var open := sin(_flap / 1.1 * PI) if _flap > 0.0 else 0.0
+	var wave := (0.8 + sin(_time * 24.0) * 0.45) * open
+	_wing_l.rotation.z = -wave
+	_wing_r.rotation.z = wave
