@@ -354,15 +354,12 @@ export("swing_seat", [join("SwingSeat", P)])
 # ---------------- Карусель: основание (неподвижное) и крутящаяся часть ----------------
 P = [cyl(0.2, 0.15, (0, 0, 0.075), CONCRETE, verts=10)]
 export("carousel_base", [join("CarouselBase", P)])
-# Крутящаяся часть (форма прежняя, по просьбе владельца): два цвета — диск серый, всё
-# металлическое (швы, обод, ступица, стойка, колпак, поручни, ручки) пастельно-зелёное.
-PASTEL_BLUE = mat("CarouselPastelGreen", (0.24, 0.42, 0.28), 0.6)       # пастельно-зелёный
-PASTEL_CREAM = mat("CarouselPastelGrey", (0.42, 0.43, 0.42), 0.75)      # серый
-DECK = PASTEL_BLUE                                                         # швы между дольками
-DECK_A = PASTEL_CREAM
-DECK_B = PASTEL_CREAM
-RIM = PASTEL_BLUE
-GRIP = PASTEL_BLUE
+# Крутящаяся часть (цветной вариант — владелец вернул его: сдержанные варианты «скучные»): крашеный диск (не металл — металл в игре серый/тёмный) из цветных
+# секторов-«долек» с белыми швами, стальной обод, центральная стойка с колпаком, поручни —
+# трубки, сходящиеся к центру, с резиновыми ручками.
+DECK = mat("CarouselDeckPaint", (0.82, 0.8, 0.74), 0.7)
+RIM = mat("CarouselRim", (0.35, 0.36, 0.38), 0.5)
+GRIP = mat("CarouselGrip", (0.12, 0.12, 0.13), 0.8)
 P = [cyl(1.3, 0.08, (0, 0, 0.3), DECK, verts=36)]
 n = 12
 for i in range(n):                                                            # «дольки»
@@ -375,22 +372,22 @@ for i in range(n):                                                            # 
     me.from_pydata(pts, [], [tuple(range(len(pts)))])
     o = bpy.data.objects.new("Slice", me)
     bpy.context.scene.collection.objects.link(o)
-    P.append(flat(o, [DECK_A, DECK_B][i % 2]))
+    P.append(flat(o, [RED, YELLOW, BLUE, GREEN][i % 4]))
 bpy.ops.mesh.primitive_torus_add(major_radius=1.28, minor_radius=0.045, major_segments=36, minor_segments=6,
                                  location=(0, 0, 0.32))
 P.append(flat(bpy.context.object, RIM))                                       # обод
 P.append(cyl(0.14, 0.05, (0, 0, 0.36), RIM, verts=16))                        # ступица
-P.append(cyl(0.05, 0.85, (0, 0, 0.78), PASTEL_BLUE, verts=12))                # стойка
-P.append(cyl(0.1, 0.08, (0, 0, 1.2), PASTEL_BLUE, verts=16, r2=0.04))         # колпак
+P.append(cyl(0.05, 0.85, (0, 0, 0.78), YELLOW, verts=12))                     # стойка
+P.append(cyl(0.1, 0.08, (0, 0, 1.2), RED, verts=16, r2=0.04))                 # колпак
 for i in range(4):                                                            # поручни
     a = i * math.pi / 2 + math.pi / 4
     x, y = math.cos(a), math.sin(a)
-    P.append(rod((x * 1.1, y * 1.1, 0.34), (x * 1.1, y * 1.1, 0.95), 0.03, PASTEL_BLUE))
-    P.append(rod((x * 1.1, y * 1.1, 0.95), (x * 0.08, y * 0.08, 1.12), 0.028, PASTEL_BLUE))
+    P.append(rod((x * 1.1, y * 1.1, 0.34), (x * 1.1, y * 1.1, 0.95), 0.03, BLUE))
+    P.append(rod((x * 1.1, y * 1.1, 0.95), (x * 0.08, y * 0.08, 1.12), 0.028, BLUE))
     P.append(rod((x * 0.75, y * 0.75, 0.99), (x * 0.45, y * 0.45, 1.04), 0.04, GRIP))   # ручка
 bpy.ops.mesh.primitive_torus_add(major_radius=1.1, minor_radius=0.03, major_segments=36, minor_segments=6,
                                  location=(0, 0, 0.95))
-P.append(flat(bpy.context.object, PASTEL_BLUE))
+P.append(flat(bpy.context.object, BLUE))
 export("carousel_top", [join("CarouselTop", P)])
 
 # ---------------- Забор: секция 2 м (вдоль X), низкий металлический ----------------
