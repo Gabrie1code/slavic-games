@@ -354,41 +354,39 @@ export("swing_seat", [join("SwingSeat", P)])
 # ---------------- Карусель: основание (неподвижное) и крутящаяся часть ----------------
 P = [cyl(0.2, 0.15, (0, 0, 0.075), CONCRETE, verts=10)]
 export("carousel_base", [join("CarouselBase", P)])
-# Крутящаяся часть: крашеный диск (не металл) из «долек» двух сдержанных цветов с тёмными швами, стальной обод, центральная стойка с колпаком, поручни —
-# трубки, сходящиеся к центру, с резиновыми ручками.
-DECK = mat("CarouselDeckPaint", (0.3, 0.32, 0.33), 0.7)               # тёмные швы между дольками
-DECK_A = mat("CarouselDeckA", (0.42, 0.55, 0.62), 0.75)                   # выцветший синий
-DECK_B = mat("CarouselDeckB", (0.72, 0.68, 0.56), 0.75)                   # выцветший бежевый
-RIM = mat("CarouselRim", (0.35, 0.36, 0.38), 0.5)
-GRIP = mat("CarouselGrip", (0.12, 0.12, 0.13), 0.8)
-P = [cyl(1.3, 0.08, (0, 0, 0.3), DECK, verts=36)]
-n = 12
-for i in range(n):                                                            # «дольки»
-    a0, a1 = i * math.tau / n + 0.03, (i + 1) * math.tau / n - 0.03
-    pts = [(0.0, 0.0, 0.343)]
-    for k in range(5):
-        a = a0 + (a1 - a0) * k / 4
-        pts.append((math.cos(a) * 1.18, math.sin(a) * 1.18, 0.343))
-    me = bpy.data.meshes.new("Slice")
-    me.from_pydata(pts, [], [tuple(range(len(pts)))])
-    o = bpy.data.objects.new("Slice", me)
-    bpy.context.scene.collection.objects.link(o)
-    P.append(flat(o, [DECK_A, DECK_B][i % 2]))
-bpy.ops.mesh.primitive_torus_add(major_radius=1.28, minor_radius=0.045, major_segments=36, minor_segments=6,
-                                 location=(0, 0, 0.32))
-P.append(flat(bpy.context.object, RIM))                                       # обод
-P.append(cyl(0.14, 0.05, (0, 0, 0.36), RIM, verts=16))                        # ступица
-P.append(cyl(0.05, 0.85, (0, 0, 0.78), YELLOW, verts=12))                     # стойка
-P.append(cyl(0.1, 0.08, (0, 0, 1.2), RED, verts=16, r2=0.04))                 # колпак
-for i in range(4):                                                            # поручни
+# Крутящаяся часть, как во дворах (по фото владельца): тёмно-бордовый диск с красным ободом,
+# красная стойка со ступицей, 4 сиденья (тёмно-бордовые, как диск) в красных трубчатых рамах:
+# спинка-дуга, подлокотники, распорки к верху стойки. Сиденья только для вида (сидеть нельзя).
+# Два цвета: красный (трубы) и тёмно-бордовый (диск и сиденья).
+FRAME_RED = mat("CarouselRed", (0.72, 0.06, 0.05), 0.45)
+DECK_DARK = mat("CarouselMaroon", (0.2, 0.06, 0.06), 0.8)
+P = [cyl(1.3, 0.08, (0, 0, 0.3), DECK_DARK, verts=40)]
+bpy.ops.mesh.primitive_torus_add(major_radius=1.3, minor_radius=0.045, major_segments=40, minor_segments=6,
+                                 location=(0, 0, 0.3))
+P.append(flat(bpy.context.object, FRAME_RED))                                 # обод
+P.append(cyl(0.22, 0.03, (0, 0, 0.355), DECK_DARK, verts=20))                 # ступица
+P.append(cyl(0.055, 1.0, (0, 0, 0.84), FRAME_RED, verts=14))                  # стойка
+P.append(cyl(0.08, 0.06, (0, 0, 1.33), FRAME_RED, verts=14))                  # колпачок
+SEAT_R, SEAT_Z, TUBE = 0.78, 0.62, 0.022
+for i in range(4):
     a = i * math.pi / 2 + math.pi / 4
-    x, y = math.cos(a), math.sin(a)
-    P.append(rod((x * 1.1, y * 1.1, 0.34), (x * 1.1, y * 1.1, 0.95), 0.03, BLUE))
-    P.append(rod((x * 1.1, y * 1.1, 0.95), (x * 0.08, y * 0.08, 1.12), 0.028, BLUE))
-    P.append(rod((x * 0.75, y * 0.75, 0.99), (x * 0.45, y * 0.45, 1.04), 0.04, GRIP))   # ручка
-bpy.ops.mesh.primitive_torus_add(major_radius=1.1, minor_radius=0.03, major_segments=36, minor_segments=6,
-                                 location=(0, 0, 0.95))
-P.append(flat(bpy.context.object, BLUE))
+    c, sn = math.cos(a), math.sin(a)                                          # наружу
+    tx, ty = -sn, c                                                           # вдоль сиденья
+
+    def w(radial, side, z):
+        return (c * radial + tx * side, sn * radial + ty * side, z)
+
+    P.append(box((0.42, 0.44, 0.04), w(SEAT_R, 0, SEAT_Z), DECK_DARK, rot=(0, 0, a)))   # сиденье
+    for side in (-0.24, 0.24):
+        # Подлокотник: стойка от диска у внешнего края, вверх, вперёд к центру, вниз к сиденью.
+        pts = [w(1.05, side, 0.34), w(1.05, side, 0.92), w(0.55, side, 0.92), w(0.55, side, SEAT_Z)]
+        for p0, p1 in zip(pts, pts[1:]):
+            P.append(rod(p0, p1, TUBE, FRAME_RED))
+        P.append(rod(w(0.55, side, SEAT_Z - 0.02), w(0.55, side, 0.34), TUBE, FRAME_RED))
+    P.append(rod(w(1.05, -0.24, 0.92), w(1.05, 0.24, 0.92), TUBE, FRAME_RED))   # спинка сверху
+    P.append(rod(w(1.05, -0.24, 0.66), w(1.05, 0.24, 0.66), TUBE, FRAME_RED))
+    P.append(rod(w(0.55, 0, 0.92), (c * 0.05, sn * 0.05, 1.25), TUBE, FRAME_RED))   # распорка к стойке
+    P.append(rod(w(0.55, -0.24, 0.92), w(0.55, 0.24, 0.92), TUBE, FRAME_RED))
 export("carousel_top", [join("CarouselTop", P)])
 
 # ---------------- Забор: секция 2 м (вдоль X), низкий металлический ----------------

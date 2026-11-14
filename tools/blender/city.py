@@ -593,6 +593,7 @@ B.box((ox - gw / 2 + L / 2, gd, gh), ((-L / 2 + ox - gw / 2) / 2, gd / 2, gh / 2
 B.box((L / 2 - ox - gw / 2, gd, gh), ((ox + gw / 2 + L / 2) / 2, gd / 2, gh / 2), GARAGE_WALL)
 B.box((L + 0.4, gd + 0.4, 0.15), (0, gd / 2, gh + 0.07), ROOF)
 WARM = mat("CGarageInside", (0.62, 0.48, 0.3), 0.9)
+GARAGE_NUM = mat("CGarageNum", (1, 1, 1), 0.5, image="assets/textures/city/garage_numbers.png")
 WARM_D = mat("CGarageInsideDark", (0.4, 0.3, 0.2), 0.9)
 B.box((gw - 0.1, 0.1, gh), (ox, gd - 0.05, gh / 2), WARM)                      # задняя стена
 B.box((gw - 0.1, gd, 0.08), (ox, gd / 2, gh - 0.04), WARM_D)                   # потолок
@@ -631,7 +632,10 @@ for k in range(n):
         for s in (-1, 1):
             B.box((1.28, 0.08, 2.1), (x + s * 0.66, -0.04, 1.05), g)
         B.box((0.08, 0.1, 0.25), (x + 0.1, -0.1, 1.0), METAL)                     # замок
-    B.box((0.5, 0.05, 0.3), (x + 1.1, -0.06, 2.3), WHITE)                         # номер
+    B.box((0.5, 0.05, 0.3), (x + 1.1, -0.115, 2.3), WHITE)                        # табличка (перед стеной)
+    u0 = k / n                                                                  # номер (у 4-го — 57)
+    B.quad([(x + 0.85, -0.142, 2.15), (x + 1.35, -0.142, 2.15), (x + 1.35, -0.142, 2.45),
+            (x + 0.85, -0.142, 2.45)], (u0, 0.0, u0 + 1.0 / n, 1.0), GARAGE_NUM)
 export("garage_row", B)
 
 # ---------------- 6. Трансформаторная будка ----------------
