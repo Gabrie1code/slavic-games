@@ -12,7 +12,7 @@ const RING := Vector2(19.0, 13.0)
 const RING_W := 1.6
 ## Размер домов (ширина, глубина) — тротуар у их лицевой стороны.
 const SIZES := {
-	"khrushchevka": Vector2(28, 11), "khrushchevka_yard": Vector2(28, 11),
+	"khrushchevka": Vector2(28, 11),
 	"brick_khrushchevka": Vector2(26, 10),
 	"panel_ninestory": Vector2(30, 12), "stalinka": Vector2(28, 13), "tower_block": Vector2(16, 16),
 }

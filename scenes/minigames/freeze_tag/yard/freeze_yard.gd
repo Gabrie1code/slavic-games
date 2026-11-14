@@ -21,8 +21,8 @@ const SANDBOX := Vector3(-5.0, 0, -2.5) * S
 ## Только декорации (без столкновений, за забором).
 const SURROUNDINGS: Array = [
 	# Близкий круг: лицом к площадке.
-	["khrushchevka_yard", Vector3(0, 0, -26.25), 0.0],
-	["khrushchevka_yard", Vector3(-36, 0, -4.5), PI / 2],
+	["khrushchevka", Vector3(0, 0, -26.25), 0.0],
+	["khrushchevka", Vector3(-36, 0, -4.5), PI / 2],
 	["brick_khrushchevka", Vector3(35, 0, -4.5), -PI / 2],
 	["panel_ninestory", Vector3(-6, 0, 31), PI],
 	["garage_row", Vector3(22, 0, 20), PI],
@@ -39,7 +39,7 @@ const SURROUNDINGS: Array = [
 	["panel_ninestory", Vector3(-85, 0, 35), PI / 2],
 	["panel_ninestory", Vector3(95, 0, 5), -PI / 2],
 	["stalinka", Vector3(60, 0, -75), -0.4],
-	["khrushchevka_yard", Vector3(-55, 0, -80), 0.3],
+	["khrushchevka", Vector3(-55, 0, -80), 0.3],
 	# Труба ТЭЦ и краны — в просветах между ближними домами (иначе их закрывают дома).
 	["tec_chimney", Vector3(-111, 0, 100), 0.6],
 	["tower_crane", Vector3(105, 0, 34), 2.4],

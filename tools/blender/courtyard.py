@@ -21,7 +21,10 @@ _mats = {}
 KEEP = []
 
 
-def mat(name, color, rough=0.6, metal=0.0, emit=0.0):
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+
+def mat(name, color, rough=0.6, metal=0.0, emit=0.0, image=None):
     if name in _mats:
         return _mats[name]
     m = bpy.data.materials.new(name)
@@ -30,6 +33,10 @@ def mat(name, color, rough=0.6, metal=0.0, emit=0.0):
     b.inputs["Base Color"].default_value = (*color, 1)
     b.inputs["Roughness"].default_value = rough
     b.inputs["Metallic"].default_value = metal
+    if image:
+        tex = m.node_tree.nodes.new("ShaderNodeTexImage")
+        tex.image = bpy.data.images.load(os.path.join(ROOT, image))
+        m.node_tree.links.new(tex.outputs["Color"], b.inputs["Base Color"])
     if emit:
         b.inputs["Emission Color"].default_value = (*color, 1)
         b.inputs["Emission Strength"].default_value = emit
@@ -132,7 +139,7 @@ for f in range(1, FLOORS + 1):                                                  
 LAUNDRY = [mat("L%d" % i, c, 0.9) for i, c in enumerate(
     [(0.9, 0.2, 0.2), (0.95, 0.95, 0.9), (0.25, 0.45, 0.85), (0.95, 0.8, 0.2), (0.4, 0.75, 0.4)])]
 cols = 12
-dishes_old, dish_spots = [], []
+dish_spots = []
 for f in range(FLOORS):
     z = 0.6 + f * FLOOR + 1.45
     for c in range(cols):
@@ -157,8 +164,6 @@ for f in range(FLOORS):
                     P.append(box((0.3, 0.02, random.uniform(0.3, 0.6)),
                                  (x - 0.4 + k * 0.45, y - 0.45, z + 0.35), random.choice(LAUNDRY)))
             if random.random() < 0.3:                                              # тарелка
-                dishes_old.append(cyl(0.32, 0.12, (x + 1.1, y - 0.6, z + 0.1), METAL, verts=12, r2=0.05,
-                                      rot=(math.radians(-70), 0, math.radians(20))))
                 dish_spots.append((x + 1.1, y - 0.6, z + 0.1))
 for c in (2, 6, 10):                                                               # подъезды
     x = -W / 2 + 1.2 + c * (W - 2.4) / (cols - 1)
@@ -170,24 +175,68 @@ for x in (-9, -2, 5, 11):                                                       
     for k in range(3):
         P.append(rod((x - 0.6 + k * 0.1, 0, H + 1.8 + k * 0.3), (x + 0.6 - k * 0.1, 0, H + 1.8 + k * 0.3),
                      0.02, METAL, verts=4))
-# Вариант для дворов мини-игр (khrushchevka_yard): тарелки светлые, НЕ металл (металл в игре
-# чёрный — были «чёрные круги»), чашей наружу и вверх, на кронштейне; их вдвое меньше.
-# Сама khrushchevka (видна из окон квартиры) не меняется.
-DISH_LIGHT = mat("DishLight", (0.84, 0.85, 0.86), 0.5, 0.1)
-P_yard = []
-for o in P:
-    c = o.copy()
-    c.data = o.data.copy()
-    bpy.context.scene.collection.objects.link(c)
-    P_yard.append(c)
+# Спутниковые тарелки «ДВУКОЛОР» (как на новых домах, city.py): овальная вогнутая чаша с
+# логотипом (tools/textures/dish_logo.py), светлая изнанка, штанга с конвертером, кронштейн к
+# перилам. Не металл (металл в игре чёрный — были «чёрные круги»). Тарелок вдвое меньше.
+DISH_FACE = mat("DishFace", (1, 1, 1), 0.45, image="assets/textures/city/dish_logo.png")
+DISH_BACK = mat("DishBack", (0.8, 0.81, 0.82), 0.5)
+
+
+def dish(cx, cy, cz, ax=0.34, az=0.38, depth=0.07, tilt=0.25):
+    """Тарелка лицом в −Y (на улицу), чуть вверх; центр чаши в (cx, cy, cz)."""
+    n, rings = 20, 4
+    ct, st = math.cos(tilt), math.sin(tilt)
+
+    def pt(u, v, back=False):
+        x, z = u * ax, v * az
+        y = depth * (1 - (u * u + v * v)) + (0.012 if back else 0.0)    # вогнутая к стене
+        return (cx + x, cy + y * ct + z * st, cz + z * ct - y * st)
+
+    verts, faces, uvs = [], [], []
+    for side in (False, True):
+        base = len(verts)
+        verts.append(pt(0, 0, side))
+        uvs.append((0.5, 0.5))
+        for r in range(1, rings + 1):
+            for k in range(n):
+                a = k * math.tau / n
+                u, v = math.cos(a) * r / rings, math.sin(a) * r / rings
+                verts.append(pt(u, v, side))
+                uvs.append((0.5 + u * 0.5, 0.5 + v * 0.5))
+        for r in range(rings):
+            for k in range(n):
+                k2 = (k + 1) % n
+                if r == 0:
+                    f = (base, base + 1 + k2, base + 1 + k)
+                else:
+                    o0, o1 = base + 1 + (r - 1) * n, base + 1 + r * n
+                    f = (o0 + k, o0 + k2, o1 + k2, o1 + k)
+                faces.append(f[::-1] if side else f)
+    me = bpy.data.meshes.new("Dish")
+    me.from_pydata(verts, [], faces)
+    me.materials.append(DISH_FACE)
+    me.materials.append(DISH_BACK)
+    half = len(faces) // 2
+    uv = me.uv_layers.new(name="UVMap")
+    for i, poly in enumerate(me.polygons):
+        poly.material_index = 0 if i < half else 1
+        for li in poly.loop_indices:
+            uv.data[li].uv = uvs[me.loops[li].vertex_index]
+    o = bpy.data.objects.new("Dish", me)
+    bpy.context.scene.collection.objects.link(o)
+    focus = (cx + 0.12, cy - 0.42, cz - 0.02)
+    return [o, rod((cx, cy + 0.03, cz - az * 0.95), (cx + 0.08, cy - 0.3, cz - az * 0.9), 0.012, DISH_BACK,
+                   verts=4),
+            rod((cx + 0.08, cy - 0.3, cz - az * 0.9), focus, 0.012, DISH_BACK, verts=4),
+            box((0.07, 0.09, 0.07), focus, WHITE)]
+
+
 for i, (dx, dy, dz) in enumerate(dish_spots):
     if i % 2:
         continue
-    P_yard.append(cyl(0.3, 0.08, (dx, dy - 0.1, dz + 0.1), DISH_LIGHT, verts=16, r2=0.1,
-                      rot=(math.radians(-110), 0, math.radians(15))))
-    P_yard.append(box((0.04, 0.4, 0.04), (dx, dy + 0.15, dz - 0.05), METAL))
-export("khrushchevka_yard", [join("KhrushchevkaYard", P_yard)])
-P += dishes_old
+    # Снаружи перил балкона, над ними; кронштейн — к перилам.
+    P += dish(dx - 0.1, dy - 0.25, dz + 0.15)
+    P.append(rod((dx - 0.1, dy - 0.2, dz - 0.15), (dx - 0.1, dy + 0.05, dz - 0.4), 0.02, METAL, verts=4))
 export("khrushchevka", [join("Khrushchevka", P)])
 
 # ---------------- Деревья: тополь и берёза ----------------
