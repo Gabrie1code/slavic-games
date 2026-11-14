@@ -841,7 +841,10 @@ func _update_fog() -> void:
 		return
 	var elapsed := ROUND_TIME - _time_left if _running else 0.0
 	var level := maxf(0.0, FOG_START - FOG_STEP * floorf(elapsed / FOG_STEP_TIME))
-	_fog_env.fog_density = level
+	# level — затемнение «на глаз». Туман считается в линейной яркости, а экран показывает её
+	# с гаммой 2.2: при плотности 0.8 оставалось ~50% видимой яркости. Поэтому пересчёт:
+	# видимая яркость (1 − level) = линейная ^ (1 / 2.2).
+	_fog_env.fog_density = 1.0 - pow(1.0 - level, 2.2)
 	_fog_env.background_color = _sky_color.lerp(Color.BLACK, level)
 
 
