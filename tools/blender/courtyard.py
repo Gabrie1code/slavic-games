@@ -624,28 +624,48 @@ def bin_lid(x0, open_angle):
 def trash_bin(open_lid):
     P = bin_body()
     if open_lid:
-        P.append(bin_lid(-0.76, 0.0))
-        P.append(bin_lid(0.0, math.radians(108)))                          # правая половинка открыта
-        # Мусор под открытой половиной: «дно» с картинкой мусора + горка вещей поверх.
-        me = bpy.data.meshes.new("Fill")
-        me.from_pydata([(0.0, -0.52, 1.112), (0.73, -0.52, 1.112), (0.73, 0.43, 1.112), (0.0, 0.43, 1.112)],
-                       [], [(0, 1, 2, 3)])
-        me.materials.append(TRASH_FILL)
-        uv = me.uv_layers.new(name="UVMap")
-        for li, c in zip(me.polygons[0].loop_indices, ((0, 0), (1, 0), (1, 1), (0, 1))):
-            uv.data[li].uv = c
-        fill = bpy.data.objects.new("Fill", me)
-        bpy.context.scene.collection.objects.link(fill)
-        P.append(fill)
-        P.append(bag_parts(31, 0.17, 0.15, 0.3, at=(0.22, 0.12, 1.05), tilt=(0.3, -0.2, 0.5)))
-        P.append(bag_parts(32, 0.15, 0.14, 0.26, at=(0.5, -0.2, 1.03), tilt=(-0.4, 0.3, 1.2)))
-        P[-1].data.materials[0] = mat("BagBlue", (0.12, 0.2, 0.42), 0.6)
-        P.append(box((0.3, 0.22, 0.14), (0.45, 0.2, 1.17), CARDBOARD, rot=(0.25, 0.15, 0.4)))  # коробка
-        for (x, y, r) in ((0.15, -0.3, 0.3), (0.62, 0.05, 1.9)):                               # газеты
-            P.append(box((0.22, 0.17, 0.012), (x, y, 1.125), PAPER, rot=(0.2, -0.25, r)))
-        P.append(cyl(0.04, 0.26, (0.3, -0.12, 1.15), BOTTLE, verts=8, rot=(1.3, 0, 0.6)))  # бутылка
-        P.append(rod((0.6, -0.38, 1.13), (0.68, -0.3, 1.17), 0.022, BANANA, verts=5))     # кожура
-        P.append(rod((0.6, -0.38, 1.13), (0.52, -0.3, 1.16), 0.02, BANANA, verts=5))
+        P.append(bin_lid(-0.76, math.radians(62)))                         # обе половинки приоткрыты
+        P.append(bin_lid(0.0, math.radians(62)))
+        # Горка мусора с картинкой мусора (tools/textures/trash_fill.py) — бугристая, выше борта;
+        # поверх — вещи, каждая положена прямо на поверхность горки.
+        rnd = random.Random(5)
+        bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=3, radius=1.0, location=(0, -0.04, 1.08))
+        heap = bpy.context.object
+        for v in heap.data.vertices:
+            x, y, z = v.co
+            bump = 1.0 + rnd.uniform(-0.12, 0.12)
+            v.co = (x * 0.73, y * 0.49, max(z, -0.2) * 0.3 * bump)
+        while heap.data.uv_layers:                                          # своя развёртка — сверху
+            heap.data.uv_layers.remove(heap.data.uv_layers[0])
+        uv = heap.data.uv_layers.new(name="UVMap")
+        for poly in heap.data.polygons:
+            for li in poly.loop_indices:
+                co = heap.data.vertices[heap.data.loops[li].vertex_index].co
+                uv.data[li].uv = ((co.x + 0.75) / 1.5 * 1.6, (co.y + 0.5) * 1.1)
+        P.append(flat(heap, TRASH_FILL))
+
+        def on_heap(x, y):
+            hit, loc, _, _ = heap.ray_cast(Vector((x, y + 0.04, 2.0)) - heap.location, Vector((0, 0, -1)))
+            return (heap.location + loc).z if hit else 1.12
+
+        for (seed, x, y, sc, tilt, m) in ((31, -0.4, 0.1, 1.0, (0.3, -0.2, 0.5), None),
+                                          (32, 0.35, 0.12, 0.9, (-0.4, 0.3, 1.2), "BagBlue"),
+                                          (34, 0.05, -0.15, 0.8, (0.2, 0.4, 2.0), "BagWhite")):
+            bag = bag_parts(seed, 0.17 * sc, 0.15 * sc, 0.3 * sc, at=(x, y, on_heap(x, y) - 0.06), tilt=tilt)
+            if m == "BagBlue":
+                bag.data.materials[0] = mat("BagBlue", (0.12, 0.2, 0.42), 0.6)
+            elif m == "BagWhite":
+                bag.data.materials[0] = mat("BagWhite", (0.8, 0.8, 0.78), 0.6)
+            P.append(bag)
+        P.append(box((0.3, 0.22, 0.14), (0.5, -0.2, on_heap(0.5, -0.2) + 0.03), CARDBOARD,
+                     rot=(0.25, 0.15, 0.4)))                                                  # коробка
+        for (x, y, r) in ((-0.15, -0.3, 0.3), (0.62, 0.15, 1.9), (-0.6, -0.2, 0.9)):            # газеты
+            P.append(box((0.22, 0.17, 0.012), (x, y, on_heap(x, y) + 0.005), PAPER, rot=(0.2, -0.25, r)))
+        P.append(cyl(0.04, 0.26, (0.2, -0.3, on_heap(0.2, -0.3) + 0.03), BOTTLE, verts=8,
+                     rot=(1.3, 0, 0.6)))                                                     # бутылка
+        z = on_heap(-0.35, -0.35)
+        P.append(rod((-0.35, -0.38, z), (-0.27, -0.3, z + 0.04), 0.022, BANANA, verts=5))   # кожура
+        P.append(rod((-0.35, -0.38, z), (-0.43, -0.3, z + 0.03), 0.02, BANANA, verts=5))
     else:
         P.append(bin_lid(-0.76, 0.0))
         P.append(bin_lid(0.0, 0.0))

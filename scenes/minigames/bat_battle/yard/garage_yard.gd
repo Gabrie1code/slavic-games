@@ -305,8 +305,9 @@ func _build_buildings() -> void:
 	_place("khrushchevka", Vector3(0, GROUND_Y, -13.5))
 	_place("khrushchevka", Vector3(-31, GROUND_Y, -8.0), PI / 4)
 	_place("khrushchevka", Vector3(31, GROUND_Y, -8.0), -PI / 4)
-	for spot: Vector3 in [Vector3(-12.5, 0, -2.0), Vector3(13.0, 0, 1.0), Vector3(-11.0, 0, -5.0),
-			Vector3(10.5, 0, -5.0)]:
+	# Деревья за гаражами — между подъездами, а не у дверей (подъезды: x −8.1, 1.2, 10.5).
+	for spot: Vector3 in [Vector3(-12.5, 0, -2.0), Vector3(13.0, 0, 1.0), Vector3(-3.6, 0, -5.6),
+			Vector3(5.8, 0, -5.6)]:
 		var model := "tree_poplar" if int(spot.x) % 2 == 0 else "tree_birch"
 		_place(model, spot + Vector3(0, GROUND_Y, 0), randf() * TAU)
 	_place("tree_birch", Vector3(-18.6, GROUND_Y, 9.0)) # на траве за краем асфальта
