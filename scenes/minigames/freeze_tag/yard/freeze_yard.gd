@@ -170,8 +170,8 @@ func _build_far_trees() -> void:
 		tree.scale = Vector3.ONE * rng.randf_range(2.6, 4.0)
 		placed += 1
 	# Роща в просвете на востоке (между кирпичной хрущёвкой и сталинкой виден горизонт).
-	for spot: Vector3 in [Vector3(58, 0, 22), Vector3(64, 0, 28), Vector3(70, 0, 21), Vector3(62, 0, 16),
-			Vector3(76, 0, 30), Vector3(68, 0, 35)]:
+	for spot: Vector3 in [Vector3(58, 0, 22), Vector3(64, 0, 28), Vector3(70, 0, 21),
+			Vector3(62, 0, 16), Vector3(76, 0, 30), Vector3(68, 0, 35)]:
 		var grove := _place(COURTYARD + "tree_poplar", spot, rng.randf() * TAU)
 		grove.scale = Vector3.ONE * rng.randf_range(2.8, 3.8)
 
