@@ -35,12 +35,12 @@ func start(world_env: WorldEnvironment, sun: DirectionalLight3D, yard: FreezeYar
 		_env.sky = _env.sky.duplicate(true) as Sky
 		_sky = _env.sky.sky_material as ProceduralSkyMaterial
 		_sky.sun_angle_max = 0.0 # солнца за тучами не видно
-	_set_flash(0.0)
 	_env.ambient_light_energy *= 0.65
 	_sun = sun
 	_sun.light_energy *= 0.4
 	_sun.light_color = Color(0.78, 0.82, 0.92)
 	_sun_energy = _sun.light_energy
+	_set_flash(0.0) # серое небо — только после того, как запомнили солнце (оно тоже в _set_flash)
 	yard.tint_clouds(CLOUD_RAIN)
 	yard.smoke.tint = Color(0.55, 0.56, 0.6)
 	_build_drops()
