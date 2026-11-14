@@ -68,6 +68,9 @@ func close() -> void:
 func _exit_tree() -> void:
 	if toilet.in_use:
 		toilet.stop_use() # игрок вышел из игры прямо в туалете
+	# Окно закрыли не кнопкой (любым другим путём) — рука всё равно опускается.
+	if is_instance_valid(lobby_character) and lobby_character.is_inside_tree():
+		lobby_character.set_arm_angle(PlayerCharacter.ARM_DOWN, 0.2)
 
 
 ## Откуда льётся: между бёдер, чуть впереди.

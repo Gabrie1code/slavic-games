@@ -468,6 +468,8 @@ func _open_rubgame(p: PlayerData) -> void:
 
 ## Окно игрока поверх лобби (стол, туалет): персонаж замирает, лобби делит экран.
 func _open_room(p: PlayerData, room: LobbyRoom) -> void:
+	if _rooms.has(p.id): # уже открыто окно (двойное нажатие) — старое закрыть, а не бросить
+		_on_room_closed(p)
 	var character: PlayerCharacter = _characters[p.id]
 	character.input_enabled = false
 	character.velocity = Vector3.ZERO
@@ -498,6 +500,9 @@ func _on_room_closed(p: PlayerData) -> void:
 	if _characters.has(p.id):
 		# Чуть позже: тем же Пробелом, которым отошли от стола, персонаж не должен подпрыгнуть.
 		var character: PlayerCharacter = _characters[p.id]
+		# Окно закрылось (туалет, стол) — поза руки из него больше не нужна, если в руке пусто.
+		if not _gadgets.hand_busy(p) and _apartment.phone.user != p:
+			character.set_arm_angle(PlayerCharacter.ARM_DOWN, 0.2)
 		get_tree().create_timer(0.15).timeout.connect(func() -> void:
 			if is_instance_valid(character) and not _rooms.has(p.id):
 				character.input_enabled = true)
