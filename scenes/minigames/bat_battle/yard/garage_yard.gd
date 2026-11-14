@@ -118,7 +118,7 @@ func _on_pigeon_flown(pigeon: YardPigeon) -> void:
 func _edge_spot() -> Vector3:
 	var inset := 0.18
 	if randf() < 0.2: # на закрытый бак (открытый занят «местным» голубем)
-		var offset := Vector3(randf_range(-0.55, 0.55), 1.22, randf_range(-0.3, 0.3))
+		var offset := Vector3(randf_range(-0.6, 0.6), 1.16, 0.58) # на передний бортик крышки
 		return BINS[1] + offset.rotated(Vector3.UP, BIN_YAW)
 	if randf() < 0.5:
 		var x := randf_range(-ROOF_HALF.x + 0.5, ROOF_HALF.x - 0.5)
@@ -186,7 +186,7 @@ func _build_trash_bags() -> void:
 	var pigeon := YardPigeon.new()
 	pigeon.resident = true
 	add_child(pigeon)
-	pigeon.global_position = BINS[0] + Vector3(0.66, 1.1, 0.44).rotated(Vector3.UP, BIN_YAW)
+	pigeon.global_position = BINS[0] + Vector3(0.68, 1.12, 0.55).rotated(Vector3.UP, BIN_YAW)
 	pigeon.rotation.y = BIN_YAW + 0.4
 
 
